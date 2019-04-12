@@ -1,0 +1,9 @@
+[submodule "submodule/continuable"]
+	path = submodule/continuable
+	url = https://github.com/Naios/continuable.git
+[submodule "submodule/function2"]
+	path = submodule/function2
+	url = https://github.com/Naios/function2.git
+[submodule "submodule/CLI11"]
+	path = submodule/CLI11
+	url = https://github.com/CLIUtils/CLI11.git
