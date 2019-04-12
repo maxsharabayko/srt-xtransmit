@@ -7,9 +7,10 @@ add_subdirectory(submodule/CLI11)
 # Adds ${CLI11_SOURCE_DIR} etc.
 add_subdirectory(submodule/continuable)
 
-SET(ENABLE_APPS OFF)
+SET(ENABLE_APPS ON)
 SET(ENABLE_SHARED OFF)
 add_subdirectory(submodule/srt)
 
-
+SET(SRT_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/submodule/srt/srtcore)
+SET(SRT_UTILS_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/submodule/srt/apps)
 add_subdirectory(xtransmit)
