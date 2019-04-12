@@ -4,5 +4,6 @@ set(SOURCES
 
 add_executable(srt-xtransmit ${SOURCES})
 
-target_link_libraries(srt-xtransmit continuable CLI11::CLI11)
+include_directories(srt-xtransmit ${SRT_SRC_SRTCORE_DIR})
+target_link_libraries(srt-xtransmit continuable CLI11::CLI11 ${TARGET_srt}_static)
 

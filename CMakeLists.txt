@@ -7,5 +7,9 @@ add_subdirectory(submodule/CLI11)
 # Adds ${CLI11_SOURCE_DIR} etc.
 add_subdirectory(submodule/continuable)
 
+SET(ENABLE_APPS OFF)
+SET(ENABLE_SHARED OFF)
+add_subdirectory(submodule/srt)
+
 
 add_subdirectory(xtransmit)
