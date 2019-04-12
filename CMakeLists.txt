@@ -11,6 +11,6 @@ SET(ENABLE_APPS ON)
 SET(ENABLE_SHARED OFF)
 add_subdirectory(submodule/srt)
 
-SET(SRT_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/submodule/srt/srtcore)
+SET(SRT_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/submodule/srt/srtcore ${CMAKE_BINARY_DIR}/submodule/srt)
 SET(SRT_UTILS_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/submodule/srt/apps)
 add_subdirectory(xtransmit)
