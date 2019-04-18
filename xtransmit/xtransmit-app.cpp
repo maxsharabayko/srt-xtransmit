@@ -255,30 +255,34 @@ int main(int argc, char **argv) {
 	CLI::App app("SRT xtransmit tool.");
 	app.set_help_all_flag("--help-all", "Expand all help");
 
-    app.add_flag_function("--verbose,-v", [](size_t) { Verbose::on = true; }, "enable verbose output");
+	app.add_flag_function("--verbose,-v", [](size_t) { Verbose::on = true; }, "enable verbose output");
 
-    app.add_option("--loglevel", [](CLI::results_t val) {
-        std::cout << "This option was given " << val.size() << " times." << std::endl;
-        srt_logging::LogLevel::type lev = SrtParseLogLevel(val[0]);
-        UDT::setloglevel(lev);
-        UDT::addlogfa(SRT_LOGFA_FORWARDER);
-        Verb() << "Log level set to " << val[0];
-        return true;
-    }, "log level [debug, error, note, info, fatal]");
-
-
-    //auto loglevel = app.add_option("--loglevel", "log level [debug, error]");
+	app.add_option("--loglevel", [](CLI::results_t val) {
+		std::cout << "This option was given " << val.size() << " times." << std::endl;
+		srt_logging::LogLevel::type lev = SrtParseLogLevel(val[0]);
+		UDT::setloglevel(lev);
+		UDT::addlogfa(SRT_LOGFA_FORWARDER);
+		Verb() << "Log level set to " << val[0];
+		return true;
+	}, "log level [debug, error, note, info, fatal]");
 
 
-	CLI::App *sc_test    = app.add_subcommand("test",    "Receive/send a test content generated");
-	CLI::App *sc_file    = app.add_subcommand("file",    "Receive/send a file");
-	CLI::App *sc_folder  = app.add_subcommand("folder",  "Receive/send a folder");
-	CLI::App *sc_live    = app.add_subcommand("live",    "Receive/send a live source");
+	//auto loglevel = app.add_option("--loglevel", "log level [debug, error]");
+
+
 	CLI::App *sc_forward = app.add_subcommand("forward", "Bidirectional data forwarding");
+	string src, dst;
+	sc_forward->add_option("src", src, "Source URI");
+	sc_forward->add_option("dst", dst, "Destination URI");
+	sc_forward->add_flag("--oneway", "Forward only from SRT to DST");
 
-    string src, dst;
-    sc_forward->add_option("src", src, "Source URI");
-    sc_forward->add_option("dst", dst, "Destination URI");
+	// TODO:
+	// CLI::App* sc_echo    = app.add_subcommand("echo",    "Echo back all the packets received on the connection");
+	// CLI::App *sc_test    = app.add_subcommand("test",    "Receive/send a test content generated");
+	// CLI::App *sc_file    = app.add_subcommand("file",    "Receive/send a file");
+	// CLI::App *sc_folder  = app.add_subcommand("folder",  "Receive/send a folder");
+	// CLI::App *sc_live    = app.add_subcommand("live",    "Receive/send a live source");
+
 	app.require_subcommand(1);
 
 	//std::string file;
@@ -295,10 +299,10 @@ int main(int argc, char **argv) {
 	//for (auto subcom : app.get_subcommands())
 	//	std::cout << "Subcommand: " << subcom->get_name() << std::endl;
 
-    if (sc_forward->parsed())
-    {
-        forward(src, dst);
-    }
+	if (sc_forward->parsed())
+	{
+		forward(src, dst);
+	}
 
 	return 0;
 }
