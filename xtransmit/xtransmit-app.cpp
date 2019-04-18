@@ -299,6 +299,8 @@ int main(int argc, char **argv) {
 	//for (auto subcom : app.get_subcommands())
 	//	std::cout << "Subcommand: " << subcom->get_name() << std::endl;
 
+	// TODO: Callback for subcommands
+	// https://cliutils.gitlab.io/CLI11Tutorial/chapters/an-advanced-example.html
 	if (sc_forward->parsed())
 	{
 		forward(src, dst);
