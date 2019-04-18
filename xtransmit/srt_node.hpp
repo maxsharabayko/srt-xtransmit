@@ -9,7 +9,7 @@
 //#include "testmedia.hpp"
 #include "utilities.h"
 
-
+using namespace std;
 
 class SrtNode
 {

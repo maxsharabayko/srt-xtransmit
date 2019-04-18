@@ -205,28 +205,6 @@ int start_forwarding(const char *src_uri, const char *dst_uri)
 }
 
 
-int start_forwarding_v2(const char *src_uri, const char *dst_uri)
-{
-	// Create dst connection
-	shared_ptr<SrtNode> dst = create_node(dst_uri, true);
-	if (!dst)
-	{
-		g_applog.Error() << "ERROR! Failed to create destination node.";
-		return 1;
-	}
-
-	shared_ptr<SrtNode> src = create_node(src_uri, false);
-	if (!src)
-	{
-		g_applog.Error() << "ERROR! Failed to create source node.";
-		return 1;
-	}
-
-
-	(dst->Connect() >> src->AcceptConnection())
-		.then()
-}
-
 
 
 void print_help()
@@ -236,7 +214,7 @@ void print_help()
 }
 
 
-int main(int argc, char** argv)
+int forward(const string &src, const string &dst)
 {
 	// This is mainly required on Windows to initialize the network system,
 	// for a case when the instance would use UDP. SRT does it on its own, independently.
@@ -257,46 +235,12 @@ int main(int argc, char** argv)
 	signal(SIGINT, OnINT_ForceExit);
 	signal(SIGTERM, OnINT_ForceExit);
 
-	// Check options
-	vector<OptionScheme> optargs = {
-		{ {"ll", "loglevel"}, OptionScheme::ARG_ONE },
-	};
-	map<string, vector<string>> params = ProcessOptions(argv, argc, optargs);
-
-
-	if (params.count("-help") || params.count("-h"))
-	{
-		print_help();
-		return 1;
-	}
-
-	if (params[""].empty())
-	{
-		print_help();
-		return 1;
-	}
-
-	if (params[""].size() != 2)
-	{
-		cerr << "Extra parameter after the first one: " << Printable(params[""]) << endl;
-		print_help();
-		return 1;
-	}
-
-	const string loglevel = Option<OutString>(params, "error", "ll", "loglevel");
-	srt_logging::LogLevel::type lev = SrtParseLogLevel(loglevel);
-	UDT::setloglevel(lev);
-	UDT::addlogfa(SRT_LOGFA_FORWARDER);
-
-	if (params.count("v"))
-		Verbose::on = true;
-
 	srt_startup();
 
 	while (!interrup_break)
 	{
 		force_break = false;
-		start_forwarding(params[""][0].c_str(), params[""][1].c_str());
+		start_forwarding(src.c_str(), dst.c_str());
 	}
 
 	return 0;
@@ -311,12 +255,31 @@ int main(int argc, char **argv) {
 	CLI::App app("SRT xtransmit tool.");
 	app.set_help_all_flag("--help-all", "Expand all help");
 
+    app.add_flag_function("--verbose,-v", [](size_t) { Verbose::on = true; }, "enable verbose output");
+
+    app.add_option("--loglevel", [](CLI::results_t val) {
+        std::cout << "This option was given " << val.size() << " times." << std::endl;
+        srt_logging::LogLevel::type lev = SrtParseLogLevel(val[0]);
+        UDT::setloglevel(lev);
+        UDT::addlogfa(SRT_LOGFA_FORWARDER);
+        Verb() << "Log level set to " << val[0];
+        return true;
+    }, "log level [debug, error, note, info, fatal]");
+
+
+    //auto loglevel = app.add_option("--loglevel", "log level [debug, error]");
+
+
 	CLI::App *sc_test    = app.add_subcommand("test",    "Receive/send a test content generated");
 	CLI::App *sc_file    = app.add_subcommand("file",    "Receive/send a file");
 	CLI::App *sc_folder  = app.add_subcommand("folder",  "Receive/send a folder");
 	CLI::App *sc_live    = app.add_subcommand("live",    "Receive/send a live source");
 	CLI::App *sc_forward = app.add_subcommand("forward", "Bidirectional data forwarding");
-	app.require_subcommand(); // 1 or more
+
+    string src, dst;
+    sc_forward->add_option("src", src, "Source URI");
+    sc_forward->add_option("dst", dst, "Destination URI");
+	app.require_subcommand(1);
 
 	//std::string file;
 	//start->add_option("-f,--file", file, "File name");
@@ -329,8 +292,13 @@ int main(int argc, char **argv) {
 	//std::cout << "Working on --count from stop: " << s->count() << ", direct count: " << stop->count("--count")
 	//	<< std::endl;
 	//std::cout << "Count of --random flag: " << app.count("--random") << std::endl;
-	for (auto subcom : app.get_subcommands())
-		std::cout << "Subcommand: " << subcom->get_name() << std::endl;
+	//for (auto subcom : app.get_subcommands())
+	//	std::cout << "Subcommand: " << subcom->get_name() << std::endl;
+
+    if (sc_forward->parsed())
+    {
+        forward(src, dst);
+    }
 
 	return 0;
 }
