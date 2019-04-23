@@ -19,6 +19,8 @@
 #include "logsupport.hpp"
 #include "verbose.hpp"
 
+#include "srt_socket.hpp"
+
 
 
 using namespace std;
@@ -269,7 +271,7 @@ int main(int argc, char **argv) {
 
 	//auto loglevel = app.add_option("--loglevel", "log level [debug, error]");
 
-
+	CLI::App* sc_async   = app.add_subcommand("async",   "Check async staff");
 	CLI::App *sc_forward = app.add_subcommand("forward", "Bidirectional data forwarding");
 	string src, dst;
 	sc_forward->add_option("src", src, "Source URI");
@@ -303,8 +305,19 @@ int main(int argc, char **argv) {
 	// https://cliutils.gitlab.io/CLI11Tutorial/chapters/an-advanced-example.html
 	if (sc_forward->parsed())
 	{
-		forward(src, dst);
+		//forward(src, dst);
 	}
+
+
+	std::shared_ptr<xtransmit::srt::socket> sock = std::make_shared<xtransmit::srt::socket>(xtransmit::srt::socket());
+
+	auto sconnected = sock->async_connect();
+		
+
+	cerr << "Main\n";
+
+	sconnected.get();
+	cerr << "Connected\n";
 
 	return 0;
 }
