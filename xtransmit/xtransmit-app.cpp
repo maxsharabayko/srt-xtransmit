@@ -312,11 +312,14 @@ int main(int argc, char **argv) {
 	std::shared_ptr<xtransmit::srt::socket> sock = std::make_shared<xtransmit::srt::socket>(xtransmit::srt::socket());
 
 	auto sconnected = sock->async_connect();
-		
+
 
 	cerr << "Main\n";
 
-	sconnected.get();
+	auto socket = sconnected.get();
+	auto on_read = socket->async_read();
+
+
 	cerr << "Connected\n";
 
 	return 0;

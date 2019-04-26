@@ -51,13 +51,16 @@ public:
 
 	void listen();
 	std::future<std::shared_ptr<xtransmit::srt::socket>> async_connect();
-	//void async_accept();
+	std::future<std::shared_ptr<xtransmit::srt::socket>> async_accept();
 
 public:
 
-	void async_read(std::vector<char> &buffer);
+	std::future<std::shared_ptr<xtransmit::srt::socket>>  async_read(std::vector<char> &buffer);
 	void async_write();
 
+
+	void read();
+	void write();
 
 private:
 

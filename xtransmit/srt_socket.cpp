@@ -29,6 +29,12 @@ std::future<std::shared_ptr<xtransmit::srt::socket>> xtransmit::srt::socket::asy
 }
 
 
+std::future<std::shared_ptr<xtransmit::srt::socket>> xtransmit::srt::socket::async_read(std::vector<char>& buffer)
+{
+	return std::future<std::shared_ptr<xtransmit::srt::socket>>();
+}
+
+
 #if 0
 cti::continuable< std::shared_ptr<xtransmit::srt::socket> > xtransmit::srt::socket::async_connect()
 {
