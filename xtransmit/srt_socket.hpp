@@ -3,6 +3,7 @@
 #include <exception>
 #include <string>
 #include <vector>
+#include <map>
 
 
 #include "continuable/continuable.hpp"
@@ -52,6 +53,10 @@ public:
 	void listen();
 	std::future<std::shared_ptr<xtransmit::srt::socket>> async_connect();
 	std::future<std::shared_ptr<xtransmit::srt::socket>> async_accept();
+
+public:
+
+	void configure(const std::map<string, string> &options);
 
 public:
 

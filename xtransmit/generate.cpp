@@ -6,6 +6,7 @@
 
 
 using namespace std;
+using socket_ptr = std::shared_ptr<xtransmit::srt::socket>;
 
 //std::vector<std::future<void>> accepting_threads;
 
@@ -18,11 +19,11 @@ struct generate_config
 };
 
 
-void generate(std::shared_ptr<xtransmit::srt::socket> dst, const generate_config &cfg,
-	const volatile std::atomic_bool& force_break)
+void generate(socket_ptr dst, const generate_config &cfg,
+	const atomic_bool& force_break)
 {
 	// 1. Wait for acccept
-	auto s_accepted = s->async_accept();
+	//auto s_accepted = dst->async_accept();
 	// catch exception (error)
 
 	// if ok start another async_accept
@@ -34,12 +35,11 @@ void generate(std::shared_ptr<xtransmit::srt::socket> dst, const generate_config
 
 	auto time_prev = chrono::steady_clock::now();
 	long time_dev_us = 0;
-	const long msgs_per_sec = static_cast<long long>(cfg.bitrate / 8) / cfg.message_size;
-	const long msg_interval_us = 1000000 / msgs_per_sec;
+	const long msgs_per_s = static_cast<long long>(cfg.bitrate / 8) / cfg.message_size;
+	const long msg_interval_us = msgs_per_s ? 1000000 / msgs_per_s : 0;
 
-	for (int i = 0; i < cfg.num_messages; ++i)
+	for (int i = 0; (i < cfg.num_messages) && !force_break; ++i)
 	{
-
 		if (cfg.bitrate)
 		{
 			const long duration_us = time_dev_us > msg_interval_us ? 0 : (msg_interval_us - time_dev_us);
@@ -58,9 +58,25 @@ void generate(std::shared_ptr<xtransmit::srt::socket> dst, const generate_config
 			time_prev = time_now;
 		}
 
-		//dst->write();
+		dst->write();
 	}
 }
 
 
+
+
+void start_generator(future<socket_ptr> &connection, const generate_config& cfg,
+	const atomic_bool& force_break)
+{
+	const socket_ptr sock = connection.get();
+
+	generate(sock, cfg, force_break);
+}
+
+
+
+void establish_connection()
+{
+
+}
 
