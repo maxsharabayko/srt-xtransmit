@@ -45,7 +45,7 @@ class socket
 	: public std::enable_shared_from_this<socket>
 {
 	using string			= std::string;
-	using srt_socket_ptr	= shared_ptr<socket>;
+	using shared_socket		= std::shared_ptr<socket>;
 
 public:
 
@@ -56,12 +56,12 @@ public:
 public:
 
 	void listen();
-	std::future<std::shared_ptr<socket>>	async_connect();
-	std::future<std::shared_ptr<socket>>	async_accept();
+	std::future<shared_socket>	async_connect();
+	std::future<shared_socket>	async_accept();
 
-	srt_socket_ptr							connect();
+	shared_socket				connect();
 
-	std::future<std::shared_ptr<socket>> async_establish(bool is_caller);
+	std::future<shared_socket> async_establish(bool is_caller);
 
 public:
 
@@ -72,12 +72,12 @@ public:
 
 public:
 
-	std::future<std::shared_ptr<xtransmit::srt::socket>>  async_read(std::vector<char> &buffer);
+	std::future<shared_socket>  async_read(std::vector<char> &buffer);
 	void async_write();
 
 
 	void read();
-	void write();
+	int  write(const std::vector<char>& buffer);
 
 
 private:

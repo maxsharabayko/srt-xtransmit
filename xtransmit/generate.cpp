@@ -5,6 +5,7 @@
 #include <memory>
 #include <vector>
 #include "srt_socket.hpp"
+#include "generate.hpp"
 
 
 // OpenSRT
@@ -14,21 +15,18 @@
 
 
 using namespace std;
-using srt_socket = xtransmit::srt::socket;
-using socket_ptr = std::shared_ptr<xtransmit::srt::socket>;
+using namespace xtransmit;
+using namespace xtransmit::generate;
+
+using shared_srt_socket = std::shared_ptr<srt::socket>;
+
 
 //std::vector<std::future<void>> accepting_threads;
 
 
-struct generate_config
-{
-	int bitrate;
-	int num_messages;
-	int message_size;
-};
 
 
-void generate(socket_ptr dst, const generate_config &cfg,
+void run(shared_srt_socket dst, const config &cfg,
 	const atomic_bool& force_break)
 {
 	// 1. Wait for acccept
@@ -40,7 +38,14 @@ void generate(socket_ptr dst, const generate_config &cfg,
 	//	async(std::launch::async, &async_accept, s)
 	//);
 
-	
+	vector<char> message_to_send(cfg.message_size);
+	std::generate(message_to_send.begin(), message_to_send.end(), [c = 0]() mutable { return c++; });
+
+	//char c = 0;
+	//for (size_t i = 0; i < message_to_send.size(); ++i)
+	//{
+	//	message_to_send[i] = c++;
+	//}
 
 	auto time_prev = chrono::steady_clock::now();
 	long time_dev_us = 0;
@@ -67,43 +72,37 @@ void generate(socket_ptr dst, const generate_config &cfg,
 			time_prev = time_now;
 		}
 
-		dst->write();
+		dst->write(message_to_send);
 	}
 }
 
 
 
 
-void start_generator(future<socket_ptr> &connection, const generate_config& cfg,
+void start_generator(future<shared_srt_socket> &connection, const config& cfg,
 	const atomic_bool& force_break)
 {
-	const socket_ptr sock = connection.get();
+	try {
+		const shared_srt_socket sock = connection.get();
+		run(sock, cfg, force_break);
+	}
+	catch (const srt::socket_exception & e)
+	{
+		std::cerr << e.what();
+		return;
+	}
 
-	generate(sock, cfg, force_break);
 }
 
 
 
-void establish_connection()
+
+void xtransmit::generate::generate_main(const string& dst_url, const config& cfg,
+	const atomic_bool& force_break)
 {
-
-}
-
-
-socket_ptr create_connection(const char* uri, bool is_caller)
-{
-	UriParser urlp(uri);
-
-	socket_ptr socket = make_shared<srt_socket>(urlp);
-
-	return socket;
-}
-
-
-
-void generate_main(const string& dst_url)
-{
-	socket_ptr socket = make_shared<srt_socket>(UriParser(dst_url));
+	shared_srt_socket socket = make_shared<srt::socket>(UriParser(dst_url));
+	//socket->connect();
+	start_generator(socket->async_connect(), cfg, force_break);
 
 }
 

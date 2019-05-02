@@ -22,6 +22,11 @@
 #include "srt_socket.hpp"
 
 
+#include "generate.hpp"
+
+
+
+
 
 using namespace std;
 
@@ -33,8 +38,8 @@ srt_logging::Logger g_applog(SRT_LOGFA_FORWARDER, srt_logger_config, "SRT.fwd");
 
 const size_t s_message_size = 8 * 1024 * 1024;
 
-volatile atomic_bool force_break(false);
-volatile atomic_bool interrup_break(false);
+atomic_bool force_break(false);
+atomic_bool interrup_break(false);
 
 
 void OnINT_ForceExit(int)
@@ -278,6 +283,21 @@ int main(int argc, char **argv) {
 	sc_forward->add_option("dst", dst, "Destination URI");
 	sc_forward->add_flag("--oneway", "Forward only from SRT to DST");
 
+	/*{ {"reply"}, OptionScheme::ARG_ONE },
+	{ {"printmsg"},       OptionScheme::ARG_ONE },
+	{ {"ll", "loglevel"}, OptionScheme::ARG_ONE },
+	{ {"statsfile"},      OptionScheme::ARG_ONE },
+	{ {"statsfreq"},      OptionScheme::ARG_ONE },
+	{ {"repeat"},         OptionScheme::ARG_ONE },
+	{ {"bitrate"},        OptionScheme::ARG_ONE },
+	{ {"msgsize"},        OptionScheme::ARG_ONE },*/
+
+	xtransmit::generate::config cfg_generate;
+	CLI::App* sc_generate = app.add_subcommand("generate", "Send generated data");
+	sc_generate->add_option("dst", dst, "Destination URI");
+	sc_generate->add_option("msgsize", cfg_generate.message_size, "Destination URI");
+	sc_generate->add_flag("--twoway", "Both send and receive data");
+
 	// TODO:
 	// CLI::App* sc_echo    = app.add_subcommand("echo",    "Echo back all the packets received on the connection");
 	// CLI::App *sc_test    = app.add_subcommand("test",    "Receive/send a test content generated");
@@ -307,20 +327,21 @@ int main(int argc, char **argv) {
 	{
 		//forward(src, dst);
 	}
+	else if (sc_generate->parsed())
+	{
+		xtransmit::generate::generate_main(dst, cfg_generate, force_break);
+		return 0;
+	}
+	else
+	{
 
+		//std::shared_ptr<xtransmit::srt::socket> sock = std::make_shared<xtransmit::srt::socket>();
 
-	std::shared_ptr<xtransmit::srt::socket> sock = std::make_shared<xtransmit::srt::socket>(xtransmit::srt::socket());
-
-	auto sconnected = sock->async_connect();
-
-
-	cerr << "Main\n";
-
-	auto socket = sconnected.get();
-	auto on_read = socket->async_read();
-
-
-	cerr << "Connected\n";
+		/*auto sconnected = sock->async_connect();
+		cerr << "Main\n";
+		auto socket = sconnected.get();
+		cerr << "Connected\n";*/
+	}
 
 	return 0;
 }

@@ -12,12 +12,12 @@
 
 
 using namespace std;
-using srt_socket     = xtransmit::srt::socket;
-using srt_socket_ptr = shared_ptr<srt_socket>;
+using namespace xtransmit;
+using shared_socket  = shared_ptr<srt::socket>;
 
 
 
-xtransmit::srt::socket::socket(const UriParser& src_uri)
+srt::socket::socket(const UriParser& src_uri)
 	: m_host(src_uri.host())
 	, m_port(src_uri.portno())
 	, m_options(src_uri.parameters())
@@ -31,6 +31,17 @@ xtransmit::srt::socket::socket(const UriParser& src_uri)
 		m_blocking_mode = !false_names.count(m_options.at("blocking"));
 		m_options.erase("blocking");
 	}
+
+	if (!m_blocking_mode)
+	{
+		m_epoll_connect = srt_epoll_create();
+		if (m_epoll_connect == -1)
+			throw socket_exception(srt_getlasterror_str());
+
+		int modes = SRT_EPOLL_OUT;
+		if (SRT_ERROR == srt_epoll_add_usock(m_epoll_connect, m_bind_socket, &modes))
+			throw socket_exception(srt_getlasterror_str());
+	}
 }
 
 
@@ -42,7 +53,7 @@ void xtransmit::srt::socket::listen()
 
 
 
-void srt_socket::raise_exception(UDT::ERRORINFO& udt_error, const string&& src)
+void srt::socket::raise_exception(UDT::ERRORINFO& udt_error, const string&& src)
 {
 	const int udt_result = udt_error.getErrorCode();
 	const string message = udt_error.getErrorMessage();
@@ -54,7 +65,7 @@ void srt_socket::raise_exception(UDT::ERRORINFO& udt_error, const string&& src)
 
 
 
-srt_socket_ptr srt_socket::connect()
+shared_socket srt::socket::connect()
 {
 	sockaddr_in sa = CreateAddrInet(m_host, m_port);
 	sockaddr* psa = (sockaddr*)& sa;
@@ -94,7 +105,7 @@ srt_socket_ptr srt_socket::connect()
 
 
 
-std::future<srt_socket_ptr> srt_socket::async_connect()
+std::future<shared_socket> srt::socket::async_connect()
 {
 	auto self = shared_from_this();
 
@@ -106,15 +117,17 @@ std::future<srt_socket_ptr> srt_socket::async_connect()
 }
 
 
-std::future<std::shared_ptr<xtransmit::srt::socket>> xtransmit::srt::socket::async_read(std::vector<char>& buffer)
+std::future<shared_socket> srt::socket::async_read(std::vector<char>& buffer)
 {
-	return std::future<std::shared_ptr<xtransmit::srt::socket>>();
+	return std::future<shared_socket>();
 }
 
 
 
-std::future<srt_socket_ptr> srt_socket::async_establish(bool is_caller)
+std::future<shared_socket> srt::socket::async_establish(bool is_caller)
 {
+	return std::future<shared_socket>();
+#if 0
 	m_bind_socket = srt_create_socket();
 
 	if (m_bind_socket == SRT_INVALID_SOCK)
@@ -185,6 +198,7 @@ std::future<srt_socket_ptr> srt_socket::async_establish(bool is_caller)
 	}
 
 	return 0;
+#endif
 }
 
 
@@ -250,6 +264,14 @@ int xtransmit::srt::socket::configure_post(SRTSOCKET sock)
 	}
 
 	return 0;
+}
+
+
+
+int xtransmit::srt::socket::write(const vector<char> &buffer)
+{
+	// TODO: check m_blocking_mode
+	return srt_sendmsg(m_bind_socket, buffer.data(), (int)buffer.size(), -1, true);
 }
 
 
