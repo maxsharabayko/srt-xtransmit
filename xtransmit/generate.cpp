@@ -1,11 +1,20 @@
 #pragma once
+#include <atomic>
+#include <chrono>
+#include <future>
 #include <memory>
 #include <vector>
 #include "srt_socket.hpp"
 
 
+// OpenSRT
+#include "apputil.hpp"
+#include "uriparser.hpp"
+
+
 
 using namespace std;
+using srt_socket = xtransmit::srt::socket;
 using socket_ptr = std::shared_ptr<xtransmit::srt::socket>;
 
 //std::vector<std::future<void>> accepting_threads;
@@ -77,6 +86,24 @@ void start_generator(future<socket_ptr> &connection, const generate_config& cfg,
 
 void establish_connection()
 {
+
+}
+
+
+socket_ptr create_connection(const char* uri, bool is_caller)
+{
+	UriParser urlp(uri);
+
+	socket_ptr socket = make_shared<srt_socket>(urlp);
+
+	return socket;
+}
+
+
+
+void generate_main(const string& dst_url)
+{
+	socket_ptr socket = make_shared<srt_socket>(UriParser(dst_url));
 
 }
 
