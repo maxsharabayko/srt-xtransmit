@@ -295,7 +295,9 @@ int main(int argc, char **argv) {
 	xtransmit::generate::config cfg_generate;
 	CLI::App* sc_generate = app.add_subcommand("generate", "Send generated data");
 	sc_generate->add_option("dst", dst, "Destination URI");
-	sc_generate->add_option("msgsize", cfg_generate.message_size, "Destination URI");
+	sc_generate->add_option("--msgsize", cfg_generate.message_size, "Destination URI");
+	sc_generate->add_option("--bitrate", cfg_generate.bitrate, "Bitrate to generate");
+	sc_generate->add_option("--num", cfg_generate.num_messages, "Number of messages to send (-1 for infinite)");
 	sc_generate->add_flag("--twoway", "Both send and receive data");
 
 	// TODO:
@@ -313,6 +315,28 @@ int main(int argc, char **argv) {
 	//CLI::Option *s = stop->add_flag("-c,--count", "Counter");
 
 	CLI11_PARSE(app, argc, argv);
+
+
+	// This is mainly required on Windows to initialize the network system,
+	// for a case when the instance would use UDP. SRT does it on its own, independently.
+	if (!SysInitializeNetwork())
+		throw std::runtime_error("Can't initialize network!");
+
+	// Symmetrically, this does a cleanup; put into a local destructor to ensure that
+	// it's called regardless of how this function returns.
+	struct NetworkCleanup
+	{
+		~NetworkCleanup()
+		{
+			SysCleanupNetwork();
+		}
+	} cleanupobj;
+
+
+	signal(SIGINT, OnINT_ForceExit);
+	signal(SIGTERM, OnINT_ForceExit);
+
+	srt_startup();
 
 	//std::cout << "Working on --file from start: " << file << std::endl;
 	//std::cout << "Working on --count from stop: " << s->count() << ", direct count: " << stop->count("--count")

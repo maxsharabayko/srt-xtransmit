@@ -41,18 +41,13 @@ void run(shared_srt_socket dst, const config &cfg,
 	vector<char> message_to_send(cfg.message_size);
 	std::generate(message_to_send.begin(), message_to_send.end(), [c = 0]() mutable { return c++; });
 
-	//char c = 0;
-	//for (size_t i = 0; i < message_to_send.size(); ++i)
-	//{
-	//	message_to_send[i] = c++;
-	//}
-
 	auto time_prev = chrono::steady_clock::now();
 	long time_dev_us = 0;
 	const long msgs_per_s = static_cast<long long>(cfg.bitrate / 8) / cfg.message_size;
 	const long msg_interval_us = msgs_per_s ? 1000000 / msgs_per_s : 0;
 
-	for (int i = 0; (i < cfg.num_messages) && !force_break; ++i)
+
+	for (int i = 0; (cfg.num_messages < 0 || i < cfg.num_messages) && !force_break; ++i)
 	{
 		if (cfg.bitrate)
 		{
