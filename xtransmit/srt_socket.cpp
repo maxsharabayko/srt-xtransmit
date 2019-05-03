@@ -42,6 +42,9 @@ srt::socket::socket(const UriParser& src_uri)
 		if (SRT_ERROR == srt_epoll_add_usock(m_epoll_connect, m_bind_socket, &modes))
 			throw socket_exception(srt_getlasterror_str());
 	}
+
+	if (SRT_SUCCESS != configure_pre(m_bind_socket))
+		throw socket_exception(srt_getlasterror_str());
 }
 
 
