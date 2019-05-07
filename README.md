@@ -11,7 +11,10 @@ mkdir _build && cd _build
 cmake ../
 cmake --build ./
 ```
-
+## Example on Windows
+```
+cmake ../ -G "Visual Studio 15 2017 Win64" -DPTHREAD_INCLUDE_DIR=C:\pthread-x64\include -DPTHREAD_LIBRARY=C:\pthread-x64\lib\pthread_lib.lib
+```
 
 
 # BOOST
