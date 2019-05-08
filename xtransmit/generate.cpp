@@ -3,6 +3,7 @@
 #include <chrono>
 #include <future>
 #include <memory>
+#include <thread>
 #include <vector>
 #include "srt_socket.hpp"
 #include "generate.hpp"
@@ -24,6 +25,58 @@ using shared_srt_socket = std::shared_ptr<srt::socket>;
 //std::vector<std::future<void>> accepting_threads;
 
 
+static void PrintSrtStats(int sid, const SRT_TRACEBSTATS& mon, ostream& out, bool print_header)
+{
+	std::ostringstream output;
+
+	if (print_header)
+	{
+		output << "Time,SocketID,pktFlowWindow,pktCongestionWindow,pktFlightSize,";
+		output << "msRTT,mbpsBandwidth,mbpsMaxBW,pktSent,pktSndLoss,pktSndDrop,";
+		output << "pktRetrans,byteSent,byteSndDrop,mbpsSendRate,usPktSndPeriod,";
+		output << "pktRecv,pktRcvLoss,pktRcvDrop,pktRcvRetrans,pktRcvBelated,";
+		output << "byteRecv,byteRcvLoss,byteRcvDrop,mbpsRecvRate,msRcvTsbPdDelay";
+		output << endl;
+		return;
+	}
+
+	output << mon.msTimeStamp << ",";
+	output << sid << ",";
+	output << mon.pktFlowWindow << ",";
+	output << mon.pktCongestionWindow << ",";
+	output << mon.pktFlightSize << ",";
+
+	output << mon.msRTT << ",";
+	output << mon.mbpsBandwidth << ",";
+	output << mon.mbpsMaxBW << ",";
+	output << mon.pktSent << ",";
+	output << mon.pktSndLoss << ",";
+	output << mon.pktSndDrop << ",";
+
+	output << mon.pktRetrans << ",";
+	output << mon.byteSent << ",";
+	output << mon.byteSndDrop << ",";
+	output << mon.mbpsSendRate << ",";
+	output << mon.usPktSndPeriod << ",";
+
+	output << mon.pktRecv << ",";
+	output << mon.pktRcvLoss << ",";
+	output << mon.pktRcvDrop << ",";
+	output << mon.pktRcvRetrans << ",";
+	output << mon.pktRcvBelated << ",";
+
+	output << mon.byteRecv << ",";
+	output << mon.byteRcvLoss << ",";
+	output << mon.byteRcvDrop << ",";
+	output << mon.mbpsRecvRate << ",";
+	output << mon.msRcvTsbPdDelay;
+
+	output << endl;
+
+	out << output.str() << std::flush;
+}
+
+
 
 
 void run(shared_srt_socket dst, const config &cfg,
@@ -37,6 +90,25 @@ void run(shared_srt_socket dst, const config &cfg,
 	//accepting_threads.push_back(
 	//	async(std::launch::async, &async_accept, s)
 	//);
+
+	auto stats_func = [&cfg, &force_break](shared_srt_socket sock)
+	{
+		if (cfg.stats_freq == chrono::milliseconds(0))
+			return;
+
+		SRT_TRACEBSTATS stats;
+		PrintSrtStats(-1, stats, out_stats, true)
+
+		while (!force_break)
+		{
+			this_thread::sleep_for(cfg.stats_freq);
+
+			if (-1 == sock->statistics(stats))
+				break;
+
+			PrintSrtStats(-1, stats, out_stats, false);
+		}
+	};
 
 	vector<char> message_to_send(cfg.message_size);
 	std::generate(message_to_send.begin(), message_to_send.end(), [c = 0]() mutable { return c++; });

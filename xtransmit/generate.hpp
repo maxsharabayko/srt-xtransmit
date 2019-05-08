@@ -8,9 +8,11 @@ namespace generate {
 
 	struct config
 	{
-		int bitrate			= 0;
-		int num_messages	= 60;
-		int message_size = 1316;////8 * 1024 * 1024;
+		int bitrate						= 0;
+		int num_messages				= 60;
+		int message_size				= 1316; ////8 * 1024 * 1024;
+		chrono::milliseconds stats_freq = chrono::milliseconds(0);
+		ostream& stats_out;
 	};
 
 

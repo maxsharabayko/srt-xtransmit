@@ -291,6 +291,12 @@ int xtransmit::srt::socket::write(const vector<char> &buffer)
 }
 
 
+int xtransmit::srt::socket::statistics(SRT_TRACEBSTATS& stats)
+{
+	return srt_bstats(m_bind_socket, &stats, true);
+}
+
+
 #if 0
 cti::continuable< std::shared_ptr<xtransmit::srt::socket> > xtransmit::srt::socket::async_connect()
 {

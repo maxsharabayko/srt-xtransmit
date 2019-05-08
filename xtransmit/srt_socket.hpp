@@ -80,6 +80,11 @@ public:
 	int  write(const std::vector<char>& buffer);
 
 
+public:
+
+	int statistics(SRT_TRACEBSTATS &stats);
+
+
 private:
 
 	static void raise_exception(UDT::ERRORINFO& udt_error, const string&& src);
