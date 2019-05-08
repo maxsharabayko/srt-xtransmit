@@ -41,6 +41,10 @@ srt::socket::socket(const UriParser& src_uri)
 		int modes = SRT_EPOLL_OUT;
 		if (SRT_ERROR == srt_epoll_add_usock(m_epoll_connect, m_bind_socket, &modes))
 			throw socket_exception(srt_getlasterror_str());
+
+		modes = SRT_EPOLL_IN | SRT_EPOLL_OUT;
+		if (SRT_ERROR == srt_epoll_add_usock(m_epoll_io, m_bind_socket, &modes))
+			throw socket_exception(srt_getlasterror_str());
 	}
 
 	if (SRT_SUCCESS != configure_pre(m_bind_socket))
@@ -273,8 +277,17 @@ int xtransmit::srt::socket::configure_post(SRTSOCKET sock)
 
 int xtransmit::srt::socket::write(const vector<char> &buffer)
 {
-	// TODO: check m_blocking_mode
-	return srt_sendmsg(m_bind_socket, buffer.data(), (int)buffer.size(), -1, true);
+	// Check first if it's ready to write.
+	// If not, wait indefinitely.
+	if (!m_blocking_mode)
+	{
+		int ready[2];
+		int len = 2;
+		if (srt_epoll_wait(m_epoll_io, 0, 0, ready, &len, -1, 0, 0, 0, 0) == SRT_ERROR)
+			raise_exception(UDT::getlasterror(), "socket::write");
+	}
+
+	return srt_sendmsg2(m_bind_socket, buffer.data(), (int)buffer.size(), nullptr);
 }
 
 

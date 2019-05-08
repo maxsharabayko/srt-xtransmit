@@ -86,8 +86,9 @@ private:
 
 private:
 
-	int m_bind_socket    = SRT_INVALID_SOCK;
-	int m_epoll_connect  = -1;
+	int m_bind_socket	= SRT_INVALID_SOCK;
+	int m_epoll_connect	= -1;
+	int m_epoll_io		= -1;
 
 	bool m_blocking_mode = false;
 	string m_host;
