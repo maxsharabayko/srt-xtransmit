@@ -16,6 +16,18 @@ cmake --build ./
 cmake ../ -G "Visual Studio 15 2017 Win64" -DPTHREAD_INCLUDE_DIR=C:\pthread-x64\include -DPTHREAD_LIBRARY=C:\pthread-x64\lib\pthread_lib.lib
 ```
 
+# Example Usage
+
+**Send:**
+```
+srt-xtransmit generate "srt://127.0.0.1:4200?transtype=live&messageapi=1&payloadsize=1456" --msgsize 1456 --num -1 --bitrate 6000000
+```
+
+**Receive**
+```
+srt-test-messaging "srt://:4200?rcvbuf=12058624&smoother=live" -reply 0 -msgsize 1456 -printmsg 1
+```
+
 
 # BOOST
 
