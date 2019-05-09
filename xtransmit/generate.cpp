@@ -93,22 +93,34 @@ void run(shared_srt_socket dst, const config &cfg,
 
 	auto stats_func = [&cfg, &force_break](shared_srt_socket sock)
 	{
-		if (cfg.stats_freq == chrono::milliseconds(0))
+		if (cfg.stats_freq_ms == 0)
+			return;
+		if (cfg.stats_file.empty())
 			return;
 
-		SRT_TRACEBSTATS stats;
-		PrintSrtStats(-1, stats, out_stats, true)
+		ofstream logfile_stats(cfg.stats_file.c_str());
+		if (!logfile_stats)
+		{
+			cerr << "ERROR: Can't open '" << cfg.stats_file << "' for writing stats. No output.\n";
+			return;
+		}
 
+		SRT_TRACEBSTATS stats;
+		PrintSrtStats(-1, stats, logfile_stats, true);
+
+		const chrono::milliseconds interval(cfg.stats_freq_ms);
 		while (!force_break)
 		{
-			this_thread::sleep_for(cfg.stats_freq);
+			this_thread::sleep_for(interval);
 
 			if (-1 == sock->statistics(stats))
 				break;
 
-			PrintSrtStats(-1, stats, out_stats, false);
+			PrintSrtStats(-1, stats, logfile_stats, false);
 		}
 	};
+
+	auto stats_logger = async(launch::async, stats_func, dst);
 
 	vector<char> message_to_send(cfg.message_size);
 	std::generate(message_to_send.begin(), message_to_send.end(), [c = 0]() mutable { return c++; });
@@ -141,6 +153,10 @@ void run(shared_srt_socket dst, const config &cfg,
 
 		dst->write(message_to_send);
 	}
+
+
+	stats_logger.wait();
+
 }
 
 

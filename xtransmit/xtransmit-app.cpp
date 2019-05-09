@@ -274,8 +274,6 @@ int main(int argc, char **argv) {
 	}, "log level [debug, error, note, info, fatal]");
 
 
-	//auto loglevel = app.add_option("--loglevel", "log level [debug, error]");
-
 	CLI::App* sc_async   = app.add_subcommand("async",   "Check async staff");
 	CLI::App *sc_forward = app.add_subcommand("forward", "Bidirectional data forwarding");
 	string src, dst;
@@ -298,6 +296,8 @@ int main(int argc, char **argv) {
 	sc_generate->add_option("--msgsize", cfg_generate.message_size, "Destination URI");
 	sc_generate->add_option("--bitrate", cfg_generate.bitrate, "Bitrate to generate");
 	sc_generate->add_option("--num", cfg_generate.num_messages, "Number of messages to send (-1 for infinite)");
+	sc_generate->add_option("--statsfile", cfg_generate.stats_file, "output stats report filename");
+	sc_generate->add_option("--statsfreq", cfg_generate.stats_freq_ms, "output stats report frequency (ms)");
 	sc_generate->add_flag("--twoway", "Both send and receive data");
 
 	// TODO:

@@ -1,5 +1,6 @@
 #pragma once
 #include <atomic>
+#include <chrono>
 #include <string>
 
 
@@ -11,8 +12,8 @@ namespace generate {
 		int bitrate						= 0;
 		int num_messages				= 60;
 		int message_size				= 1316; ////8 * 1024 * 1024;
-		chrono::milliseconds stats_freq = chrono::milliseconds(0);
-		ostream& stats_out;
+		int stats_freq_ms				= 0;
+		std::string stats_file;
 	};
 
 
