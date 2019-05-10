@@ -82,16 +82,9 @@ static void PrintSrtStats(int sid, const SRT_TRACEBSTATS& mon, ostream& out, boo
 void run(shared_srt_socket dst, const config &cfg,
 	const atomic_bool& force_break)
 {
-	// 1. Wait for acccept
-	//auto s_accepted = dst->async_accept();
-	// catch exception (error)
+	atomic_bool local_break = false;
 
-	// if ok start another async_accept
-	//accepting_threads.push_back(
-	//	async(std::launch::async, &async_accept, s)
-	//);
-
-	auto stats_func = [&cfg, &force_break](shared_srt_socket sock)
+	auto stats_func = [&cfg, &force_break, &local_break](shared_srt_socket sock)
 	{
 		if (cfg.stats_freq_ms == 0)
 			return;
@@ -109,7 +102,7 @@ void run(shared_srt_socket dst, const config &cfg,
 		PrintSrtStats(-1, stats, logfile_stats, true);
 
 		const chrono::milliseconds interval(cfg.stats_freq_ms);
-		while (!force_break)
+		while (!force_break && !local_break)
 		{
 			this_thread::sleep_for(interval);
 
@@ -154,7 +147,7 @@ void run(shared_srt_socket dst, const config &cfg,
 		dst->write(message_to_send);
 	}
 
-
+	local_break = true;
 	stats_logger.wait();
 
 }
