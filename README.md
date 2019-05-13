@@ -28,6 +28,10 @@ srt-xtransmit generate "srt://127.0.0.1:4200?transtype=live&messageapi=1&payload
 srt-test-messaging "srt://:4200?rcvbuf=12058624&smoother=live" -reply 0 -msgsize 1456 -printmsg 1
 ```
 
+```
+receive "srt://:4200?transtype=live&messageapi=1&payloadsize=1456" --msgsize 1456
+```
+
 
 # BOOST
 

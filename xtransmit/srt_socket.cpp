@@ -53,10 +53,92 @@ srt::socket::socket(const UriParser& src_uri)
 }
 
 
+xtransmit::srt::socket::socket(const int sock, bool blocking)
+	: m_bind_socket(sock)
+	, m_blocking_mode(blocking)
+{
+	if (!m_blocking_mode)
+	{
+		m_epoll_io = srt_epoll_create();
+		int modes = SRT_EPOLL_IN | SRT_EPOLL_OUT;
+		if (SRT_ERROR == srt_epoll_add_usock(m_epoll_io, m_bind_socket, &modes))
+			throw socket_exception(srt_getlasterror_str());
+	}
+}
+
+
+xtransmit::srt::socket::~socket()
+{
+	srt_close(m_bind_socket);
+}
+
+
 void xtransmit::srt::socket::listen()
 {
+	int num_clients = 2;
+	sockaddr_in sa = CreateAddrInet(m_host, m_port);
+	sockaddr* psa = (sockaddr*)& sa;
+	Verb() << "Binding a server on " << m_host << ":" << m_port << " ..." << VerbNoEOL;
+	int res = srt_bind(m_bind_socket, psa, sizeof sa);
+	if (res == SRT_ERROR)
+	{
+		srt_close(m_bind_socket);
+		raise_exception(UDT::getlasterror(), "srt_bind");
+	}
+
+	res = srt_listen(m_bind_socket, num_clients);
+	if (res == SRT_ERROR)
+	{
+		srt_close(m_bind_socket);
+		raise_exception(UDT::getlasterror(), "srt_listen");
+	}
 
 
+	Verb() << " connected.";
+	res = configure_post(m_bind_socket);
+	if (res == SRT_ERROR)
+		raise_exception(UDT::getlasterror(), "configure_post");
+
+}
+
+
+shared_socket xtransmit::srt::socket::accept()
+{
+	sockaddr_in scl;
+	int sclen = sizeof scl;
+
+	// Wait for REAL connected state if nonblocking mode
+	if (!m_blocking_mode)
+	{
+		Verb() << "[ASYNC] " << VerbNoEOL;
+
+		// Socket readiness for connection is checked by polling on WRITE allowed sockets.
+		int len = 2;
+		SRTSOCKET ready[2];
+		if (srt_epoll_wait(m_epoll_connect, 0, 0, ready, &len, -1, 0, 0, 0, 0) == -1)
+			raise_exception(UDT::getlasterror(), "srt_epoll_wait");
+
+		Verb() << "[EPOLL: " << len << " sockets] " << VerbNoEOL;
+	}
+
+	SRTSOCKET sock = srt_accept(m_bind_socket, (sockaddr*)& scl, &sclen);
+	if (sock == SRT_INVALID_SOCK)
+	{
+		raise_exception(UDT::getlasterror(), "srt_accept");
+	}
+
+	// we do one client connection at a time,
+	// so close the listener.
+	//srt_close(m_bindsock);
+	//m_bindsock = SRT_INVALID_SOCK;
+
+	Verb() << " connected.";
+
+	int res = configure_post(sock);
+	if (res == SRT_ERROR)
+		raise_exception(UDT::getlasterror(), "configure_post");
+
+	return make_shared<socket>(sock, m_blocking_mode);
 }
 
 
@@ -122,6 +204,17 @@ std::future<shared_socket> srt::socket::async_connect()
 		});
 
 	//return async(std::launch::async, [self]() {std::this_thread::sleep_for(std::chrono::seconds(1)); return self; });
+}
+
+
+std::future<shared_socket> srt::socket::async_accept()
+{
+	listen();
+	auto self = shared_from_this();
+
+	return async(std::launch::async, [self]() {
+		return self->accept();
+		});
 }
 
 

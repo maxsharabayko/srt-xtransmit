@@ -51,15 +51,21 @@ public:
 
 	socket(const UriParser& src_uri);
 
-	//~socket();
+	~socket();
+
+
+private:
+
+	socket(const int sock, bool blocking);
 
 public:
 
-	void listen();
 	std::future<shared_socket>	async_connect();
 	std::future<shared_socket>	async_accept();
 
 	shared_socket				connect();
+	shared_socket				accept();
+	void						listen();
 
 	std::future<shared_socket> async_establish(bool is_caller);
 
