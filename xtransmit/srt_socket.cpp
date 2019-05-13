@@ -275,26 +275,100 @@ int xtransmit::srt::socket::configure_post(SRTSOCKET sock)
 }
 
 
-
-int xtransmit::srt::socket::write(const vector<char> &buffer)
+void xtransmit::srt::socket::read(std::vector<char>& buffer, int timeout_ms)
 {
-	// Check first if it's ready to write.
-	// If not, wait indefinitely.
 	if (!m_blocking_mode)
 	{
-		int ready[2];
+		// TODO: check error fds
+		int ready[2] = { SRT_INVALID_SOCK, SRT_INVALID_SOCK };
 		int len = 2;
-		if (srt_epoll_wait(m_epoll_io, 0, 0, ready, &len, -1, 0, 0, 0, 0) == SRT_ERROR)
-			raise_exception(UDT::getlasterror(), "socket::write");
+		if (srt_epoll_wait(m_epoll_io, ready, &len, 0, 0, timeout_ms, 0, 0, 0, 0) == SRT_ERROR)
+			raise_exception(UDT::getlasterror(), "socket::read::epoll");
 	}
 
-	return srt_sendmsg2(m_bind_socket, buffer.data(), (int)buffer.size(), nullptr);
+	const int res = srt_recvmsg2(m_bind_socket, buffer.data(), (int)buffer.size(), nullptr);
+	if (SRT_ERROR == res)
+		raise_exception(UDT::getlasterror(), "socket::read::send");
+
+	buffer.resize(res);
+}
+
+
+void xtransmit::srt::socket::write(const vector<char> &buffer, int timeout_ms)
+{
+	if (!m_blocking_mode)
+	{
+		// TODO: check error fds
+		int ready[2] = { SRT_INVALID_SOCK, SRT_INVALID_SOCK };
+		int len = 2;
+		if (srt_epoll_wait(m_epoll_io, 0, 0, ready, &len, timeout_ms, 0, 0, 0, 0) == SRT_ERROR)
+			raise_exception(UDT::getlasterror(), "socket::write::epoll");
+	}
+
+	if (SRT_ERROR == srt_sendmsg2(m_bind_socket, buffer.data(), (int)buffer.size(), nullptr))
+		raise_exception(UDT::getlasterror(), "socket::write::send");
 }
 
 
 int xtransmit::srt::socket::statistics(SRT_TRACEBSTATS& stats)
 {
 	return srt_bstats(m_bind_socket, &stats, true);
+}
+
+
+
+const string xtransmit::srt::socket::statistics_csv(bool print_header)
+{
+	SRT_TRACEBSTATS stats;
+	if (SRT_ERROR == srt_bstats(m_bind_socket, &stats, true))
+		raise_exception(UDT::getlasterror(), "socket::statistics");
+
+	std::ostringstream output;
+
+	if (print_header)
+	{
+		output << "Time,SocketID,pktFlowWindow,pktCongestionWindow,pktFlightSize,";
+		output << "msRTT,mbpsBandwidth,mbpsMaxBW,pktSent,pktSndLoss,pktSndDrop,";
+		output << "pktRetrans,byteSent,byteSndDrop,mbpsSendRate,usPktSndPeriod,";
+		output << "pktRecv,pktRcvLoss,pktRcvDrop,pktRcvRetrans,pktRcvBelated,";
+		output << "byteRecv,byteRcvLoss,byteRcvDrop,mbpsRecvRate,msRcvTsbPdDelay";
+		output << endl;
+	}
+
+	output << stats.msTimeStamp << ",";
+	output << m_bind_socket << ",";
+	output << stats.pktFlowWindow << ",";
+	output << stats.pktCongestionWindow << ",";
+	output << stats.pktFlightSize << ",";
+
+	output << stats.msRTT << ",";
+	output << stats.mbpsBandwidth << ",";
+	output << stats.mbpsMaxBW << ",";
+	output << stats.pktSent << ",";
+	output << stats.pktSndLoss << ",";
+	output << stats.pktSndDrop << ",";
+
+	output << stats.pktRetrans << ",";
+	output << stats.byteSent << ",";
+	output << stats.byteSndDrop << ",";
+	output << stats.mbpsSendRate << ",";
+	output << stats.usPktSndPeriod << ",";
+
+	output << stats.pktRecv << ",";
+	output << stats.pktRcvLoss << ",";
+	output << stats.pktRcvDrop << ",";
+	output << stats.pktRcvRetrans << ",";
+	output << stats.pktRcvBelated << ",";
+
+	output << stats.byteRecv << ",";
+	output << stats.byteRcvLoss << ",";
+	output << stats.byteRcvDrop << ",";
+	output << stats.mbpsRecvRate << ",";
+	output << stats.msRcvTsbPdDelay;
+
+	output << endl;
+
+	return output.str();
 }
 
 

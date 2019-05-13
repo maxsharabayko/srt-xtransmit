@@ -23,7 +23,7 @@
 
 
 #include "generate.hpp"
-
+#include "receive.hpp"
 
 
 
@@ -281,14 +281,6 @@ int main(int argc, char **argv) {
 	sc_forward->add_option("dst", dst, "Destination URI");
 	sc_forward->add_flag("--oneway", "Forward only from SRT to DST");
 
-	/*{ {"reply"}, OptionScheme::ARG_ONE },
-	{ {"printmsg"},       OptionScheme::ARG_ONE },
-	{ {"ll", "loglevel"}, OptionScheme::ARG_ONE },
-	{ {"statsfile"},      OptionScheme::ARG_ONE },
-	{ {"statsfreq"},      OptionScheme::ARG_ONE },
-	{ {"repeat"},         OptionScheme::ARG_ONE },
-	{ {"bitrate"},        OptionScheme::ARG_ONE },
-	{ {"msgsize"},        OptionScheme::ARG_ONE },*/
 
 	xtransmit::generate::config cfg_generate;
 	CLI::App* sc_generate = app.add_subcommand("generate", "Send generated data");
@@ -298,7 +290,17 @@ int main(int argc, char **argv) {
 	sc_generate->add_option("--num", cfg_generate.num_messages, "Number of messages to send (-1 for infinite)");
 	sc_generate->add_option("--statsfile", cfg_generate.stats_file, "output stats report filename");
 	sc_generate->add_option("--statsfreq", cfg_generate.stats_freq_ms, "output stats report frequency (ms)");
-	sc_generate->add_flag("--twoway", "Both send and receive data");
+	sc_generate->add_flag("--twoway", cfg_generate.two_way, "Both send and receive data");
+
+
+	xtransmit::receive::config cfg_receive;
+	CLI::App* sc_receive = app.add_subcommand("receive", "Receive data");
+	sc_receive->add_option("src", src, "Source URI");
+	sc_receive->add_option("--msgsize", cfg_receive.message_size, "Destination URI");
+	sc_receive->add_option("--statsfile", cfg_receive.stats_file, "output stats report filename");
+	sc_receive->add_option("--statsfreq", cfg_receive.stats_freq_ms, "output stats report frequency (ms)");
+	sc_receive->add_flag("--twoway", cfg_receive.send_reply, "Both send and receive data");
+
 
 	// TODO:
 	// CLI::App* sc_echo    = app.add_subcommand("echo",    "Echo back all the packets received on the connection");
@@ -354,6 +356,11 @@ int main(int argc, char **argv) {
 	else if (sc_generate->parsed())
 	{
 		xtransmit::generate::generate_main(dst, cfg_generate, force_break);
+		return 0;
+	}
+	else if (sc_receive->parsed())
+	{
+		xtransmit::receive::receive_main(src, cfg_receive, force_break);
 		return 0;
 	}
 	else

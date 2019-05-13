@@ -76,13 +76,17 @@ public:
 	void async_write();
 
 
-	void read();
-	int  write(const std::vector<char>& buffer);
+	void read(std::vector<char>& buffer, int timeout_ms = -1);
+	void write(const std::vector<char>& buffer, int timeout_ms = -1);
 
 
 public:
 
+	int id() const { return m_bind_socket; }
 	int statistics(SRT_TRACEBSTATS &stats);
+
+
+	const std::string statistics_csv(bool print_header);
 
 
 private:
