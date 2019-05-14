@@ -43,7 +43,7 @@ srt::socket::socket(const UriParser& src_uri)
 			throw socket_exception(srt_getlasterror_str());
 
 		m_epoll_io = srt_epoll_create();
-		modes = SRT_EPOLL_IN | SRT_EPOLL_OUT;
+		modes = SRT_EPOLL_IN | SRT_EPOLL_OUT | SRT_EPOLL_ERR;
 		if (SRT_ERROR == srt_epoll_add_usock(m_epoll_io, m_bind_socket, &modes))
 			throw socket_exception(srt_getlasterror_str());
 	}
@@ -69,6 +69,14 @@ xtransmit::srt::socket::socket(const int sock, bool blocking)
 
 xtransmit::srt::socket::~socket()
 {
+	if (!m_blocking_mode)
+	{
+		Verb() << "Releasing epolls for socket " << m_bind_socket;
+		if (m_epoll_connect != -1)
+			srt_epoll_release(m_epoll_connect);
+		srt_epoll_release(m_epoll_io);
+	}
+	Verb() << "Closing socket " << m_bind_socket;
 	srt_close(m_bind_socket);
 }
 
@@ -225,84 +233,6 @@ std::future<shared_socket> srt::socket::async_read(std::vector<char>& buffer)
 
 
 
-std::future<shared_socket> srt::socket::async_establish(bool is_caller)
-{
-	return std::future<shared_socket>();
-#if 0
-	m_bind_socket = srt_create_socket();
-
-	if (m_bind_socket == SRT_INVALID_SOCK)
-		throw socket_exception(srt_getlasterror_str());
-
-	int result = configure_pre(m_bind_socket);
-	if (result == SRT_ERROR)
-		throw socket_exception(srt_getlasterror_str());
-
-	sockaddr_in sa = CreateAddrInet(m_host, m_port);
-	sockaddr * psa = (sockaddr*)& sa;
-
-	if (is_caller)
-	{
-		const int no = 0;
-		const int yes = 1;
-
-		int result = 0;
-		result = srt_setsockopt(m_bind_socket, 0, SRTO_RCVSYN, &yes, sizeof yes);
-		if (result == SRT_ERROR)
-			throw socket_exception(srt_getlasterror_str());
-
-		Verb() << "Connecting to " << m_host << ":" << m_port << " ... " << VerbNoEOL;
-		int stat = srt_connect(m_bind_socket, psa, sizeof sa);
-		if (stat == SRT_ERROR)
-		{
-			srt_close(m_bind_socket);
-			Verb() << " failed: " << srt_getlasterror_str();
-			return SRT_ERROR;
-		}
-
-		result = srt_setsockopt(m_bind_socket, 0, SRTO_RCVSYN, &no, sizeof no);
-		if (result == -1)
-		{
-			Verb() << " failed while setting socket options: " << srt_getlasterror_str();
-			return result;
-		}
-
-		const int events = SRT_EPOLL_IN | SRT_EPOLL_ERR;
-		srt_epoll_add_usock(m_epoll_receive, m_bind_socket, &events);
-		Verb() << " suceeded";
-	}
-	else
-	{
-		Verb() << "Binding a server on " << m_host << ":" << m_port << VerbNoEOL;
-		stat = srt_bind(m_bind_socket, psa, sizeof sa);
-		if (stat == SRT_ERROR)
-		{
-			srt_close(m_bind_socket);
-			return SRT_ERROR;
-		}
-
-
-		const int modes = SRT_EPOLL_IN;
-		srt_epoll_add_usock(m_epoll_accept, m_bind_socket, &modes);
-
-		stat = srt_listen(m_bind_socket, max_conn);
-		if (stat == SRT_ERROR)
-		{
-			srt_close(m_bind_socket);
-			Verb() << ", but listening failed with " << srt_getlasterror_str();
-			return SRT_ERROR;
-		}
-
-		Verb() << " and listening";
-
-		//m_accepting_thread = thread(&SrtNode::AcceptingThread, this);
-	}
-
-	return 0;
-#endif
-}
-
-
 
 int xtransmit::srt::socket::configure_pre(SRTSOCKET sock)
 {
@@ -370,18 +300,30 @@ int xtransmit::srt::socket::configure_post(SRTSOCKET sock)
 
 void xtransmit::srt::socket::read(std::vector<char>& buffer, int timeout_ms)
 {
-	if (!m_blocking_mode)
+	while (!m_blocking_mode)
 	{
 		// TODO: check error fds
 		int ready[2] = { SRT_INVALID_SOCK, SRT_INVALID_SOCK };
+		int error[2] = { SRT_INVALID_SOCK, SRT_INVALID_SOCK };
 		int len = 2;
-		if (srt_epoll_wait(m_epoll_io, ready, &len, 0, 0, timeout_ms, 0, 0, 0, 0) == SRT_ERROR)
-			raise_exception(UDT::getlasterror(), "socket::read::epoll");
+		int len_error = 2;
+		if (srt_epoll_wait(m_epoll_io, ready, &len, error, &len_error, timeout_ms, 0, 0, 0, 0) == SRT_ERROR)
+			raise_exception(UDT::getlasterror(), "socket::read::epoll " + to_string(srt_getlasterror(nullptr)));
+
+		if (len_error != 0)
+		{
+			Verb() << "Epoll read: " << len;
+			Verb() << "Epoll write: " << len_error;
+			Verb() << "Socket state: " << srt_getsockstate(m_bind_socket);
+		}
+
+		if (len > 0)
+			break;
 	}
 
 	const int res = srt_recvmsg2(m_bind_socket, buffer.data(), (int)buffer.size(), nullptr);
 	if (SRT_ERROR == res)
-		raise_exception(UDT::getlasterror(), "socket::read::send");
+		raise_exception(UDT::getlasterror(), "socket::read::recv");
 
 	buffer.resize(res);
 }

@@ -283,7 +283,7 @@ int main(int argc, char **argv) {
 
 
 	xtransmit::generate::config cfg_generate;
-	CLI::App* sc_generate = app.add_subcommand("generate", "Send generated data");
+	CLI::App* sc_generate = app.add_subcommand("generate", "Send generated data")->fallthrough();
 	sc_generate->add_option("dst", dst, "Destination URI");
 	sc_generate->add_option("--msgsize", cfg_generate.message_size, "Destination URI");
 	sc_generate->add_option("--bitrate", cfg_generate.bitrate, "Bitrate to generate");
@@ -294,7 +294,7 @@ int main(int argc, char **argv) {
 
 
 	xtransmit::receive::config cfg_receive;
-	CLI::App* sc_receive = app.add_subcommand("receive", "Receive data");
+	CLI::App* sc_receive = app.add_subcommand("receive", "Receive data")->fallthrough();
 	sc_receive->add_option("src", src, "Source URI");
 	sc_receive->add_option("--msgsize", cfg_receive.message_size, "Destination URI");
 	sc_receive->add_option("--statsfile", cfg_receive.stats_file, "output stats report filename");

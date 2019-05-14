@@ -61,7 +61,14 @@ void run(shared_srt_socket src, const config& cfg,
 	
 	while (!force_break)
 	{
-		src->read(buffer);
+		try {
+			src->read(buffer);
+		}
+		catch (const srt::socket_exception & e)
+		{
+			local_break = true;
+			break;
+		}
 
 		if (cfg.print_notifications)
 		{
@@ -125,7 +132,7 @@ void xtransmit::receive::receive_main(const string & url, const config & cfg,
 {
 	shared_srt_socket socket = make_shared<srt::socket>(UriParser(url));
 
-	start_receiver(socket->async_connect(), cfg, force_break);
+	start_receiver(socket->async_accept(), cfg, force_break);
 
 }
 

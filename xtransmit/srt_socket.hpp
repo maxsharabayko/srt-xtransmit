@@ -53,10 +53,10 @@ public:
 
 	~socket();
 
+	socket(const int sock, bool blocking);
 
 private:
 
-	socket(const int sock, bool blocking);
 
 public:
 
@@ -66,8 +66,6 @@ public:
 	shared_socket				connect();
 	shared_socket				accept();
 	void						listen();
-
-	std::future<shared_socket> async_establish(bool is_caller);
 
 public:
 
