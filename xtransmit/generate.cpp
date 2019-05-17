@@ -154,7 +154,7 @@ void run(shared_srt_socket dst, const config &cfg,
 
 
 
-void start_generator(future<shared_srt_socket> &connection, const config& cfg,
+void start_generator(future<shared_srt_socket> connection, const config& cfg,
 	const atomic_bool& force_break)
 {
 	try {

@@ -109,7 +109,7 @@ void run(shared_srt_socket src, const config& cfg,
 
 
 
-void start_receiver(future<shared_srt_socket> & connection, const config & cfg,
+void start_receiver(future<shared_srt_socket>&& connection, const config & cfg,
 	const atomic_bool & force_break)
 {
 	try {
