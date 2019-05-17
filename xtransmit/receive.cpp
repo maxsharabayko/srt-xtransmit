@@ -27,7 +27,7 @@ using shared_srt_socket = std::shared_ptr<srt::socket>;
 void run(shared_srt_socket src, const config& cfg,
 	const atomic_bool& force_break)
 {
-	atomic_bool local_break = false;
+	atomic_bool local_break(false);
 
 	auto stats_func = [&cfg, &force_break, &local_break](shared_srt_socket sock)
 	{
