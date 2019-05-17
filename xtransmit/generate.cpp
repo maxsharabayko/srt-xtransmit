@@ -21,62 +21,6 @@ using namespace xtransmit::generate;
 using shared_srt_socket = std::shared_ptr<srt::socket>;
 
 
-//std::vector<std::future<void>> accepting_threads;
-
-
-static void PrintSrtStats(int sid, const SRT_TRACEBSTATS& mon, ostream& out, bool print_header)
-{
-	std::ostringstream output;
-
-	if (print_header)
-	{
-		output << "Time,SocketID,pktFlowWindow,pktCongestionWindow,pktFlightSize,";
-		output << "msRTT,mbpsBandwidth,mbpsMaxBW,pktSent,pktSndLoss,pktSndDrop,";
-		output << "pktRetrans,byteSent,byteSndDrop,mbpsSendRate,usPktSndPeriod,";
-		output << "pktRecv,pktRcvLoss,pktRcvDrop,pktRcvRetrans,pktRcvBelated,";
-		output << "byteRecv,byteRcvLoss,byteRcvDrop,mbpsRecvRate,msRcvTsbPdDelay";
-		output << endl;
-		return;
-	}
-
-	output << mon.msTimeStamp << ",";
-	output << sid << ",";
-	output << mon.pktFlowWindow << ",";
-	output << mon.pktCongestionWindow << ",";
-	output << mon.pktFlightSize << ",";
-
-	output << mon.msRTT << ",";
-	output << mon.mbpsBandwidth << ",";
-	output << mon.mbpsMaxBW << ",";
-	output << mon.pktSent << ",";
-	output << mon.pktSndLoss << ",";
-	output << mon.pktSndDrop << ",";
-
-	output << mon.pktRetrans << ",";
-	output << mon.byteSent << ",";
-	output << mon.byteSndDrop << ",";
-	output << mon.mbpsSendRate << ",";
-	output << mon.usPktSndPeriod << ",";
-
-	output << mon.pktRecv << ",";
-	output << mon.pktRcvLoss << ",";
-	output << mon.pktRcvDrop << ",";
-	output << mon.pktRcvRetrans << ",";
-	output << mon.pktRcvBelated << ",";
-
-	output << mon.byteRecv << ",";
-	output << mon.byteRcvLoss << ",";
-	output << mon.byteRcvDrop << ",";
-	output << mon.mbpsRecvRate << ",";
-	output << mon.msRcvTsbPdDelay;
-
-	output << endl;
-
-	out << output.str() << std::flush;
-}
-
-
-
 
 void run(shared_srt_socket dst, const config &cfg,
 	const atomic_bool& force_break)
@@ -97,18 +41,14 @@ void run(shared_srt_socket dst, const config &cfg,
 			return;
 		}
 
-		SRT_TRACEBSTATS stats;
-		PrintSrtStats(-1, stats, logfile_stats, true);
-
+		bool print_header = true;
 		const chrono::milliseconds interval(cfg.stats_freq_ms);
 		while (!force_break && !local_break)
 		{
 			this_thread::sleep_for(interval);
 
-			if (-1 == sock->statistics(stats))
-				break;
-
-			PrintSrtStats(-1, stats, logfile_stats, false);
+			logfile_stats << sock->statistics_csv(print_header) << flush;
+			print_header = false;
 		}
 	};
 
