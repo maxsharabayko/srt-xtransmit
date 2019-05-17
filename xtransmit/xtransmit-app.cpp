@@ -13,8 +13,8 @@
 #include "udt.h"	// srt_logger_config
 #include "apputil.hpp"
 #include "uriparser.hpp"
-#include "smoother.h" // Specific smoother for testing
-#include "srt-flow-smoother.h"
+//#include "smoother.h" // Specific smoother for testing
+//#include "srt-flow-smoother.h"
 //#include "testmedia.hpp"
 #include "srt_node.hpp"
 #include "logging.h"
@@ -345,7 +345,7 @@ int main(int argc, char **argv) {
 	srt_startup();
 
 	// Register your own Controller
-	SrtCongestion::add<WAGCongController>("flow");
+	//SrtCongestion::add<WAGCongController>("flow");
 
 	//std::cout << "Working on --file from start: " << file << std::endl;
 	//std::cout << "Working on --count from stop: " << s->count() << ", direct count: " << stop->count("--count")
