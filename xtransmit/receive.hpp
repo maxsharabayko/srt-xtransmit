@@ -8,7 +8,7 @@ namespace xtransmit {
 
 		struct config
 		{
-			bool print_notifications	= true;		// Print notifications about the messages received
+			bool print_notifications	= false;		// Print notifications about the messages received
 			bool send_reply				= false;
 			int max_connections			= 1;		// Maximum number of connections on a socket
 			int message_size			= 1316;

@@ -301,6 +301,7 @@ int main(int argc, char **argv) {
 	sc_receive->add_option("--msgsize", cfg_receive.message_size, "Destination URI");
 	sc_receive->add_option("--statsfile", cfg_receive.stats_file, "output stats report filename");
 	sc_receive->add_option("--statsfreq", cfg_receive.stats_freq_ms, "output stats report frequency (ms)");
+	sc_receive->add_option("--printmsg", cfg_receive.print_notifications, "print message into to stdout");
 	sc_receive->add_flag("--twoway", cfg_receive.send_reply, "Both send and receive data");
 
 

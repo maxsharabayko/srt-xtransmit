@@ -18,23 +18,30 @@ cmake ../ -G "Visual Studio 15 2017 Win64" -DPTHREAD_INCLUDE_DIR=C:\pthread-x64\
 
 # Example Usage
 
-**Send:**
+## Test Flow CC
+
+### Sender
+```
+srt-xtransmit generate "srt://127.0.0.1:4200?transtype=file&messageapi=1&payloadsize=1456&congestion=flow&rcvbuf=1000000000&sndbuf=1000000000&fc=800000" --msgsize 1456 --num 1000 --statsfile stats-snd.csv --statsfreq 1000
+```
+
+### Receiver
+```
+srt-xtransmit receive "srt://:4200?transtype=file&messageapi=1&payloadsize=1456&congestion=flow&rcvbuf=1000000000&sndbuf=1000000000&fc=800000" --msgsize 1456  --statsfile stats-rcv.csv --statsfreq 1000
+```
+
+## Generate with live mode
+
+### Send
 ```
 srt-xtransmit generate "srt://127.0.0.1:4200?transtype=live&messageapi=1&payloadsize=1456" --msgsize 1456 --num -1 --bitrate 6000000
 ```
 
-**Receive**
+### Receive
+```
+srt-xtransmit receive "srt://:4200?transtype=live&messageapi=1&payloadsize=1456" --msgsize 1456
+```
+or with `srt-test-messaging` app:
 ```
 srt-test-messaging "srt://:4200?rcvbuf=12058624&smoother=live" -reply 0 -msgsize 1456 -printmsg 1
 ```
-
-```
-receive "srt://:4200?transtype=live&messageapi=1&payloadsize=1456" --msgsize 1456
-```
-
-
-# BOOST
-
-
-
-b2 --toolset=msvc-14.2 link=static runtime-link=static address-model=64 define=BOOST_USE_WINAPI_VERSION=0x0501 --with-chrono --with-date_time --with-filesystem --with-program_options --with-system
