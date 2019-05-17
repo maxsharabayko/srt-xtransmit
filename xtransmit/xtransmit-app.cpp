@@ -262,6 +262,7 @@ int forward(const string &src, const string &dst)
 int main(int argc, char **argv) {
 
 	CLI::App app("SRT xtransmit tool.");
+	app.set_config("--config");
 	app.set_help_all_flag("--help-all", "Expand all help");
 
 	app.add_flag_function("--verbose,-v", [](size_t) { Verbose::on = true; }, "enable verbose output");
