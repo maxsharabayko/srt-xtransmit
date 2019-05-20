@@ -79,8 +79,12 @@ public:
 	std::future<shared_socket>  async_read(std::vector<char> &buffer);
 	void async_write();
 
-
-	void read(std::vector<char>& buffer, int timeout_ms = -1);
+	/**
+	 * @returns The number of bytes received.
+	 *
+	 * @throws socket_exception Thrown on failure.
+	 */
+	size_t read(std::vector<char>& buffer, int timeout_ms = -1);
 	void write(const std::vector<char>& buffer, int timeout_ms = -1);
 
 

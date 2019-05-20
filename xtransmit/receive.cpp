@@ -58,43 +58,40 @@ void run(shared_srt_socket src, const config& cfg,
 	auto stats_logger = async(launch::async, stats_func, src);
 
 	vector<char> buffer(cfg.message_size);
-	
-	while (!force_break)
-	{
-		try {
-			src->read(buffer);
-		}
-		catch (const srt::socket_exception & e)
+	try {
+		while (!force_break)
 		{
-			local_break = true;
-			break;
-		}
+			const size_t bytes = src->read(buffer, 500);
 
-		if (cfg.print_notifications)
-		{
-			const size_t msg_size = buffer.size();
-			::cout << "RECEIVED MESSAGE length " << msg_size << " on conn ID " << src->id();
-			if (msg_size < 50)
-			{
-				::cout << ":\n";
-				::cout << string(buffer.data(), msg_size).c_str();
-			}
-			else if (buffer[0] >= '0' && buffer[0] <= 'z')
-			{
-				::cout << " (first character):";
-				::cout << buffer[0];
-			}
-			::cout << endl;
-		}
-
-		if (cfg.send_reply)
-		{
-			const vector<char> out_message{ 'M', 'e', 's', 's', 'a', 'g', 'e', ' ', 'r', 'e', 'c', 'e', 'i', 'v', 'e', 'd' };
-			src->write(out_message);
-			
 			if (cfg.print_notifications)
-				::cout << "Reply sent on conn ID " << src->id() << "\n";
+			{
+				::cout << "RECEIVED MESSAGE length " << bytes << " on conn ID " << src->id();
+				if (bytes < 50)
+				{
+					::cout << ":\n";
+					::cout << string(buffer.data(), bytes).c_str();
+				}
+				else if (buffer[0] >= '0' && buffer[0] <= 'z')
+				{
+					::cout << " (first character):";
+					::cout << buffer[0];
+				}
+				::cout << endl;
+			}
+
+			if (cfg.send_reply)
+			{
+				const vector<char> out_message{ 'M', 'e', 's', 's', 'a', 'g', 'e', ' ', 'r', 'e', 'c', 'e', 'i', 'v', 'e', 'd' };
+				src->write(out_message);
+
+				if (cfg.print_notifications)
+					::cout << "Reply sent on conn ID " << src->id() << "\n";
+			}
 		}
+	}
+	catch (const srt::socket_exception & e)
+	{
+		local_break = true;
 	}
 
 	if (force_break)

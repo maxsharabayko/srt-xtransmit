@@ -296,7 +296,7 @@ int xtransmit::srt::socket::configure_post(SRTSOCKET sock)
 }
 
 
-void xtransmit::srt::socket::read(std::vector<char>& buffer, int timeout_ms)
+size_t xtransmit::srt::socket::read(std::vector<char>& buffer, int timeout_ms)
 {
 	if (!m_blocking_mode)
 	{
@@ -306,6 +306,9 @@ void xtransmit::srt::socket::read(std::vector<char>& buffer, int timeout_ms)
 		const int epoll_res = srt_epoll_wait(m_epoll_io, ready, &len, nullptr, nullptr, timeout_ms, 0, 0, 0, 0);
 		if (epoll_res == SRT_ERROR)
 		{
+			if (srt_getlasterror(nullptr) == SRT_ETIMEOUT)
+				return 0;
+
 			raise_exception(UDT::getlasterror(), "socket::read::epoll " + to_string(srt_getlasterror(nullptr)));
 		}
 
@@ -316,7 +319,7 @@ void xtransmit::srt::socket::read(std::vector<char>& buffer, int timeout_ms)
 	if (SRT_ERROR == res)
 		raise_exception(UDT::getlasterror(), "socket::read::recv");
 
-	buffer.resize(res);
+	return static_cast<size_t>(res);
 }
 
 
