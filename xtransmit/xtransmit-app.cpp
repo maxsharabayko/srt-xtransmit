@@ -322,7 +322,6 @@ int main(int argc, char **argv) {
 
 	CLI11_PARSE(app, argc, argv);
 
-
 	// This is mainly required on Windows to initialize the network system,
 	// for a case when the instance would use UDP. SRT does it on its own, independently.
 	if (!SysInitializeNetwork())

@@ -60,7 +60,7 @@ xtransmit::srt::socket::socket(const int sock, bool blocking)
 	if (!m_blocking_mode)
 	{
 		m_epoll_io = srt_epoll_create();
-		int modes = SRT_EPOLL_IN | SRT_EPOLL_OUT;
+		int modes = SRT_EPOLL_IN | SRT_EPOLL_OUT | SRT_EPOLL_ERR;
 		if (SRT_ERROR == srt_epoll_add_usock(m_epoll_io, m_bind_socket, &modes))
 			throw socket_exception(srt_getlasterror_str());
 	}
@@ -210,8 +210,6 @@ std::future<shared_socket> srt::socket::async_connect()
 	return async(std::launch::async, [self]() {
 		return self->connect();
 		});
-
-	//return async(std::launch::async, [self]() {std::this_thread::sleep_for(std::chrono::seconds(1)); return self; });
 }
 
 
@@ -300,25 +298,18 @@ int xtransmit::srt::socket::configure_post(SRTSOCKET sock)
 
 void xtransmit::srt::socket::read(std::vector<char>& buffer, int timeout_ms)
 {
-	while (!m_blocking_mode)
+	if (!m_blocking_mode)
 	{
-		// TODO: check error fds
 		int ready[2] = { SRT_INVALID_SOCK, SRT_INVALID_SOCK };
-		int error[2] = { SRT_INVALID_SOCK, SRT_INVALID_SOCK };
 		int len = 2;
-		int len_error = 2;
-		if (srt_epoll_wait(m_epoll_io, ready, &len, error, &len_error, timeout_ms, 0, 0, 0, 0) == SRT_ERROR)
-			raise_exception(UDT::getlasterror(), "socket::read::epoll " + to_string(srt_getlasterror(nullptr)));
 
-		if (len_error != 0)
+		const int epoll_res = srt_epoll_wait(m_epoll_io, ready, &len, nullptr, nullptr, timeout_ms, 0, 0, 0, 0);
+		if (epoll_res == SRT_ERROR)
 		{
-			Verb() << "Epoll read: " << len;
-			Verb() << "Epoll write: " << len_error;
-			Verb() << "Socket state: " << srt_getsockstate(m_bind_socket);
+			raise_exception(UDT::getlasterror(), "socket::read::epoll " + to_string(srt_getlasterror(nullptr)));
 		}
 
-		if (len > 0)
-			break;
+		Verb() << "Socket state: " << srt_getsockstate(m_bind_socket);
 	}
 
 	const int res = srt_recvmsg2(m_bind_socket, buffer.data(), (int)buffer.size(), nullptr);
