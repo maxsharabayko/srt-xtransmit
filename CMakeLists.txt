@@ -10,6 +10,13 @@ SET(ENABLE_APPS ON)
 SET(ENABLE_SHARED OFF)
 add_subdirectory(submodule/srt)
 
+#set_target_properties(srt-live-transmit
+#	PROPERTIES
+#	ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
+#	LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
+#	RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
+#)
+
 SET(SRT_INCLUDE_DIR
 	${CMAKE_SOURCE_DIR}/submodule/srt/srtcore
 	${CMAKE_BINARY_DIR}/submodule/srt
