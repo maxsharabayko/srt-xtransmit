@@ -128,9 +128,7 @@ void xtransmit::receive::receive_main(const string & url, const config & cfg,
 	const atomic_bool & force_break)
 {
 	shared_srt_socket socket = make_shared<srt::socket>(UriParser(url));
-
 	start_receiver(socket->async_accept(), cfg, force_break);
-
 }
 
 

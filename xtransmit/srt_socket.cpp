@@ -121,10 +121,17 @@ shared_socket xtransmit::srt::socket::accept()
 		Verb() << "[ASYNC] " << VerbNoEOL;
 
 		// Socket readiness for connection is checked by polling on WRITE allowed sockets.
+
+		constexpr int timeout_ms = -1;
 		int len = 2;
 		SRTSOCKET ready[2];
-		if (srt_epoll_wait(m_epoll_connect, 0, 0, ready, &len, -1, 0, 0, 0, 0) == -1)
+		if (srt_epoll_wait(m_epoll_connect, 0, 0, ready, &len, timeout_ms, 0, 0, 0, 0) == -1)
+		{
+			//if (srt_getlasterror(nullptr) == SRT_ETIMEOUT)
+			//	continue;
+
 			raise_exception(UDT::getlasterror(), "srt_epoll_wait");
+		}
 
 		Verb() << "[EPOLL: " << len << " sockets] " << VerbNoEOL;
 	}

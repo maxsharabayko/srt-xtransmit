@@ -338,8 +338,8 @@ int main(int argc, char **argv) {
 	} cleanupobj;
 
 
-	signal(SIGINT, OnINT_ForceExit);
-	signal(SIGTERM, OnINT_ForceExit);
+	//signal(SIGINT, OnINT_ForceExit);
+	//signal(SIGTERM, OnINT_ForceExit);
 
 	srt_startup();
 
