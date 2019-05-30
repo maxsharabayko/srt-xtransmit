@@ -284,15 +284,20 @@ int main(int argc, char **argv) {
 	sc_forward->add_option("dst", dst, "Destination URI");
 	sc_forward->add_flag("--oneway", "Forward only from SRT to DST");
 
+	map<string, int> to_bps{ {"kbps", 1'000}, {"Mbps", 1'000'000}, {"Gbps", 1'000'000'000} };
+	map<string, int> to_ms{ {"s", 1'000}, {"ms", 1} };
+	map<string, int> to_bytes{ {"kB", 1'000}, {"MB", 1'000'000}, {"GB", 1'000'000'000}, {"Gb", 1'000'000'000 / 8} };
 
 	xtransmit::generate::config cfg_generate;
 	CLI::App* sc_generate = app.add_subcommand("generate", "Send generated data")->fallthrough();
 	sc_generate->add_option("dst", dst, "Destination URI");
 	sc_generate->add_option("--msgsize", cfg_generate.message_size, "Destination URI");
-	sc_generate->add_option("--bitrate", cfg_generate.bitrate, "Bitrate to generate");
+	sc_generate->add_option("--bitrate", cfg_generate.bitrate, "Bitrate to generate")
+		->transform(CLI::AsNumberWithUnit(to_bps, CLI::AsNumberWithUnit::CASE_SENSITIVE));
 	sc_generate->add_option("--num", cfg_generate.num_messages, "Number of messages to send (-1 for infinite)");
 	sc_generate->add_option("--statsfile", cfg_generate.stats_file, "output stats report filename");
-	sc_generate->add_option("--statsfreq", cfg_generate.stats_freq_ms, "output stats report frequency (ms)");
+	sc_generate->add_option("--statsfreq", cfg_generate.stats_freq_ms, "output stats report frequency (ms)")
+		->transform(CLI::AsNumberWithUnit(to_ms, CLI::AsNumberWithUnit::CASE_SENSITIVE));
 	sc_generate->add_flag("--twoway", cfg_generate.two_way, "Both send and receive data");
 
 
@@ -301,7 +306,8 @@ int main(int argc, char **argv) {
 	sc_receive->add_option("src", src, "Source URI");
 	sc_receive->add_option("--msgsize", cfg_receive.message_size, "Destination URI");
 	sc_receive->add_option("--statsfile", cfg_receive.stats_file, "output stats report filename");
-	sc_receive->add_option("--statsfreq", cfg_receive.stats_freq_ms, "output stats report frequency (ms)");
+	sc_receive->add_option("--statsfreq", cfg_receive.stats_freq_ms, "output stats report frequency (ms)")
+		->transform(CLI::AsNumberWithUnit(to_ms, CLI::AsNumberWithUnit::CASE_SENSITIVE));
 	sc_receive->add_option("--printmsg", cfg_receive.print_notifications, "print message into to stdout");
 	sc_receive->add_flag("--twoway", cfg_receive.send_reply, "Both send and receive data");
 
