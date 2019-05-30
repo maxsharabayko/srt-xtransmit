@@ -365,8 +365,8 @@ const string xtransmit::srt::socket::statistics_csv(bool print_header)
 	{
 		output << "Time,SocketID,pktFlowWindow,pktCongestionWindow,pktFlightSize,";
 		output << "msRTT,mbpsBandwidth,mbpsMaxBW,pktSent,pktSndLoss,pktSndDrop,";
-		output << "pktRetrans,byteSent,byteSndDrop,mbpsSendRate,usPktSndPeriod,";
-		output << "pktRecv,pktRcvLoss,pktRcvDrop,pktRcvRetrans,pktRcvBelated,";
+		output << "pktRetrans,byteSent,byteAvailSndBuf,byteSndDrop,mbpsSendRate,usPktSndPeriod,";
+		output << "pktRecv,byteAvailRcvBuf,pktRcvLoss,pktRcvDrop,pktRcvRetrans,pktRcvBelated,";
 		output << "byteRecv,byteRcvLoss,byteRcvDrop,mbpsRecvRate,msRcvTsbPdDelay";
 		output << endl;
 	}
@@ -381,6 +381,7 @@ const string xtransmit::srt::socket::statistics_csv(bool print_header)
 	output << stats.mbpsBandwidth << ",";
 	output << stats.mbpsMaxBW << ",";
 	output << stats.pktSent << ",";
+	output << stats.byteAvailSndBuf << ",";
 	output << stats.pktSndLoss << ",";
 	output << stats.pktSndDrop << ",";
 
@@ -391,6 +392,7 @@ const string xtransmit::srt::socket::statistics_csv(bool print_header)
 	output << stats.usPktSndPeriod << ",";
 
 	output << stats.pktRecv << ",";
+	output << stats.byteAvailRcvBuf << ",";
 	output << stats.pktRcvLoss << ",";
 	output << stats.pktRcvDrop << ",";
 	output << stats.pktRcvRetrans << ",";
