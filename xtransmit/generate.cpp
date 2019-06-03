@@ -62,6 +62,8 @@ void run(shared_srt_socket dst, const config &cfg,
 	const long msgs_per_s = static_cast<long long>(cfg.bitrate / 8) / cfg.message_size;
 	const long msg_interval_us = msgs_per_s ? 1000000 / msgs_per_s : 0;
 
+	srt::socket* target = dst.get();
+
 	for (int i = 0; (cfg.num_messages < 0 || i < cfg.num_messages) && !force_break; ++i)
 	{
 		if (cfg.bitrate)
@@ -82,7 +84,7 @@ void run(shared_srt_socket dst, const config &cfg,
 			time_prev = time_now;
 		}
 
-		dst->write(message_to_send);
+		target->write(message_to_send);
 	}
 
 	local_break = true;
@@ -102,7 +104,7 @@ void start_generator(future<shared_srt_socket> connection, const config& cfg,
 	}
 	catch (const srt::socket_exception & e)
 	{
-		std::cerr << e.what();
+		cerr << e.what() << endl;
 		return;
 	}
 

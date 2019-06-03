@@ -99,7 +99,8 @@ public:
 
 private:
 
-	static void raise_exception(UDT::ERRORINFO& udt_error, const string&& src);
+	static void raise_exception(const string&& place, UDT::ERRORINFO& udt_error);
+	static void raise_exception(const string &&place, const string&& reason);
 
 private:
 
