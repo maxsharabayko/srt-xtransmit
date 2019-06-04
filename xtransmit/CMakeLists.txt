@@ -20,9 +20,9 @@ set (VIRTUAL_srtsupport $<TARGET_OBJECTS:srtsupport_virtual>)
 target_link_libraries(srt-xtransmit CLI11::CLI11 ${TARGET_srt}_static ${VIRTUAL_srtsupport})
 
 set_target_properties(srt-xtransmit
-    PROPERTIES
-    ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
-    LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
-    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
+	PROPERTIES
+	ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
+	LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
+	RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
 )
 

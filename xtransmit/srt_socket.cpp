@@ -318,7 +318,7 @@ int xtransmit::srt::socket::configure_post(SRTSOCKET sock)
 }
 
 
-size_t xtransmit::srt::socket::read(std::vector<char>& buffer, int timeout_ms)
+size_t xtransmit::srt::socket::read(const boost::asio::mutable_buffer& buffer, int timeout_ms)
 {
 	if (!m_blocking_mode)
 	{
@@ -337,7 +337,7 @@ size_t xtransmit::srt::socket::read(std::vector<char>& buffer, int timeout_ms)
 		Verb() << "Socket state: " << srt_getsockstate(m_bind_socket);
 	}
 
-	const int res = srt_recvmsg2(m_bind_socket, buffer.data(), (int)buffer.size(), nullptr);
+	const int res = srt_recvmsg2(m_bind_socket, reinterpret_cast<char*>(buffer.data()), (int)buffer.size(), nullptr);
 	if (SRT_ERROR == res)
 		raise_exception("socket::read::recv", UDT::getlasterror());
 
@@ -345,7 +345,7 @@ size_t xtransmit::srt::socket::read(std::vector<char>& buffer, int timeout_ms)
 }
 
 
-void xtransmit::srt::socket::write(const vector<char> &buffer, int timeout_ms)
+void xtransmit::srt::socket::write(const boost::asio::const_buffer &buffer, int timeout_ms)
 {
 	if (!m_blocking_mode)
 	{
@@ -356,7 +356,7 @@ void xtransmit::srt::socket::write(const vector<char> &buffer, int timeout_ms)
 			raise_exception("socket::write::epoll", UDT::getlasterror());
 	}
 
-	if (SRT_ERROR == srt_sendmsg2(m_bind_socket, buffer.data(), (int)buffer.size(), nullptr))
+	if (SRT_ERROR == srt_sendmsg2(m_bind_socket, reinterpret_cast<const char*>(buffer.data()), (int)buffer.size(), nullptr))
 		raise_exception("socket::write::send", UDT::getlasterror());
 }
 

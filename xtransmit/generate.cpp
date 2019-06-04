@@ -84,7 +84,7 @@ void run(shared_srt_socket dst, const config &cfg,
 			time_prev = time_now;
 		}
 
-		target->write(message_to_send);
+		target->write(boost::asio::const_buffer(message_to_send.data(), message_to_send.size()));
 	}
 
 	local_break = true;

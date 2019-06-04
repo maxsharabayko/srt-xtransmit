@@ -6,6 +6,21 @@ add_subdirectory(submodule/CLI11)
 # Adds ${CLI11_SOURCE_DIR} etc.
 
 
+if (NOT WIN32 AND NOT MINGW)
+	find_package(Threads REQUIRED)
+	set(PTHREAD_LIBRARY ${CMAKE_THREAD_LIBS_INIT})
+	find_package(Boost 1.70 COMPONENTS date_time regex REQUIRED )
+elseif(WIN32)
+	set (Boost_THREADAPI win32)
+	set (Boost_COMPILER "-vc")
+	set (Boost_USE_STATIC_RUNTIME ON)
+	find_package(Boost 1.70)
+endif()
+
+include_directories(${Boost_INCLUDE_DIR})
+link_directories(${Boost_INCLUDE_DIR}/stage/lib)
+
+
 SET(ENABLE_APPS ON)
 SET(ENABLE_SHARED OFF)
 add_subdirectory(submodule/srt)

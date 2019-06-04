@@ -6,6 +6,9 @@
 #include <vector>
 #include <map>
 
+// Boost
+#include "boost/asio/buffer.hpp"
+
 // OpenSRT
 #include "srt.h"
 #include "udt.h"
@@ -84,8 +87,8 @@ public:
 	 *
 	 * @throws socket_exception Thrown on failure.
 	 */
-	size_t read(std::vector<char>& buffer, int timeout_ms = -1);
-	void write(const std::vector<char>& buffer, int timeout_ms = -1);
+	size_t read(const boost::asio::mutable_buffer& buffer, int timeout_ms = -1);
+	void write(const boost::asio::const_buffer& buffer, int timeout_ms = -1);
 
 
 public:
