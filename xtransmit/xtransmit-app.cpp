@@ -295,6 +295,7 @@ int main(int argc, char **argv) {
 	sc_generate->add_option("--bitrate", cfg_generate.bitrate, "Bitrate to generate")
 		->transform(CLI::AsNumberWithUnit(to_bps, CLI::AsNumberWithUnit::CASE_SENSITIVE));
 	sc_generate->add_option("--num", cfg_generate.num_messages, "Number of messages to send (-1 for infinite)");
+	sc_generate->add_option("--duration", cfg_generate.duration, "Sending duration (supresses --num option)");
 	sc_generate->add_option("--statsfile", cfg_generate.stats_file, "output stats report filename");
 	sc_generate->add_option("--statsfreq", cfg_generate.stats_freq_ms, "output stats report frequency (ms)")
 		->transform(CLI::AsNumberWithUnit(to_ms, CLI::AsNumberWithUnit::CASE_SENSITIVE));

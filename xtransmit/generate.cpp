@@ -62,9 +62,13 @@ void run(shared_srt_socket dst, const config &cfg,
 	const long msgs_per_s = static_cast<long long>(cfg.bitrate / 8) / cfg.message_size;
 	const long msg_interval_us = msgs_per_s ? 1000000 / msgs_per_s : 0;
 
+	const int num_messages = (cfg.duration != 0 && cfg.bitrate != 0)
+		? cfg.duration * msgs_per_s
+		: cfg.num_messages;
+
 	srt::socket* target = dst.get();
 
-	for (int i = 0; (cfg.num_messages < 0 || i < cfg.num_messages) && !force_break; ++i)
+	for (int i = 0; (num_messages < 0 || i < num_messages) && !force_break; ++i)
 	{
 		if (cfg.bitrate)
 		{
