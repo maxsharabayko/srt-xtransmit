@@ -5,16 +5,12 @@
 #include <thread>
 #include <vector>
 
-
 #include "srt_socket.hpp"
 #include "receive.hpp"
-
 
 // OpenSRT
 #include "apputil.hpp"
 #include "uriparser.hpp"
-
-
 
 using namespace std;
 using namespace xtransmit;
@@ -22,15 +18,11 @@ using namespace xtransmit::receive;
 
 using shared_srt_socket = std::shared_ptr<srt::socket>;
 
-
-
-void run(shared_srt_socket src, const config& cfg,
-	const atomic_bool& force_break)
+void run(shared_srt_socket src, const config &cfg, const atomic_bool &force_break)
 {
 	atomic_bool local_break(false);
 
-	auto stats_func = [&cfg, &force_break, &local_break](shared_srt_socket sock)
-	{
+	auto stats_func = [&cfg, &force_break, &local_break](shared_srt_socket sock) {
 		if (cfg.stats_freq_ms == 0)
 			return;
 		if (cfg.stats_file.empty())
@@ -58,7 +50,8 @@ void run(shared_srt_socket src, const config& cfg,
 	auto stats_logger = async(launch::async, stats_func, src);
 
 	vector<char> buffer(cfg.message_size);
-	try {
+	try
+	{
 		while (!force_break)
 		{
 			const size_t bytes = src->read(boost::asio::mutable_buffer(buffer.data(), buffer.size()), 500);
@@ -89,7 +82,7 @@ void run(shared_srt_socket src, const config& cfg,
 			}
 		}
 	}
-	catch (const srt::socket_exception & e)
+	catch (const srt::socket_exception &e)
 	{
 		local_break = true;
 	}
@@ -103,33 +96,22 @@ void run(shared_srt_socket src, const config& cfg,
 	stats_logger.wait();
 }
 
-
-
-
-void start_receiver(future<shared_srt_socket>&& connection, const config & cfg,
-	const atomic_bool & force_break)
+void start_receiver(future<shared_srt_socket> &&connection, const config &cfg, const atomic_bool &force_break)
 {
-	try {
+	try
+	{
 		const shared_srt_socket sock = connection.get();
 		run(sock, cfg, force_break);
 	}
-	catch (const srt::socket_exception & e)
+	catch (const srt::socket_exception &e)
 	{
 		std::cerr << e.what();
 		return;
 	}
-
 }
 
-
-
-
-void xtransmit::receive::receive_main(const string & url, const config & cfg,
-	const atomic_bool & force_break)
+void xtransmit::receive::receive_main(const string &url, const config &cfg, const atomic_bool &force_break)
 {
 	shared_srt_socket socket = make_shared<srt::socket>(UriParser(url));
 	start_receiver(socket->async_accept(), cfg, force_break);
 }
-
-
-
