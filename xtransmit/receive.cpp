@@ -1,6 +1,8 @@
 #include <atomic>
 #include <chrono>
+#include <ctime>
 #include <future>
+#include <iomanip>
 #include <memory>
 #include <thread>
 #include <vector>
@@ -59,6 +61,24 @@ void run(shared_srt_socket src, const config &cfg, const atomic_bool &force_brea
 			if (cfg.print_notifications)
 			{
 				::cout << "RECEIVED MESSAGE length " << bytes << " on conn ID " << src->id();
+
+				const time_t send_time = *(reinterpret_cast<time_t *>(buffer.data()));
+				const auto   systime_now = chrono::system_clock::now();
+				const time_t read_time    = chrono::system_clock::to_time_t(systime_now);
+
+				std::tm tm = *std::localtime(&send_time);
+				time_t  usec = send_time % 1000000;
+				::cout << " snd_time " << std::put_time(&tm, "%T.") << usec;
+				tm = *std::localtime(&read_time);
+				usec = read_time % 1000000;
+				::cout << " read_time " << std::put_time(&tm, "%T.") << usec;
+
+				const auto delay =
+					chrono::system_clock::from_time_t(read_time) - chrono::system_clock::from_time_t(send_time);
+				
+				::cout << " delta " << chrono::duration_cast<chrono::milliseconds>(delay).count() << " ms";
+
+				#if 0
 				if (bytes < 50)
 				{
 					::cout << ":\n";
@@ -69,6 +89,7 @@ void run(shared_srt_socket src, const config &cfg, const atomic_bool &force_brea
 					::cout << " (first character):";
 					::cout << buffer[0];
 				}
+				#endif
 				::cout << endl;
 			}
 

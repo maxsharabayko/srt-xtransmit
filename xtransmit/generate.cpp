@@ -1,3 +1,4 @@
+#include <numeric>
 #include <atomic>
 #include <chrono>
 #include <future>
@@ -48,7 +49,7 @@ void run(shared_srt_socket dst, const config &cfg, const atomic_bool &force_brea
 	auto stats_logger = async(launch::async, stats_func, dst);
 
 	vector<char> message_to_send(cfg.message_size);
-	std::generate(message_to_send.begin(), message_to_send.end(), [c = 0]() mutable { return c++; });
+	iota(message_to_send.begin(), message_to_send.end(), (char)0);
 
 	auto       time_prev       = chrono::steady_clock::now();
 	long       time_dev_us     = 0;
@@ -79,6 +80,10 @@ void run(shared_srt_socket dst, const config &cfg, const atomic_bool &force_brea
 			    (long)chrono::duration_cast<chrono::microseconds>(time_now - time_prev).count() - msg_interval_us;
 			time_prev = time_now;
 		}
+
+		const auto   systime_now                           = chrono::system_clock::now();
+		const time_t now_c                                 = chrono::system_clock::to_time_t(systime_now);
+		*(reinterpret_cast<time_t *>(&message_to_send[0])) = now_c;
 
 		target->write(boost::asio::const_buffer(message_to_send.data(), message_to_send.size()));
 	}
