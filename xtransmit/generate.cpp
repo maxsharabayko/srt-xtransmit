@@ -83,7 +83,12 @@ void run(shared_srt_socket dst, const config &cfg, const atomic_bool &force_brea
 
 		const auto   systime_now                           = chrono::system_clock::now();
 		const time_t now_c                                 = chrono::system_clock::to_time_t(systime_now);
-		*(reinterpret_cast<time_t *>(&message_to_send[0])) = now_c;
+		*(reinterpret_cast<time_t *>(message_to_send.data())) = now_c;
+
+        chrono::system_clock::duration frac = systime_now.time_since_epoch() -
+		    chrono::duration_cast<chrono::seconds>(systime_now.time_since_epoch());
+
+        *(reinterpret_cast<long long *>(message_to_send.data() + 8)) = chrono::duration_cast<chrono::microseconds>(frac).count();
 
 		target->write(boost::asio::const_buffer(message_to_send.data(), message_to_send.size()));
 	}

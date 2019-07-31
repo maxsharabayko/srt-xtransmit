@@ -63,19 +63,21 @@ void run(shared_srt_socket src, const config &cfg, const atomic_bool &force_brea
 				::cout << "RECEIVED MESSAGE length " << bytes << " on conn ID " << src->id();
 
 				const time_t send_time = *(reinterpret_cast<time_t *>(buffer.data()));
+				const long long send_time_us = *(reinterpret_cast<long long *>(buffer.data() + 8));
+
 				const auto   systime_now = chrono::system_clock::now();
 				const time_t read_time    = chrono::system_clock::to_time_t(systime_now);
 
-				std::tm tm = *std::localtime(&send_time);
-				time_t  usec = send_time % 1000000;
-				::cout << " snd_time " << std::put_time(&tm, "%T.") << usec;
-				tm = *std::localtime(&read_time);
-				usec = read_time % 1000000;
-				::cout << " read_time " << std::put_time(&tm, "%T.") << usec;
+				std::tm tm_send = *std::localtime(&send_time);
+				::cout << " snd_time " << std::put_time(&tm_send, "%T.") << send_time_us;
+				std::tm tm_read = *std::localtime(&read_time);
+				chrono::system_clock::duration read_time_frac =
+				    systime_now.time_since_epoch() -
+				    chrono::duration_cast<chrono::seconds>(systime_now.time_since_epoch());
+				::cout << " read_time " << std::put_time(&tm_read, "%T.")
+				       << chrono::duration_cast<chrono::microseconds>(read_time_frac).count();
 
-				const auto delay =
-					chrono::system_clock::from_time_t(read_time) - chrono::system_clock::from_time_t(send_time);
-				
+				const auto delay = systime_now - (chrono::system_clock::from_time_t(send_time) + chrono::microseconds(send_time_us));
 				::cout << " delta " << chrono::duration_cast<chrono::milliseconds>(delay).count() << " ms";
 
 				#if 0
