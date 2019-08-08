@@ -318,7 +318,7 @@ int srt::socket::configure_post(SRTSOCKET sock)
 }
 
 
-size_t srt::socket::read(const boost::asio::mutable_buffer& buffer, int timeout_ms)
+size_t srt::socket::read(const mutable_buffer& buffer, int timeout_ms)
 {
 	if (!m_blocking_mode)
 	{
@@ -345,7 +345,7 @@ size_t srt::socket::read(const boost::asio::mutable_buffer& buffer, int timeout_
 }
 
 
-void srt::socket::write(const boost::asio::const_buffer &buffer, int timeout_ms)
+void srt::socket::write(const const_buffer &buffer, int timeout_ms)
 {
 	if (!m_blocking_mode)
 	{
@@ -369,7 +369,6 @@ srt::socket::connection_mode srt::socket::mode() const
 int srt::socket::statistics(SRT_TRACEBSTATS &stats) {
 	return srt_bstats(m_bind_socket, &stats, true);
 }
-
 
 
 const string srt::socket::statistics_csv(bool print_header)

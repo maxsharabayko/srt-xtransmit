@@ -5,20 +5,21 @@ project(SRT-XTRANSMIT C CXX)
 add_subdirectory(submodule/CLI11)
 # Adds ${CLI11_SOURCE_DIR} etc.
 
-
-if (NOT WIN32 AND NOT MINGW)
-	find_package(Threads REQUIRED)
-	set(PTHREAD_LIBRARY ${CMAKE_THREAD_LIBS_INIT})
-	find_package(Boost 1.70 COMPONENTS date_time regex REQUIRED )
-elseif(WIN32)
-	set (Boost_THREADAPI win32)
-	set (Boost_COMPILER "-vc")
-	set (Boost_USE_STATIC_RUNTIME ON)
-	find_package(Boost 1.70)
-endif()
-
-include_directories(${Boost_INCLUDE_DIR})
-link_directories(${Boost_INCLUDE_DIR}/stage/lib)
+# BOOST is not used at the moment
+#
+#if (NOT WIN32 AND NOT MINGW)
+#	find_package(Threads REQUIRED)
+#	set(PTHREAD_LIBRARY ${CMAKE_THREAD_LIBS_INIT})
+#	find_package(Boost 1.70 COMPONENTS date_time regex REQUIRED )
+#elseif(WIN32)
+#	set (Boost_THREADAPI win32)
+#	set (Boost_COMPILER "-vc")
+#	set (Boost_USE_STATIC_RUNTIME ON)
+#	find_package(Boost 1.70)
+#endif()
+#
+#include_directories(${Boost_INCLUDE_DIR})
+#link_directories(${Boost_INCLUDE_DIR}/stage/lib)
 
 
 SET(ENABLE_APPS ON)
@@ -39,5 +40,9 @@ SET(SRT_INCLUDE_DIR
 	${CMAKE_SOURCE_DIR}/submodule/srt/haicrypt
 )
 
-SET(SRT_UTILS_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/submodule/srt/apps ${CMAKE_SOURCE_DIR}/submodule/srt/testing)
+SET(SRT_UTILS_INCLUDE_DIR
+	${CMAKE_SOURCE_DIR}/submodule/srt/apps
+	${CMAKE_SOURCE_DIR}/submodule/srt/testing
+)
+
 add_subdirectory(xtransmit)

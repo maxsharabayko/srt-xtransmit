@@ -6,8 +6,8 @@
 #include <vector>
 #include <map>
 
-// Boost
-#include "boost/asio/buffer.hpp"
+// xtransmit
+#include "buffer.hpp"
 
 // OpenSRT
 #include "srt.h"
@@ -87,8 +87,8 @@ public:
 	 *
 	 * @throws socket_exception Thrown on failure.
 	 */
-	size_t read(const boost::asio::mutable_buffer& buffer, int timeout_ms = -1);
-	void write(const boost::asio::const_buffer& buffer, int timeout_ms = -1);
+	size_t read(const mutable_buffer& buffer, int timeout_ms = -1);
+	void write(const const_buffer& buffer, int timeout_ms = -1);
 
 	enum connection_mode
 	{
@@ -124,8 +124,6 @@ private:
 	string m_host;
 	int m_port;
 	std::map<string, string> m_options; // All other options, as provided in the URI
-
-
 };
 
 } // namespace srt

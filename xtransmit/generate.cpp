@@ -90,7 +90,7 @@ void run(shared_srt_socket dst, const config &cfg, const atomic_bool &force_brea
 
 		*(reinterpret_cast<long long *>(message_to_send.data() + 8)) = chrono::duration_cast<chrono::microseconds>(frac).count();
 
-		target->write(boost::asio::const_buffer(message_to_send.data(), message_to_send.size()));
+		target->write(const_buffer(message_to_send.data(), message_to_send.size()));
 	}
 
 	local_break = true;

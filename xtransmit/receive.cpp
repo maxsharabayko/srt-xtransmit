@@ -57,7 +57,7 @@ void run(shared_srt_socket src, const config &cfg, const atomic_bool &force_brea
 	{
 		while (!force_break)
 		{
-			const size_t bytes = src->read(boost::asio::mutable_buffer(buffer.data(), buffer.size()), 500);
+			const size_t bytes = src->read(mutable_buffer(buffer.data(), buffer.size()), 500);
 
 			if (cfg.print_notifications)
 			{
@@ -100,14 +100,14 @@ void run(shared_srt_socket src, const config &cfg, const atomic_bool &force_brea
 			if (cfg.send_reply)
 			{
 				const string out_message("Message received");
-				src->write(boost::asio::const_buffer(out_message.data(), out_message.size()));
+				src->write(const_buffer(out_message.data(), out_message.size()));
 
 				if (cfg.print_notifications)
 					::cout << "Reply sent on conn ID " << src->id() << "\n";
 			}
 		}
 	}
-	catch (const srt::socket_exception &e)
+	catch (const srt::socket_exception &)
 	{
 		local_break = true;
 	}
