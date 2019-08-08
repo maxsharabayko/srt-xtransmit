@@ -17,6 +17,7 @@
 using namespace std;
 using namespace xtransmit;
 using namespace xtransmit::receive;
+using namespace std::chrono;
 
 using shared_srt_socket = std::shared_ptr<srt::socket>;
 
@@ -39,7 +40,7 @@ void run(shared_srt_socket src, const config &cfg, const atomic_bool &force_brea
 
 		bool print_header = true;
 
-		const chrono::milliseconds interval(cfg.stats_freq_ms);
+		const milliseconds interval(cfg.stats_freq_ms);
 		while (!force_break && !local_break)
 		{
 			this_thread::sleep_for(interval);
@@ -65,20 +66,21 @@ void run(shared_srt_socket src, const config &cfg, const atomic_bool &force_brea
 				const time_t send_time = *(reinterpret_cast<time_t *>(buffer.data()));
 				const long long send_time_us = *(reinterpret_cast<long long *>(buffer.data() + 8));
 
-				const auto   systime_now = chrono::system_clock::now();
-				const time_t read_time    = chrono::system_clock::to_time_t(systime_now);
+				const auto   systime_now = system_clock::now();
+				const time_t read_time    = system_clock::to_time_t(systime_now);
 
 				std::tm tm_send = *std::localtime(&send_time);
-				::cout << " snd_time " << std::put_time(&tm_send, "%T.") << send_time_us;
+				::cout << " snd_time " << std::put_time(&tm_send, "%T.") << std::setfill('0')
+				       << std::setw(6) << send_time_us;
 				std::tm tm_read = *std::localtime(&read_time);
-				chrono::system_clock::duration read_time_frac =
+				system_clock::duration read_time_frac =
 				    systime_now.time_since_epoch() -
-				    chrono::duration_cast<chrono::seconds>(systime_now.time_since_epoch());
+				    duration_cast<seconds>(systime_now.time_since_epoch());
 				::cout << " read_time " << std::put_time(&tm_read, "%T.")
-				       << chrono::duration_cast<chrono::microseconds>(read_time_frac).count();
+				       << duration_cast<microseconds>(read_time_frac).count();
 
-				const auto delay = systime_now - (chrono::system_clock::from_time_t(send_time) + chrono::microseconds(send_time_us));
-				::cout << " delta " << chrono::duration_cast<chrono::milliseconds>(delay).count() << " ms";
+				const auto delay = systime_now - (system_clock::from_time_t(send_time) + microseconds(send_time_us));
+				::cout << " delta " << duration_cast<milliseconds>(delay).count() << " ms";
 
 				#if 0
 				if (bytes < 50)
@@ -136,5 +138,6 @@ void start_receiver(future<shared_srt_socket> &&connection, const config &cfg, c
 void xtransmit::receive::receive_main(const string &url, const config &cfg, const atomic_bool &force_break)
 {
 	shared_srt_socket socket = make_shared<srt::socket>(UriParser(url));
-	start_receiver(socket->async_accept(), cfg, force_break);
+	const bool accept = socket->mode() == srt::socket::LISTENER;
+	start_receiver(accept ? socket->async_accept() : socket->async_connect(), cfg, force_break);
 }

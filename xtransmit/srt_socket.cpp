@@ -53,7 +53,7 @@ srt::socket::socket(const UriParser& src_uri)
 }
 
 
-xtransmit::srt::socket::socket(const int sock, bool blocking)
+srt::socket::socket(const int sock, bool blocking)
 	: m_bind_socket(sock)
 	, m_blocking_mode(blocking)
 {
@@ -67,7 +67,7 @@ xtransmit::srt::socket::socket(const int sock, bool blocking)
 }
 
 
-xtransmit::srt::socket::~socket()
+srt::socket::~socket()
 {
 	if (!m_blocking_mode)
 	{
@@ -81,7 +81,7 @@ xtransmit::srt::socket::~socket()
 }
 
 
-void xtransmit::srt::socket::listen()
+void srt::socket::listen()
 {
 	int num_clients = 2;
 	sockaddr_in sa = CreateAddrInet(m_host, m_port);
@@ -110,7 +110,7 @@ void xtransmit::srt::socket::listen()
 }
 
 
-shared_socket xtransmit::srt::socket::accept()
+shared_socket srt::socket::accept()
 {
 	sockaddr_in scl;
 	int sclen = sizeof scl;
@@ -252,9 +252,7 @@ std::future<shared_socket> srt::socket::async_read(std::vector<char>& buffer)
 }
 
 
-
-
-int xtransmit::srt::socket::configure_pre(SRTSOCKET sock)
+int srt::socket::configure_pre(SRTSOCKET sock)
 {
 	int maybe = m_blocking_mode ? 1 : 0;
 	int result = srt_setsockopt(sock, 0, SRTO_RCVSYN, &maybe, sizeof maybe);
@@ -282,12 +280,14 @@ int xtransmit::srt::socket::configure_pre(SRTSOCKET sock)
 		return SRT_ERROR;
 	}
 
+	m_mode = static_cast<connection_mode>(conmode);
+
 	return SRT_SUCCESS;
 }
 
 
 
-int xtransmit::srt::socket::configure_post(SRTSOCKET sock)
+int srt::socket::configure_post(SRTSOCKET sock)
 {
 	int is_blocking = m_blocking_mode ? 1 : 0;
 
@@ -318,7 +318,7 @@ int xtransmit::srt::socket::configure_post(SRTSOCKET sock)
 }
 
 
-size_t xtransmit::srt::socket::read(const boost::asio::mutable_buffer& buffer, int timeout_ms)
+size_t srt::socket::read(const boost::asio::mutable_buffer& buffer, int timeout_ms)
 {
 	if (!m_blocking_mode)
 	{
@@ -345,7 +345,7 @@ size_t xtransmit::srt::socket::read(const boost::asio::mutable_buffer& buffer, i
 }
 
 
-void xtransmit::srt::socket::write(const boost::asio::const_buffer &buffer, int timeout_ms)
+void srt::socket::write(const boost::asio::const_buffer &buffer, int timeout_ms)
 {
 	if (!m_blocking_mode)
 	{
@@ -361,14 +361,18 @@ void xtransmit::srt::socket::write(const boost::asio::const_buffer &buffer, int 
 }
 
 
-int xtransmit::srt::socket::statistics(SRT_TRACEBSTATS& stats)
+srt::socket::connection_mode srt::socket::mode() const
 {
+	return m_mode;
+}
+
+int srt::socket::statistics(SRT_TRACEBSTATS &stats) {
 	return srt_bstats(m_bind_socket, &stats, true);
 }
 
 
 
-const string xtransmit::srt::socket::statistics_csv(bool print_header)
+const string srt::socket::statistics_csv(bool print_header)
 {
 	SRT_TRACEBSTATS stats;
 	if (SRT_ERROR == srt_bstats(m_bind_socket, &stats, true))
@@ -425,72 +429,4 @@ const string xtransmit::srt::socket::statistics_csv(bool print_header)
 }
 
 
-#if 0
-cti::continuable< std::shared_ptr<xtransmit::srt::socket> > xtransmit::srt::socket::async_connect()
-{
-	const int no = 0;
-	const int yes = 1;
-
-	int result = srt_setsockopt(m_bindsocket, 0, SRTO_RCVSYN, &yes, sizeof yes);
-	//if (result == -1)
-	//	return cti::make_exceptional_continuable< std::shared_ptr<xtransmit::srt::socket>>();
-
-
-
-	return cti::make_continuable< std::shared_ptr<xtransmit::srt::socket>>([](auto && promise) {
-		sockaddr_in sa = CreateAddrInet(m_host, m_port);
-		sockaddr* psa = (sockaddr*)& sa;
-
-		std::cerr << "Connecting to " << m_host << ":" << m_port << " ... \n";
-		int stat = srt_connect(m_bindsocket, psa, sizeof sa);
-		if (stat == SRT_ERROR)
-		{
-			srt_close(m_bindsock);
-			Verb() << " failed: " << srt_getlasterror_str();
-			return SRT_ERROR;
-		}
-
-		result = srt_setsockopt(m_bindsock, 0, SRTO_RCVSYN, &no, sizeof no);
-		if (result == -1)
-		{
-			Verb() << " failed while setting socket options: " << srt_getlasterror_str();
-			return result;
-		}
-
-		const int events = SRT_EPOLL_IN | SRT_EPOLL_ERR;
-		srt_epoll_add_usock(m_epoll_receive, m_bindsock, &events);
-		Verb() << " suceeded";
-		});
-
-
-	const int no = 0;
-	const int yes = 1;
-
-	int result = srt_setsockopt(m_bindsocket, 0, SRTO_RCVSYN, &yes, sizeof yes);
-	if (result == -1)
-		return result;
-
-	Verb() << "Connecting to " << m_host << ":" << m_port << " ... " << VerbNoEOL;
-	int stat = srt_connect(m_bindsock, psa, sizeof sa);
-	if (stat == SRT_ERROR)
-	{
-		srt_close(m_bindsock);
-		Verb() << " failed: " << srt_getlasterror_str();
-		return SRT_ERROR;
-	}
-
-	result = srt_setsockopt(m_bindsock, 0, SRTO_RCVSYN, &no, sizeof no);
-	if (result == -1)
-	{
-		Verb() << " failed while setting socket options: " << srt_getlasterror_str();
-		return result;
-	}
-
-	const int events = SRT_EPOLL_IN | SRT_EPOLL_ERR;
-	srt_epoll_add_usock(m_epoll_receive, m_bindsock, &events);
-	Verb() << " suceeded";
-
-	return cti::make_ready_continuable<std::shared_ptr<xtransmit::srt::socket>>(shared_from_this());
-}
-#endif
 

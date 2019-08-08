@@ -90,12 +90,20 @@ public:
 	size_t read(const boost::asio::mutable_buffer& buffer, int timeout_ms = -1);
 	void write(const boost::asio::const_buffer& buffer, int timeout_ms = -1);
 
+	enum connection_mode
+	{
+		FAILURE    =-1,
+		LISTENER   = 0,
+		CALLER     = 1,
+		RENDEZVOUS = 2
+	};
+
+	connection_mode mode() const;
 
 public:
 
 	int id() const { return m_bind_socket; }
 	int statistics(SRT_TRACEBSTATS &stats);
-
 
 	const std::string statistics_csv(bool print_header);
 
@@ -111,6 +119,7 @@ private:
 	int m_epoll_connect	= -1;
 	int m_epoll_io		= -1;
 
+	connection_mode           m_mode;
 	bool m_blocking_mode = false;
 	string m_host;
 	int m_port;

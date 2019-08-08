@@ -77,7 +77,7 @@ void run(shared_srt_socket dst, const config &cfg, const atomic_bool &force_brea
 			}
 
 			time_dev_us +=
-			    (long)chrono::duration_cast<chrono::microseconds>(time_now - time_prev).count() - msg_interval_us;
+				(long)chrono::duration_cast<chrono::microseconds>(time_now - time_prev).count() - msg_interval_us;
 			time_prev = time_now;
 		}
 
@@ -85,10 +85,10 @@ void run(shared_srt_socket dst, const config &cfg, const atomic_bool &force_brea
 		const time_t now_c                                 = chrono::system_clock::to_time_t(systime_now);
 		*(reinterpret_cast<time_t *>(message_to_send.data())) = now_c;
 
-        chrono::system_clock::duration frac = systime_now.time_since_epoch() -
-		    chrono::duration_cast<chrono::seconds>(systime_now.time_since_epoch());
+		chrono::system_clock::duration frac = systime_now.time_since_epoch() -
+			chrono::duration_cast<chrono::seconds>(systime_now.time_since_epoch());
 
-        *(reinterpret_cast<long long *>(message_to_send.data() + 8)) = chrono::duration_cast<chrono::microseconds>(frac).count();
+		*(reinterpret_cast<long long *>(message_to_send.data() + 8)) = chrono::duration_cast<chrono::microseconds>(frac).count();
 
 		target->write(boost::asio::const_buffer(message_to_send.data(), message_to_send.size()));
 	}
@@ -114,6 +114,6 @@ void start_generator(future<shared_srt_socket> connection, const config &cfg, co
 void xtransmit::generate::generate_main(const string &dst_url, const config &cfg, const atomic_bool &force_break)
 {
 	shared_srt_socket socket = make_shared<srt::socket>(UriParser(dst_url));
-	// socket->connect();
-	start_generator(socket->async_connect(), cfg, force_break);
+	const bool accept = socket->mode() == srt::socket::LISTENER;
+	start_generator(accept ? socket->async_accept() : socket->async_connect(), cfg, force_break);
 }
