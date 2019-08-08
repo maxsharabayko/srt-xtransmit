@@ -266,7 +266,7 @@ int srt::socket::configure_pre(SRTSOCKET sock)
 	// NOTE: here host = "", so the 'connmode' will be returned as LISTENER always,
 	// but it doesn't matter here. We don't use 'connmode' for anything else than
 	// checking for failures.
-	SocketOption::Mode conmode = SrtConfigurePre(sock, "", m_options, &failures);
+	SocketOption::Mode conmode = SrtConfigurePre(sock, m_host, m_options, &failures);
 
 	if (conmode == SocketOption::FAILURE)
 	{
