@@ -286,6 +286,7 @@ int main(int argc, char **argv) {
 
 	map<string, int> to_bps{ {"kbps", 1'000}, {"Mbps", 1'000'000}, {"Gbps", 1'000'000'000} };
 	map<string, int> to_ms{ {"s", 1'000}, {"ms", 1} };
+	map<string, int> to_sec{{"s", 1}, {"min", 60}, {"mins", 60}};
 	map<string, int> to_bytes{ {"kB", 1'000}, {"MB", 1'000'000}, {"GB", 1'000'000'000}, {"Gb", 1'000'000'000 / 8} };
 
 	xtransmit::generate::config cfg_generate;
@@ -295,7 +296,8 @@ int main(int argc, char **argv) {
 	sc_generate->add_option("--bitrate", cfg_generate.bitrate, "Bitrate to generate")
 		->transform(CLI::AsNumberWithUnit(to_bps, CLI::AsNumberWithUnit::CASE_SENSITIVE));
 	sc_generate->add_option("--num", cfg_generate.num_messages, "Number of messages to send (-1 for infinite)");
-	sc_generate->add_option("--duration", cfg_generate.duration, "Sending duration (supresses --num option)");
+	sc_generate->add_option("--duration", cfg_generate.duration, "Sending duration in seconds (supresses --num option)")
+		->transform(CLI::AsNumberWithUnit(to_sec, CLI::AsNumberWithUnit::CASE_SENSITIVE));
 	sc_generate->add_option("--statsfile", cfg_generate.stats_file, "output stats report filename");
 	sc_generate->add_option("--statsfreq", cfg_generate.stats_freq_ms, "output stats report frequency (ms)")
 		->transform(CLI::AsNumberWithUnit(to_ms, CLI::AsNumberWithUnit::CASE_SENSITIVE));
