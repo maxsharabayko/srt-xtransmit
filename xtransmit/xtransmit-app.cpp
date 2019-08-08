@@ -293,7 +293,7 @@ int main(int argc, char **argv) {
 	CLI::App* sc_generate = app.add_subcommand("generate", "Send generated data")->fallthrough();
 	sc_generate->add_option("dst", dst, "Destination URI");
 	sc_generate->add_option("--msgsize", cfg_generate.message_size, "Destination URI");
-	sc_generate->add_option("--bitrate", cfg_generate.bitrate, "Bitrate to generate")
+	sc_generate->add_option("--sendrate", cfg_generate.sendrate, "Bitrate to generate")
 		->transform(CLI::AsNumberWithUnit(to_bps, CLI::AsNumberWithUnit::CASE_SENSITIVE));
 	sc_generate->add_option("--num", cfg_generate.num_messages, "Number of messages to send (-1 for infinite)");
 	sc_generate->add_option("--duration", cfg_generate.duration, "Sending duration in seconds (supresses --num option)")

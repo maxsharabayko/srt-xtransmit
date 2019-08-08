@@ -21,6 +21,42 @@ using namespace std::chrono;
 
 using shared_srt_socket = std::shared_ptr<srt::socket>;
 
+
+void trace_message(const size_t bytes, const vector<char> &buffer, int conn_id)
+{
+	::cout << "RECEIVED MESSAGE length " << bytes << " on conn ID " << conn_id;
+
+	const time_t    send_time    = *(reinterpret_cast<const time_t *>(buffer.data()));
+	const long long send_time_us = *(reinterpret_cast<const long long *>(buffer.data() + 8));
+
+	const auto   systime_now = system_clock::now();
+	const time_t read_time   = system_clock::to_time_t(systime_now);
+
+	std::tm tm_send = *std::localtime(&send_time);
+	::cout << " snd_time " << std::put_time(&tm_send, "%T.") << std::setfill('0') << std::setw(6) << send_time_us;
+	std::tm                tm_read = *std::localtime(&read_time);
+	system_clock::duration read_time_frac =
+	    systime_now.time_since_epoch() - duration_cast<seconds>(systime_now.time_since_epoch());
+	::cout << " read_time " << std::put_time(&tm_read, "%T.") << duration_cast<microseconds>(read_time_frac).count();
+
+	const auto delay = systime_now - (system_clock::from_time_t(send_time) + microseconds(send_time_us));
+	::cout << " delta " << duration_cast<milliseconds>(delay).count() << " ms";
+
+#if 0
+	if (bytes < 50)
+	{
+		::cout << ":\n";
+		::cout << string(buffer.data(), bytes).c_str();
+	}
+	else if (buffer[0] >= '0' && buffer[0] <= 'z')
+	{
+		::cout << " (first character):";
+		::cout << buffer[0];
+	}
+#endif
+	::cout << endl;
+}
+
 void run(shared_srt_socket src, const config &cfg, const atomic_bool &force_break)
 {
 	atomic_bool local_break(false);
@@ -60,42 +96,7 @@ void run(shared_srt_socket src, const config &cfg, const atomic_bool &force_brea
 			const size_t bytes = src->read(mutable_buffer(buffer.data(), buffer.size()), 500);
 
 			if (cfg.print_notifications)
-			{
-				::cout << "RECEIVED MESSAGE length " << bytes << " on conn ID " << src->id();
-
-				const time_t send_time = *(reinterpret_cast<time_t *>(buffer.data()));
-				const long long send_time_us = *(reinterpret_cast<long long *>(buffer.data() + 8));
-
-				const auto   systime_now = system_clock::now();
-				const time_t read_time    = system_clock::to_time_t(systime_now);
-
-				std::tm tm_send = *std::localtime(&send_time);
-				::cout << " snd_time " << std::put_time(&tm_send, "%T.") << std::setfill('0')
-				       << std::setw(6) << send_time_us;
-				std::tm tm_read = *std::localtime(&read_time);
-				system_clock::duration read_time_frac =
-				    systime_now.time_since_epoch() -
-				    duration_cast<seconds>(systime_now.time_since_epoch());
-				::cout << " read_time " << std::put_time(&tm_read, "%T.")
-				       << duration_cast<microseconds>(read_time_frac).count();
-
-				const auto delay = systime_now - (system_clock::from_time_t(send_time) + microseconds(send_time_us));
-				::cout << " delta " << duration_cast<milliseconds>(delay).count() << " ms";
-
-				#if 0
-				if (bytes < 50)
-				{
-					::cout << ":\n";
-					::cout << string(buffer.data(), bytes).c_str();
-				}
-				else if (buffer[0] >= '0' && buffer[0] <= 'z')
-				{
-					::cout << " (first character):";
-					::cout << buffer[0];
-				}
-				#endif
-				::cout << endl;
-			}
+				trace_message(bytes, buffer, src->id());
 
 			if (cfg.send_reply)
 			{
@@ -138,6 +139,6 @@ void start_receiver(future<shared_srt_socket> &&connection, const config &cfg, c
 void xtransmit::receive::receive_main(const string &url, const config &cfg, const atomic_bool &force_break)
 {
 	shared_srt_socket socket = make_shared<srt::socket>(UriParser(url));
-	const bool accept = socket->mode() == srt::socket::LISTENER;
+	const bool        accept = socket->mode() == srt::socket::LISTENER;
 	start_receiver(accept ? socket->async_accept() : socket->async_connect(), cfg, force_break);
 }
