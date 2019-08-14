@@ -4,6 +4,10 @@
 * OpenSSL
 * Pthreads (use pthreads4w on Windows)
 
+# Build Instructions
+
+## Linux
+
 ```
 git submodule init
 git submodule update
@@ -11,11 +15,25 @@ mkdir _build && cd _build
 cmake ../
 cmake --build ./
 ```
-## Example on Windows
+## Windows
 
+### Install Pre-requirements
+
+1. Download [nuget CLI](https://www.nuget.org/downloads) to the `_build` folder, created in the steps.
+2. Install [OpenSSL](http://slproweb.com/download/Win64OpenSSL_Light-1_1_1c.exe)
+
+### Build the Project
 ```
-cmake ../ -G"Visual Studio 16 2019" -A x64 -DPTHREAD_INCLUDE_DIR=C:\pthread-x64\include -DPTHREAD_LIBRARY=C:\pthread-x64\lib\pthread_lib.lib
+git clone https://stash.haivision.com/scm/~maxsharabayko/srt-xtransmit.git srt-xtransmit
+cd srt-xtransmit
+git submodule init
+git submodule update
+mkdir _build && cd _build
+nuget install cinegy.pthreads-win64 -version 2.9.1.17
+cmake ../ -G"Visual Studio 16 2019" -A x64 -DPTHREAD_INCLUDE_DIR="_build\cinegy.pthreads-win64.2.9.1.17\sources" -DPTHREAD_LIBRARY="$(SolutionDir)cinegy.pthreads-win64.2.9.1.17\runtimes\win-x64\native\release\pthread_lib.lib"
+cmake --build ./
 ```
+
 
 # Example Usage
 
