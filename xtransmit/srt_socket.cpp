@@ -320,8 +320,6 @@ size_t srt::socket::read(const mutable_buffer &buffer, int timeout_ms)
 
 			raise_exception("socket::read::epoll", UDT::getlasterror());
 		}
-
-		Verb() << "Socket state: " << srt_getsockstate(m_bind_socket);
 	}
 
 	const int res = srt_recvmsg2(m_bind_socket, reinterpret_cast<char *>(buffer.data()), (int)buffer.size(), nullptr);
