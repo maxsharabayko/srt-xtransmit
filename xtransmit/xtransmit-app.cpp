@@ -268,14 +268,21 @@ int main(int argc, char **argv) {
 	app.add_flag_function("--verbose,-v", [](size_t) { Verbose::on = true; }, "enable verbose output");
 
 	app.add_option("--loglevel", [](CLI::results_t val) {
-		std::cout << "This option was given " << val.size() << " times." << std::endl;
 		srt_logging::LogLevel::type lev = SrtParseLogLevel(val[0]);
 		UDT::setloglevel(lev);
-		UDT::addlogfa(SRT_LOGFA_FORWARDER);
 		Verb() << "Log level set to " << val[0];
 		return true;
 	}, "log level [debug, error, note, info, fatal]");
 
+	app.add_option("--logfa",
+	               [](CLI::results_t val) {
+		               set<srt_logging::LogFA>     fas = SrtParseLogFA(val[0]);
+		               for (set<srt_logging::LogFA>::iterator i = fas.begin(); i != fas.end(); ++i)
+			               srt_addlogfa(*i);
+		               Verb() << "Logfa set to " << val[0];
+		               return true;
+	               },
+	               "log functional area [ all, general, bstats, control, data, tsbpd, rexmit ]");
 
 	CLI::App* sc_async   = app.add_subcommand("async",   "Check async staff");
 	CLI::App *sc_forward = app.add_subcommand("forward", "Bidirectional data forwarding");
