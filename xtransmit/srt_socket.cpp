@@ -175,16 +175,16 @@ void srt::socket::raise_exception(const string &&place, const string &&reason)
 shared_socket srt::socket::connect()
 {
 	sockaddr_in sa;
-
 	try
 	{
 		sa = CreateAddrInet(m_host, m_port);
 	}
 	catch (const std::invalid_argument &e)
 	{
-		cerr << "ERROR: " << e.what() << endl;
-		return shared_socket();
+		raise_exception("create_addr_inet", e.what());
 	}
+
+
 	sockaddr *psa = (sockaddr *)&sa;
 	Verb() << "Connecting to " << m_host << ":" << m_port << (m_blocking_mode ? " (SYNC)" : " (ASYNC)");
 
@@ -208,9 +208,6 @@ shared_socket srt::socket::connect()
 			const SRT_SOCKSTATUS state = srt_getsockstate(m_bind_socket);
 			if (state != SRTS_CONNECTED)
 				raise_exception("srt::socket::connect", "connection failed, socket state " + to_string(state));
-
-			Verb() << "[EPOLL: " << len << " sockets] " << VerbNoEOL;
-			Verb() << "state: " << srt_getsockstate(m_bind_socket) << VerbNoEOL;
 		}
 		else
 		{
@@ -237,17 +234,9 @@ std::future<shared_socket> srt::socket::async_connect()
 
 std::future<shared_socket> srt::socket::async_accept()
 {
-	try
-	{
-		listen();
-	}
-	catch (const socket_exception &e)
-	{
-		return future<shared_socket>();
-	}
+	listen();
 
 	auto self = shared_from_this();
-
 	return async(std::launch::async, [self]() { return self->accept(); });
 }
 

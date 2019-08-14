@@ -63,12 +63,19 @@ private:
 
 public:
 
-	std::future<shared_socket>	async_connect();
-	std::future<shared_socket>	async_accept();
+	std::future<shared_socket> async_connect() noexcept(false);
+	std::future<shared_socket> async_accept()  noexcept(false);
+
 
 	shared_socket				connect();
 	shared_socket				accept();
-	void						listen();
+
+	/**
+	 * Start listening on the incomming connection requests.
+	 *
+	 * May throw a socket_exception.
+	 */
+	void                        listen() noexcept(false);
 
 public:
 

@@ -108,26 +108,32 @@ void run(shared_srt_socket dst, const config &cfg, const atomic_bool &force_brea
 void start_generator(future<shared_srt_socket> connection, const config &cfg, const atomic_bool &force_break)
 {
 	if (!connection.valid())
+	{
+		cerr << "Error: Unexpected socket creation failure!" << endl;
 		return;
+	}
 
 	const shared_srt_socket sock = connection.get();
 	if (!sock)
+	{
+		cerr << "Error: Unexpected socket connection failure!" << endl;
 		return;
+	}
 
-	try
-	{
-		run(sock, cfg, force_break);
-	}
-	catch (const srt::socket_exception &e)
-	{
-		cerr << e.what() << endl;
-		return;
-	}
+	run(sock, cfg, force_break);
 }
 
 void xtransmit::generate::generate_main(const string &dst_url, const config &cfg, const atomic_bool &force_break)
 {
 	shared_srt_socket socket = make_shared<srt::socket>(UriParser(dst_url));
 	const bool        accept = socket->mode() == srt::socket::LISTENER;
-	start_generator(accept ? socket->async_accept() : socket->async_connect(), cfg, force_break);
+	try
+	{
+		start_generator(accept ? socket->async_accept() : socket->async_connect(), cfg, force_break);
+	}
+	catch (const srt::socket_exception &e)
+	{
+		cerr << e.what() << endl;
+		return;
+	}
 }
