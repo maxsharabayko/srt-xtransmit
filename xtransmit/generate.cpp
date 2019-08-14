@@ -107,9 +107,15 @@ void run(shared_srt_socket dst, const config &cfg, const atomic_bool &force_brea
 
 void start_generator(future<shared_srt_socket> connection, const config &cfg, const atomic_bool &force_break)
 {
+	if (!connection.valid())
+		return;
+
+	const shared_srt_socket sock = connection.get();
+	if (!sock)
+		return;
+
 	try
 	{
-		const shared_srt_socket sock = connection.get();
 		run(sock, cfg, force_break);
 	}
 	catch (const srt::socket_exception &e)

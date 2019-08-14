@@ -127,6 +127,9 @@ void start_receiver(future<shared_srt_socket> &&connection, const config &cfg, c
 	try
 	{
 		const shared_srt_socket sock = connection.get();
+		if (!sock)
+			return;
+
 		run(sock, cfg, force_break);
 	}
 	catch (const srt::socket_exception &e)
