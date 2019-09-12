@@ -299,7 +299,7 @@ int main(int argc, char **argv) {
 	xtransmit::generate::config cfg_generate;
 	CLI::App* sc_generate = app.add_subcommand("generate", "Send generated data")->fallthrough();
 	sc_generate->add_option("dst", dst, "Destination URI");
-	sc_generate->add_option("--msgsize", cfg_generate.message_size, "Destination URI");
+	sc_generate->add_option("--msgsize", cfg_generate.message_size, "Size of a message to send");
 	sc_generate->add_option("--sendrate", cfg_generate.sendrate, "Bitrate to generate")
 		->transform(CLI::AsNumberWithUnit(to_bps, CLI::AsNumberWithUnit::CASE_SENSITIVE));
 	sc_generate->add_option("--num", cfg_generate.num_messages, "Number of messages to send (-1 for infinite)");
@@ -314,7 +314,7 @@ int main(int argc, char **argv) {
 	xtransmit::receive::config cfg_receive;
 	CLI::App* sc_receive = app.add_subcommand("receive", "Receive data")->fallthrough();
 	sc_receive->add_option("src", src, "Source URI");
-	sc_receive->add_option("--msgsize", cfg_receive.message_size, "Destination URI");
+	sc_receive->add_option("--msgsize", cfg_receive.message_size, "Size of a buffer to receive message payload");
 	sc_receive->add_option("--statsfile", cfg_receive.stats_file, "output stats report filename");
 	sc_receive->add_option("--statsfreq", cfg_receive.stats_freq_ms, "output stats report frequency (ms)")
 		->transform(CLI::AsNumberWithUnit(to_ms, CLI::AsNumberWithUnit::CASE_SENSITIVE));

@@ -93,7 +93,13 @@ void run(shared_srt_socket src, const config &cfg, const atomic_bool &force_brea
 	{
 		while (!force_break)
 		{
-			const size_t bytes = src->read(mutable_buffer(buffer.data(), buffer.size()), 500);
+			const size_t bytes = src->read(mutable_buffer(buffer.data(), buffer.size()), -1);
+
+			if (bytes == 0)
+			{
+				::cerr << "src->read returned 0\n";
+				continue;
+			}
 
 			if (cfg.print_notifications)
 				trace_message(bytes, buffer, src->id());
@@ -104,7 +110,7 @@ void run(shared_srt_socket src, const config &cfg, const atomic_bool &force_brea
 				src->write(const_buffer(out_message.data(), out_message.size()));
 
 				if (cfg.print_notifications)
-					::cout << "Reply sent on conn ID " << src->id() << "\n";
+					::cerr << "Reply sent on conn ID " << src->id() << "\n";
 			}
 		}
 	}
@@ -134,7 +140,7 @@ void start_receiver(future<shared_srt_socket> &&connection, const config &cfg, c
 	}
 	catch (const srt::socket_exception &e)
 	{
-		std::cerr << e.what();
+		::cerr << e.what();
 		return;
 	}
 }

@@ -13,9 +13,9 @@ using namespace xtransmit;
 using shared_socket = shared_ptr<srt::socket>;
 
 srt::socket::socket(const UriParser &src_uri)
-    : m_host(src_uri.host())
-    , m_port(src_uri.portno())
-    , m_options(src_uri.parameters())
+	: m_host(src_uri.host())
+	, m_port(src_uri.portno())
+	, m_options(src_uri.parameters())
 {
 	m_bind_socket = srt_create_socket();
 	if (m_bind_socket == SRT_INVALID_SOCK)
@@ -48,8 +48,8 @@ srt::socket::socket(const UriParser &src_uri)
 }
 
 srt::socket::socket(const int sock, bool blocking)
-    : m_bind_socket(sock)
-    , m_blocking_mode(blocking)
+	: m_bind_socket(sock)
+	, m_blocking_mode(blocking)
 {
 	if (!m_blocking_mode)
 	{
@@ -103,7 +103,7 @@ void srt::socket::listen()
 		raise_exception("srt_listen", UDT::getlasterror());
 	}
 
-	Verb() << " connected.";
+	Verb() << " listening.";
 	res = configure_post(m_bind_socket);
 	if (res == SRT_ERROR)
 		raise_exception("configure_post", UDT::getlasterror());
@@ -322,7 +322,7 @@ size_t srt::socket::read(const mutable_buffer &buffer, int timeout_ms)
 		}
 	}
 
-	const int res = srt_recvmsg2(m_bind_socket, reinterpret_cast<char *>(buffer.data()), (int)buffer.size(), nullptr);
+	const int res = srt_recvmsg2(m_bind_socket, static_cast<char *>(buffer.data()), (int)buffer.size(), nullptr);
 	if (SRT_ERROR == res)
 		raise_exception("socket::read::recv", UDT::getlasterror());
 
@@ -331,18 +331,26 @@ size_t srt::socket::read(const mutable_buffer &buffer, int timeout_ms)
 
 void srt::socket::write(const const_buffer &buffer, int timeout_ms)
 {
+	stringstream ss;
 	if (!m_blocking_mode)
 	{
-		// TODO: check error fds
 		int ready[2] = {SRT_INVALID_SOCK, SRT_INVALID_SOCK};
 		int len      = 2;
-		if (srt_epoll_wait(m_epoll_io, 0, 0, ready, &len, timeout_ms, 0, 0, 0, 0) == SRT_ERROR)
+		int rready[2] = {SRT_INVALID_SOCK, SRT_INVALID_SOCK};
+		int rlen      = 2;
+		// TODO: check error fds
+		const int res = srt_epoll_wait(m_epoll_io, rready, &rlen, ready, &len, timeout_ms, 0, 0, 0, 0);
+		if (res == SRT_ERROR)
 			raise_exception("socket::write::epoll", UDT::getlasterror());
+
+		ss << "srt::socket::write: srt_epoll_wait res " << res << " rlen " << rlen << " wlen " << len << " wsocket " << ready[0];
+		//Verb() << "srt::socket::write: srt_epoll_wait set len " << len << " socket " << ready[0];
 	}
 
-	if (SRT_ERROR ==
-	    srt_sendmsg2(m_bind_socket, reinterpret_cast<const char *>(buffer.data()), (int)buffer.size(), nullptr))
-		raise_exception("socket::write::send", UDT::getlasterror());
+	const int res = srt_sendmsg2(m_bind_socket, static_cast<const char*>(buffer.data()), static_cast<int>(buffer.size()), nullptr);
+	if (res == SRT_ERROR)
+		raise_exception("socket::write::send", srt_getlasterror_str() + ss.str());
+	//	raise_exception("socket::write::send", UDT::getlasterror());
 }
 
 srt::socket::connection_mode srt::socket::mode() const { return m_mode; }
