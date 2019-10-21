@@ -22,12 +22,10 @@ using namespace std::chrono;
 using shared_srt_socket = std::shared_ptr<srt::socket>;
 
 
-void trace_message(const size_t bytes, const vector<char> &buffer, int conn_id)
+void read_timestamp(const vector<char>& buffer)
 {
-	::cout << "RECEIVED MESSAGE length " << bytes << " on conn ID " << conn_id;
-
-	const time_t    send_time    = *(reinterpret_cast<const time_t *>(buffer.data()));
-	const long long send_time_us = *(reinterpret_cast<const long long *>(buffer.data() + 8));
+	const time_t    send_time    = *(reinterpret_cast<const time_t*>   (buffer.data()));
+	const long long send_time_us = *(reinterpret_cast<const long long*>(buffer.data() + 8));
 
 	const auto   systime_now = system_clock::now();
 	const time_t read_time   = system_clock::to_time_t(systime_now);
@@ -36,11 +34,19 @@ void trace_message(const size_t bytes, const vector<char> &buffer, int conn_id)
 	::cout << " snd_time " << std::put_time(&tm_send, "%T.") << std::setfill('0') << std::setw(6) << send_time_us;
 	std::tm                tm_read = *std::localtime(&read_time);
 	system_clock::duration read_time_frac =
-	    systime_now.time_since_epoch() - duration_cast<seconds>(systime_now.time_since_epoch());
+		systime_now.time_since_epoch() - duration_cast<seconds>(systime_now.time_since_epoch());
 	::cout << " read_time " << std::put_time(&tm_read, "%T.") << duration_cast<microseconds>(read_time_frac).count();
 
 	const auto delay = systime_now - (system_clock::from_time_t(send_time) + microseconds(send_time_us));
 	::cout << " delta " << duration_cast<milliseconds>(delay).count() << " ms";
+}
+
+
+void trace_message(const size_t bytes, const vector<char> &buffer, int conn_id)
+{
+	::cout << "RECEIVED MESSAGE length " << bytes << " on conn ID " << conn_id;
+
+	// read_timestamp(buffer);
 
 #if 0
 	if (bytes < 50)
