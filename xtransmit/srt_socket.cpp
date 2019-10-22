@@ -329,7 +329,7 @@ size_t srt::socket::read(const mutable_buffer &buffer, int timeout_ms)
 	return static_cast<size_t>(res);
 }
 
-void srt::socket::write(const const_buffer &buffer, int timeout_ms)
+int srt::socket::write(const const_buffer &buffer, int timeout_ms)
 {
 	stringstream ss;
 	if (!m_blocking_mode)
@@ -351,6 +351,8 @@ void srt::socket::write(const const_buffer &buffer, int timeout_ms)
 	if (res == SRT_ERROR)
 		raise_exception("socket::write::send", srt_getlasterror_str() + ss.str());
 	//	raise_exception("socket::write::send", UDT::getlasterror());
+
+	return res;
 }
 
 srt::socket::connection_mode srt::socket::mode() const { return m_mode; }

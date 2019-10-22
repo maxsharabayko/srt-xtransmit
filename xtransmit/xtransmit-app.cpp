@@ -26,6 +26,7 @@
 
 #include "generate.hpp"
 #include "receive.hpp"
+#include "sendfile.h"
 
 
 
@@ -321,6 +322,14 @@ int main(int argc, char **argv) {
 	sc_receive->add_option("--printmsg", cfg_receive.print_notifications, "print message into to stdout");
 	sc_receive->add_flag("--twoway", cfg_receive.send_reply, "Both send and receive data");
 
+#ifdef ENABLE_FILE
+	xtransmit::file::config cfg_file;
+	CLI::App* sc_sendfile = app.add_subcommand("sendfile", "Send file or folder")->fallthrough();
+	sc_sendfile->add_option("src", cfg_file.src_path, "Source path to file/folder");
+	sc_sendfile->add_option("dst", dst, "Destination URI");
+	
+#endif
+
 
 	// TODO:
 	// CLI::App* sc_echo    = app.add_subcommand("echo",    "Echo back all the packets received on the connection");
@@ -385,6 +394,13 @@ int main(int argc, char **argv) {
 		xtransmit::receive::receive_main(src, cfg_receive, force_break);
 		return 0;
 	}
+#ifdef ENABLE_FILE
+	else if (sc_sendfile->parsed())
+	{
+		xtransmit::file::send(dst, cfg_file, force_break);
+		return 0;
+	}
+#endif
 	else
 	{
 
