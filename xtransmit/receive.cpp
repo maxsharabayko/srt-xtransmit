@@ -46,8 +46,6 @@ void trace_message(const size_t bytes, const vector<char> &buffer, int conn_id)
 {
 	::cout << "RECEIVED MESSAGE length " << bytes << " on conn ID " << conn_id;
 
-	// read_timestamp(buffer);
-
 #if 0
 	if (bytes < 50)
 	{
@@ -109,6 +107,8 @@ void run(shared_srt_socket src, const config &cfg, const atomic_bool &force_brea
 
 			if (cfg.print_notifications)
 				trace_message(bytes, buffer, src->id());
+			if (cfg.check_timestamp)
+				read_timestamp(buffer);
 
 			if (cfg.send_reply)
 			{

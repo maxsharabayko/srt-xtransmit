@@ -4,6 +4,7 @@
 #include <future>
 #include <limits>
 #include <memory>
+#include <string>
 #include <thread>
 #include <vector>
 #include "srt_socket.hpp"
@@ -23,14 +24,14 @@ using shared_srt_socket = std::shared_ptr<srt::socket>;
 
 void write_timestamp(vector<char> &message_to_send)
 {
-    const auto   systime_now = system_clock::now();
-    const time_t now_c = system_clock::to_time_t(systime_now);
-    *(reinterpret_cast<time_t*>(message_to_send.data())) = now_c;
+	const auto   systime_now = system_clock::now();
+	const time_t now_c = system_clock::to_time_t(systime_now);
+	*(reinterpret_cast<time_t*>(message_to_send.data())) = now_c;
 
-    system_clock::duration frac =
-        systime_now.time_since_epoch() - duration_cast<seconds>(systime_now.time_since_epoch());
+	system_clock::duration frac =
+		systime_now.time_since_epoch() - duration_cast<seconds>(systime_now.time_since_epoch());
 
-    *(reinterpret_cast<long long*>(message_to_send.data() + 8)) = duration_cast<microseconds>(frac).count();
+	*(reinterpret_cast<long long*>(message_to_send.data() + 8)) = duration_cast<microseconds>(frac).count();
 }
 
 
@@ -103,7 +104,8 @@ void run(shared_srt_socket dst, const config &cfg, const atomic_bool &force_brea
 			break;
 		}
 
-		// write_timestamp(message_to_send);
+		if (cfg.add_timestamp)
+			write_timestamp(message_to_send);
 
 		target->write(const_buffer(message_to_send.data(), message_to_send.size()));
 	}
@@ -130,7 +132,7 @@ void start_generator(future<shared_srt_socket> connection, const config &cfg, co
 	run(sock, cfg, force_break);
 }
 
-void xtransmit::generate::generate_main(const string &dst_url, const config &cfg, const atomic_bool &force_break)
+void xtransmit::generate::run(const string &dst_url, const config &cfg, const atomic_bool &force_break)
 {
 	shared_srt_socket socket = make_shared<srt::socket>(UriParser(dst_url));
 	const bool        accept = socket->mode() == srt::socket::LISTENER;
@@ -144,3 +146,30 @@ void xtransmit::generate::generate_main(const string &dst_url, const config &cfg
 		return;
 	}
 }
+
+CLI::App* xtransmit::generate::add_subcommand(CLI::App &app, config &cfg, string &dst_url)
+{
+	const map<string, int> to_bps{ {"kbps", 1'000}, {"Mbps", 1'000'000}, {"Gbps", 1'000'000'000} };
+	const map<string, int> to_ms{ {"s", 1'000}, {"ms", 1} };
+	const map<string, int> to_sec{ {"s", 1}, {"min", 60}, {"mins", 60} };
+
+	CLI::App* sc_generate = app.add_subcommand("generate", "Send generated data")->fallthrough();
+	sc_generate->add_option("dst", dst_url, "Destination URI");
+	sc_generate->add_option("--msgsize", cfg.message_size, "Size of a message to send");
+	sc_generate->add_option("--sendrate", cfg.sendrate, "Bitrate to generate")
+		->transform(CLI::AsNumberWithUnit(to_bps, CLI::AsNumberWithUnit::CASE_SENSITIVE));
+	sc_generate->add_option("--num", cfg.num_messages, "Number of messages to send (-1 for infinite)");
+	sc_generate->add_option("--duration", cfg.duration, "Sending duration in seconds (supresses --num option)")
+		->transform(CLI::AsNumberWithUnit(to_sec, CLI::AsNumberWithUnit::CASE_SENSITIVE));
+	sc_generate->add_option("--statsfile", cfg.stats_file, "output stats report filename");
+	sc_generate->add_option("--statsfreq", cfg.stats_freq_ms, "output stats report frequency (ms)")
+		->transform(CLI::AsNumberWithUnit(to_ms, CLI::AsNumberWithUnit::CASE_SENSITIVE));
+	sc_generate->add_flag("--twoway", cfg.two_way, "Both send and receive data");
+	sc_generate->add_flag("--timestamp", cfg.add_timestamp, "Place a timestamp in the message payload");
+
+	return sc_generate;
+}
+
+
+
+

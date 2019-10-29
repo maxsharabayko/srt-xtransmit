@@ -260,7 +260,9 @@ int forward(const string &src, const string &dst)
 
 
 
-int main(int argc, char **argv) {
+int main(int argc, char **argv)
+{
+	using namespace xtransmit;
 
 	CLI::App app("SRT xtransmit tool.");
 	app.set_config("--config");
@@ -292,24 +294,14 @@ int main(int argc, char **argv) {
 	sc_forward->add_option("dst", dst, "Destination URI");
 	sc_forward->add_flag("--oneway", "Forward only from SRT to DST");
 
-	map<string, int> to_bps{ {"kbps", 1'000}, {"Mbps", 1'000'000}, {"Gbps", 1'000'000'000} };
-	map<string, int> to_ms{ {"s", 1'000}, {"ms", 1} };
-	map<string, int> to_sec{{"s", 1}, {"min", 60}, {"mins", 60}};
-	map<string, int> to_bytes{ {"kB", 1'000}, {"MB", 1'000'000}, {"GB", 1'000'000'000}, {"Gb", 1'000'000'000 / 8} };
+	const map<string, int> to_bps{ {"kbps", 1'000}, {"Mbps", 1'000'000}, {"Gbps", 1'000'000'000} };
+	const map<string, int> to_ms{ {"s", 1'000}, {"ms", 1} };
+	const map<string, int> to_sec{{"s", 1}, {"min", 60}, {"mins", 60}};
+	const map<string, int> to_bytes{ {"kB", 1'000}, {"MB", 1'000'000}, {"GB", 1'000'000'000}, {"Gb", 1'000'000'000 / 8} };
 
-	xtransmit::generate::config cfg_generate;
-	CLI::App* sc_generate = app.add_subcommand("generate", "Send generated data")->fallthrough();
-	sc_generate->add_option("dst", dst, "Destination URI");
-	sc_generate->add_option("--msgsize", cfg_generate.message_size, "Size of a message to send");
-	sc_generate->add_option("--sendrate", cfg_generate.sendrate, "Bitrate to generate")
-		->transform(CLI::AsNumberWithUnit(to_bps, CLI::AsNumberWithUnit::CASE_SENSITIVE));
-	sc_generate->add_option("--num", cfg_generate.num_messages, "Number of messages to send (-1 for infinite)");
-	sc_generate->add_option("--duration", cfg_generate.duration, "Sending duration in seconds (supresses --num option)")
-		->transform(CLI::AsNumberWithUnit(to_sec, CLI::AsNumberWithUnit::CASE_SENSITIVE));
-	sc_generate->add_option("--statsfile", cfg_generate.stats_file, "output stats report filename");
-	sc_generate->add_option("--statsfreq", cfg_generate.stats_freq_ms, "output stats report frequency (ms)")
-		->transform(CLI::AsNumberWithUnit(to_ms, CLI::AsNumberWithUnit::CASE_SENSITIVE));
-	sc_generate->add_flag("--twoway", cfg_generate.two_way, "Both send and receive data");
+	// SUBCOMMAND: generate
+	generate::config cfg_generate;
+	CLI::App* sc_generate = generate::add_subcommand(app, cfg_generate, dst);
 
 
 	xtransmit::receive::config cfg_receive;
@@ -319,7 +311,8 @@ int main(int argc, char **argv) {
 	sc_receive->add_option("--statsfile", cfg_receive.stats_file, "output stats report filename");
 	sc_receive->add_option("--statsfreq", cfg_receive.stats_freq_ms, "output stats report frequency (ms)")
 		->transform(CLI::AsNumberWithUnit(to_ms, CLI::AsNumberWithUnit::CASE_SENSITIVE));
-	sc_receive->add_option("--printmsg", cfg_receive.print_notifications, "print message into to stdout");
+	sc_receive->add_flag("--printmsg", cfg_receive.print_notifications, "print message into to stdout");
+	sc_receive->add_flag("--timestamp", cfg_receive.check_timestamp, "Check a timestamp in the message payload");
 	sc_receive->add_flag("--twoway", cfg_receive.send_reply, "Both send and receive data");
 
 #ifdef ENABLE_FILE
@@ -386,7 +379,7 @@ int main(int argc, char **argv) {
 	}
 	else if (sc_generate->parsed())
 	{
-		xtransmit::generate::generate_main(dst, cfg_generate, force_break);
+		generate::run(dst, cfg_generate, force_break);
 		return 0;
 	}
 	else if (sc_receive->parsed())
