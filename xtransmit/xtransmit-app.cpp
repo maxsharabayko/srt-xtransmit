@@ -382,7 +382,7 @@ int main(int argc, char **argv) {
 	// https://cliutils.gitlab.io/CLI11Tutorial/chapters/an-advanced-example.html
 	if (sc_forward->parsed())
 	{
-		//forward(src, dst);
+		forward(src, dst);
 	}
 	else if (sc_generate->parsed())
 	{
