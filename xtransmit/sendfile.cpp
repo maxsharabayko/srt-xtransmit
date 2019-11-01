@@ -12,6 +12,7 @@
 using namespace std;
 using namespace xtransmit;
 using namespace xtransmit::file;
+namespace fs = std::filesystem;
 
 
 using shared_srt_socket = std::shared_ptr<srt::socket>;
@@ -93,6 +94,7 @@ struct path_leaf_string
 {
 	string operator()(const filesystem::directory_entry& entry) const
 	{
+		entry.is_directory();
 		return entry.path().string();
 	}
 };
@@ -100,10 +102,27 @@ struct path_leaf_string
 // TODO: Read subfolders
 void read_directory(const string& name, vector<string>& v)
 {
-	std::filesystem::path p(name);
-	std::filesystem::directory_iterator start(p);
-	std::filesystem::directory_iterator end;
-	std::transform(start, end, std::back_inserter(v), path_leaf_string());
+	deque<string> subdirs = { name };
+
+	while (!subdirs.empty())
+	{
+		fs::path p(subdirs.front());
+		subdirs.pop_front();
+
+		if (!fs::is_directory(p))
+		{
+			v.push_back(p.string());
+			continue;
+		}
+
+		for (const auto& entry : filesystem::directory_iterator(p))
+		{
+			if (entry.is_directory())
+				subdirs.push_back(entry.path().string());
+			else
+				v.push_back(entry.path().string());
+		}
+	}
 }
 
 //
