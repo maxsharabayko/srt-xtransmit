@@ -4,6 +4,7 @@
 #include <filesystem>	// Requires C++17
 #include <string>
 #include <vector>
+#include <deque>
 
 #include "sendfile.h"
 #include "srt_socket.hpp"
@@ -125,96 +126,67 @@ void read_directory(const string& name, vector<string>& v)
 	}
 }
 
-//
-//bool send_folder(UriParser& ut, string path)
-//{
-//	std::list<pair<dirent*, string>> processing_list;
-//
-//	auto get_files = [&processing_list](const std::string& path)
-//	{
-//		struct dirent** files;
-//		const int n = scandir(path.c_str(), &files, NULL, alphasort);
-//		if (n < 0)
-//		{
-//			cerr << "No files found in the directory: '" << path << "'";
-//			return false;
-//		}
-//
-//		for (int i = 0; i < n; ++i)
-//		{
-//			if (0 == strcmp(files[i]->d_name, ".") || 0 == strcmp(files[i]->d_name, ".."))
-//			{
-//				free(files[i]);
-//				continue;
-//			}
-//
-//			processing_list.push_back(pair<dirent*, string>(files[i], path + "/"));
-//		}
-//
-//		free(files);
-//		return true;
-//	};
-//
-//	/* Initial scan for files in the directory */
-//	get_files(path);
-//
-//	// Use a manual loop for reading from SRT
-//	vector<char> buf(::g_buffer_size);
-//
-//	while (!processing_list.empty())
-//	{
-//		dirent* ent = processing_list.front().first;
-//		string dir = processing_list.front().second;
-//		processing_list.pop_front();
-//
-//		if (ent->d_type == DT_DIR)
-//		{
-//			get_files(dir + ent->d_name);
-//			free(ent);
-//			continue;
-//		}
-//
-//		if (ent->d_type != DT_REG)
-//		{
-//			free(ent);
-//			continue;
-//		}
-//
-//		cerr << "File: '" << dir << ent->d_name << "'\n";
-//		const bool transmit_res = send_file(dir + ent->d_name, dir + ent->d_name,
-//			m.Socket(), buf);
-//		free(ent);
-//
-//		if (!transmit_res)
-//			break;
-//	};
-//
-//	while (!processing_list.empty())
-//	{
-//		dirent* ent = processing_list.front().first;
-//		processing_list.pop_front();
-//		free(ent);
-//	};
-//
-//	// We have to check if the sending buffer is empty.
-//	// Or we will loose this data, because SRT is not waiting
-//	// for all the data to be sent in a general live streaming use case,
-//	// as it might be not something it is expected to do, and may lead to
-//	// to unnesessary waits on destroy.
-//	// srt_getsndbuffer() is designed to handle such cases.
-//	const SRTSOCKET sock = m.Socket();
-//	size_t blocks = 0;
-//	do
-//	{
-//		if (SRT_ERROR == srt_getsndbuffer(sock, &blocks, nullptr))
-//			break;
-//
-//		if (blocks)
-//			this_thread::sleep_for(chrono::milliseconds(5));
-//	} while (blocks != 0);
-//
-//	return true;
-//}
+
+bool send_folder(UriParser& ut, string path)
+{
+
+	// Use a manual loop for reading from SRT
+	vector<char> buf(::g_buffer_size);
+
+	while (!processing_list.empty())
+	{
+		dirent* ent = processing_list.front().first;
+		string dir = processing_list.front().second;
+		processing_list.pop_front();
+
+		if (ent->d_type == DT_DIR)
+		{
+			get_files(dir + ent->d_name);
+			free(ent);
+			continue;
+		}
+
+		if (ent->d_type != DT_REG)
+		{
+			free(ent);
+			continue;
+		}
+
+		cerr << "File: '" << dir << ent->d_name << "'\n";
+		const bool transmit_res = send_file(dir + ent->d_name, dir + ent->d_name,
+			m.Socket(), buf);
+		free(ent);
+
+		if (!transmit_res)
+			break;
+	};
+
+	while (!processing_list.empty())
+	{
+		dirent* ent = processing_list.front().first;
+		processing_list.pop_front();
+		free(ent);
+	};
+
+	// We have to check if the sending buffer is empty.
+	// Or we will loose this data, because SRT is not waiting
+	// for all the data to be sent in a general live streaming use case,
+	// as it might be not something it is expected to do, and may lead to
+	// to unnesessary waits on destroy.
+	// srt_getsndbuffer() is designed to handle such cases.
+	const SRTSOCKET sock = m.Socket();
+	size_t blocks = 0;
+	do
+	{
+		if (SRT_ERROR == srt_getsndbuffer(sock, &blocks, nullptr))
+			break;
+
+		if (blocks)
+			this_thread::sleep_for(chrono::milliseconds(5));
+	} while (blocks != 0);
+
+	return true;
+}
 
 
 void enum_dir(const config& cfg)
@@ -240,6 +212,8 @@ void start_filesender(future<shared_srt_socket> connection, const config& cfg, c
 		cerr << "Error: Unexpected socket connection failure!" << endl;
 		return;
 	}
+
+
 
 	//run(sock, cfg, force_break);
 }
