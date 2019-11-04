@@ -27,6 +27,7 @@
 #include "generate.hpp"
 #include "receive.hpp"
 #include "sendfile.h"
+#include "recvfile.h"
 
 
 
@@ -323,6 +324,11 @@ int main(int argc, char **argv)
 	sc_sendfile->add_flag("--printout", cfg_file.only_print, "Print files found in a folder ad subfolders. No transfer.");
 	sc_sendfile->add_option("--segment", cfg_file.segment_size, "Size of the transmission segment");
 	
+	xtransmit::file::rcvconfig rcvcfg_file;
+	CLI::App* sc_recvfile = app.add_subcommand("recvfile", "Receive file or folder")->fallthrough();
+	sc_recvfile->add_option("src", src, "Source URI");
+	sc_recvfile->add_option("dst", rcvcfg_file.dst_path, "Destination path to file/folder");
+	sc_recvfile->add_option("--segment", cfg_file.segment_size, "Size of the transmission segment");
 #endif
 
 
@@ -393,6 +399,11 @@ int main(int argc, char **argv)
 	else if (sc_sendfile->parsed())
 	{
 		xtransmit::file::send(dst, cfg_file, force_break);
+		return 0;
+	}
+	else if (sc_recvfile->parsed())
+	{
+		xtransmit::file::receive(src, rcvcfg_file, force_break);
 		return 0;
 	}
 #endif

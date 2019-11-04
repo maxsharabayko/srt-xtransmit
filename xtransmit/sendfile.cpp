@@ -1,4 +1,4 @@
-#ifdef ENABLE_FILE
+#if 1 //def ENABLE_FILE
 #include <iostream>
 #include <iterator>
 #include <filesystem>	// Requires C++17
@@ -6,12 +6,14 @@
 #include <string>
 #include <vector>
 #include <deque>
+#include <chrono>
 
 #include "sendfile.h"
 #include "srt_socket.hpp"
 
 
 using namespace std;
+using namespace std::chrono;
 using namespace xtransmit;
 using namespace xtransmit::file;
 namespace fs = std::filesystem;
@@ -129,7 +131,7 @@ const std::vector<string> read_directory(const string& path)
 }
 
 
-/// Get file path relative to root directory.
+/// Get file path relative to root directory (upload name).
 /// Transmission preserves only relative dir structure.
 ///
 /// @return    filename if filepath matches dirpath (dirpath is a file)
@@ -149,7 +151,6 @@ const string relative_path(const string& filepath, const string &dirpath)
 	}
 
 	return file.generic_string().erase(pos, dir.generic_string().size());
-	//file.filename().string().replace(;
 }
 
 
@@ -169,39 +170,48 @@ void start_filesender(future<shared_srt_socket> connection, const config& cfg,
 		return;
 	}
 
+	atomic_bool local_break(false);
+
+	auto stats_func = [&cfg, &force_break, &local_break](shared_srt_socket sock) {
+		if (cfg.stats_freq_ms == 0)
+			return;
+		if (cfg.stats_file.empty())
+			return;
+
+		ofstream logfile_stats(cfg.stats_file.c_str());
+		if (!logfile_stats)
+		{
+			cerr << "ERROR: Can't open '" << cfg.stats_file << "' for writing stats. No output.\n";
+			return;
+		}
+
+		bool               print_header = true;
+		const milliseconds interval(cfg.stats_freq_ms);
+		while (!force_break && !local_break)
+		{
+			this_thread::sleep_for(interval);
+
+			logfile_stats << sock->statistics_csv(print_header) << flush;
+			print_header = false;
+		}
+	};
+	auto stats_logger = async(launch::async, stats_func, sock);
+
+
 	srt::socket dst_sock = *sock.get();
 
 	vector<char> buf(cfg.segment_size);
-	//using namespace placeholders;
-	//auto send = std::bind(send_file, _1, _1, dst_sock, buf);
-	//for_each(filenames.begin(), filenames.end(), send);
+	for (const string& fname : filenames)
+	{
+		const bool transmit_res = send_file(fname, relative_path(fname, cfg.src_path),
+			dst_sock, buf, force_break);
 
-	//for (const string& filename : filenames)
-	//{
-	//	const bool transmit_res = send_file(dir + ent->d_name, dir + ent->d_name,
-	//		dst_sock, buf);
+		if (!transmit_res)
+			break;
 
-	//	if (!transmit_res)
-	//		break;
-
-	//	if (force_break)
-	//		break;
-	//}
-
-
-	//for ()
-	//{
-	//	cerr << "File: '" << dir << ent->d_name << "'\n";
-	//	const bool transmit_res = send_file(dir + ent->d_name, dir + ent->d_name,
-	//		dst_sock, buf);
-	//	free(ent);
-
-	//	if (!transmit_res)
-	//		break;
-	//}
-
-
-
+		if (force_break)
+			break;
+	}
 
 	//// We have to check if the sending buffer is empty.
 	//// Or we will loose this data, because SRT is not waiting
@@ -220,6 +230,8 @@ void start_filesender(future<shared_srt_socket> connection, const config& cfg,
 	//		this_thread::sleep_for(chrono::milliseconds(5));
 	//} while (blocks != 0);
 
+	local_break = true;
+	stats_logger.wait();
 }
 
 

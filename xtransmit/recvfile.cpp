@@ -1,0 +1,218 @@
+#if 1 //def ENABLE_FILE
+#include <iostream>
+#include <iterator>
+#include <filesystem>	// Requires C++17
+#include <functional>
+#include <string>
+#include <vector>
+#include <deque>
+#include <chrono>
+
+#include "recvfile.h"
+#include "srt_socket.hpp"
+
+
+using namespace std;
+using namespace std::chrono;
+using namespace xtransmit;
+using namespace xtransmit::file;
+namespace fs = std::filesystem;
+
+
+using shared_srt_socket = std::shared_ptr<srt::socket>;
+
+
+// Returns true on success, false on error
+bool create_folder(const string& path)
+{
+	// If the function fails because p resolves to an existing directory, no error is reported.
+	if (fs::create_directory(path))
+	{
+		cerr << "Directory '" << path << "' was successfully created" << endl;
+		return true;
+	}
+
+	cerr << "Directory '" << path << "' failed to be created" << endl;
+	return false;
+}
+
+
+// Returns true on success, false on error
+// TODO: avoid multiple serial delimiters
+bool create_subfolders(const string& path)
+{
+	size_t found = path.find("./");
+	if (found == std::string::npos)
+	{
+		found = path.find(".\\");
+	}
+
+	size_t pos = found != std::string::npos ? (found + 2) : 0;
+	const size_t last_delim = path.find_last_of("/\\");
+	if (last_delim == string::npos || last_delim < pos)
+	{
+		cerr << "No folders to create\n";
+		return true;
+	}
+
+	while (pos != std::string::npos && pos != last_delim)
+	{
+		pos = path.find_first_of("\\/", pos + 1);
+		cerr << "Creating folder " << path.substr(0, pos) << "\n";
+		if (!create_folder(path.substr(0, pos).c_str()))
+			return false;
+	};
+
+	return true;
+}
+
+
+
+bool receive_files(srt::socket& src, const string& dstpath
+	, vector<char>& buf, const atomic_bool& force_break)
+{
+	cerr << "Downloading to '" << dstpath;
+
+	chrono::steady_clock::time_point time_start;
+	size_t file_size = 0;
+
+	ofstream ofile;
+	while (!force_break)
+	{
+		const size_t bytes = src.read(mutable_buffer(buf.data(), buf.size()), -1);
+		if (bytes == 0)
+		{
+			cerr << "Nothing was received. Closing.";
+			break;
+		}
+
+		int hdr_size = 1;
+		const bool is_first = (buf[0] & 0x01) != 0;
+		const bool is_eof = (buf[0] & 0x02) != 0;
+
+		if (is_first)
+		{
+			ofile.close();
+			// extranct the filename from the received buffer
+			string filename = string(buf.data() + 1);
+			hdr_size += filename.size() + 1;    // 1 for null character
+
+			create_subfolders(filename);
+
+			ofile.open(filename.c_str(), ios::out | ios::trunc | ios::binary);
+			if (!ofile) {
+				cerr << "Download: error opening file " << filename << endl;
+				break;
+			}
+
+			cerr << "Downloading: --> " << filename;
+			time_start = chrono::steady_clock::now();
+			file_size = 0;
+		}
+
+		if (!ofile)
+		{
+			cerr << "Download: file is closed while data is received: first packet missed?\n";
+			continue;
+		}
+
+		ofile.write(buf.data() + hdr_size, bytes - hdr_size);
+		file_size += bytes - hdr_size;
+
+		if (is_eof)
+		{
+			ofile.close();
+			const chrono::steady_clock::time_point time_end = chrono::steady_clock::now();
+			const auto delta_us = chrono::duration_cast<chrono::microseconds>(time_end - time_start).count();
+
+			const size_t rate_kbps = (file_size * 1000) / (delta_us ? delta_us : 1) * 8;
+#if ENABLE_JSON_INPUT
+			const auto delta_ms = chrono::duration_cast<chrono::milliseconds>(time_end - time_start).count();
+			cerr << "--> done (" << file_size / 1024 << " kbytes transfered at " << rate_kbps << " kbps, took "
+				<< delta_ms / 1000.0 << " sec)";
+#else
+			cerr << "--> done (" << file_size / 1024 << " kbytes transfered at " << rate_kbps << " kbps, took "
+				<< chrono::duration_cast<chrono::minutes>(time_end - time_start).count() << " minute(s))";
+#endif
+		}
+	}
+
+	return true;
+}
+
+
+
+void start_filereceiver(future<shared_srt_socket> connection, const rcvconfig& cfg,
+	const atomic_bool& force_break)
+{
+	if (!connection.valid())
+	{
+		cerr << "Error: Unexpected socket creation failure!" << endl;
+		return;
+	}
+
+	const shared_srt_socket sock = connection.get();
+	if (!sock)
+	{
+		cerr << "Error: Unexpected socket connection failure!" << endl;
+		return;
+	}
+
+	atomic_bool local_break(false);
+
+	auto stats_func = [&cfg, &force_break, &local_break](shared_srt_socket sock) {
+		if (cfg.stats_freq_ms == 0)
+			return;
+		if (cfg.stats_file.empty())
+			return;
+
+		ofstream logfile_stats(cfg.stats_file.c_str());
+		if (!logfile_stats)
+		{
+			cerr << "ERROR: Can't open '" << cfg.stats_file << "' for writing stats. No output.\n";
+			return;
+		}
+
+		bool               print_header = true;
+		const milliseconds interval(cfg.stats_freq_ms);
+		while (!force_break && !local_break)
+		{
+			this_thread::sleep_for(interval);
+
+			logfile_stats << sock->statistics_csv(print_header) << flush;
+			print_header = false;
+		}
+	};
+	auto stats_logger = async(launch::async, stats_func, sock);
+
+	vector<char> buf(cfg.segment_size);
+	receive_files(*sock.get(), cfg.dst_path, buf, force_break);
+
+	local_break = true;
+	stats_logger.wait();
+}
+
+
+void xtransmit::file::receive(const string& dst_url, const rcvconfig& cfg, const atomic_bool& force_break)
+{
+	UriParser ut(dst_url);
+	ut["transtype"] = string("file");
+	ut["messageapi"] = string("true");
+	ut["rcvbuf"] = to_string(cfg.segment_size * 10);
+
+	shared_srt_socket socket = make_shared<srt::socket>(ut);
+	const bool        accept = socket->mode() == srt::socket::LISTENER;
+	try
+	{
+		start_filereceiver(accept ? socket->async_accept() : socket->async_connect()
+			, cfg, force_break);
+	}
+	catch (const srt::socket_exception & e)
+	{
+		cerr << e.what() << endl;
+		return;
+	}
+}
+
+#endif
+

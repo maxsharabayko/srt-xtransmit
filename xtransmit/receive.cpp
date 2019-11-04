@@ -93,12 +93,14 @@ void run(shared_srt_socket src, const config &cfg, const atomic_bool &force_brea
 
 	auto stats_logger = async(launch::async, stats_func, src);
 
+	srt::socket &sock = *src.get();
+
 	vector<char> buffer(cfg.message_size);
 	try
 	{
 		while (!force_break)
 		{
-			const size_t bytes = src->read(mutable_buffer(buffer.data(), buffer.size()), -1);
+			const size_t bytes = sock.read(mutable_buffer(buffer.data(), buffer.size()), -1);
 
 			if (bytes == 0)
 			{
@@ -107,17 +109,17 @@ void run(shared_srt_socket src, const config &cfg, const atomic_bool &force_brea
 			}
 
 			if (cfg.print_notifications)
-				trace_message(bytes, buffer, src->id());
+				trace_message(bytes, buffer, sock.id());
 			if (cfg.check_timestamp)
 				read_timestamp(buffer);
 
 			if (cfg.send_reply)
 			{
 				const string out_message("Message received");
-				src->write(const_buffer(out_message.data(), out_message.size()));
+				sock.write(const_buffer(out_message.data(), out_message.size()));
 
 				if (cfg.print_notifications)
-					::cerr << "Reply sent on conn ID " << src->id() << "\n";
+					::cerr << "Reply sent on conn ID " << sock.id() << "\n";
 			}
 		}
 	}
