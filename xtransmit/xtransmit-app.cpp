@@ -323,12 +323,18 @@ int main(int argc, char **argv)
 	sc_sendfile->add_option("dst", dst, "Destination URI");
 	sc_sendfile->add_flag("--printout", cfg_file.only_print, "Print files found in a folder ad subfolders. No transfer.");
 	sc_sendfile->add_option("--segment", cfg_file.segment_size, "Size of the transmission segment");
+	sc_sendfile->add_option("--statsfile", cfg_file.stats_file, "output stats report filename");
+	sc_sendfile->add_option("--statsfreq", cfg_file.stats_freq_ms, "output stats report frequency (ms)")
+		->transform(CLI::AsNumberWithUnit(to_ms, CLI::AsNumberWithUnit::CASE_SENSITIVE));
 	
 	xtransmit::file::rcvconfig rcvcfg_file;
 	CLI::App* sc_recvfile = app.add_subcommand("recvfile", "Receive file or folder")->fallthrough();
 	sc_recvfile->add_option("src", src, "Source URI");
 	sc_recvfile->add_option("dst", rcvcfg_file.dst_path, "Destination path to file/folder");
-	sc_recvfile->add_option("--segment", cfg_file.segment_size, "Size of the transmission segment");
+	sc_recvfile->add_option("--segment", rcvcfg_file.segment_size, "Size of the transmission segment");
+	sc_recvfile->add_option("--statsfile", rcvcfg_file.stats_file, "output stats report filename");
+	sc_recvfile->add_option("--statsfreq", rcvcfg_file.stats_freq_ms, "output stats report frequency (ms)")
+		->transform(CLI::AsNumberWithUnit(to_ms, CLI::AsNumberWithUnit::CASE_SENSITIVE));
 #endif
 
 

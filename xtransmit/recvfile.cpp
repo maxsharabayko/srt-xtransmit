@@ -71,7 +71,7 @@ bool create_subfolders(const string& path)
 bool receive_files(srt::socket& src, const string& dstpath
 	, vector<char>& buf, const atomic_bool& force_break)
 {
-	cerr << "Downloading to '" << dstpath;
+	cerr << "Downloading to '" << dstpath << endl;
 
 	chrono::steady_clock::time_point time_start;
 	size_t file_size = 0;

@@ -213,22 +213,21 @@ void start_filesender(future<shared_srt_socket> connection, const config& cfg,
 			break;
 	}
 
-	//// We have to check if the sending buffer is empty.
-	//// Or we will loose this data, because SRT is not waiting
-	//// for all the data to be sent in a general live streaming use case,
-	//// as it might be not something it is expected to do, and may lead to
-	//// to unnesessary waits on destroy.
-	//// srt_getsndbuffer() is designed to handle such cases.
-	//const SRTSOCKET sock = m.Socket();
-	//size_t blocks = 0;
-	//do
-	//{
-	//	if (SRT_ERROR == srt_getsndbuffer(sock, &blocks, nullptr))
-	//		break;
+	// We have to check if the sending buffer is empty.
+	// Or we will loose this data, because SRT is not waiting
+	// for all the data to be sent in a general live streaming use case,
+	// as it might be not something it is expected to do, and may lead to
+	// to unnesessary waits on destroy.
+	// srt_getsndbuffer() is designed to handle such cases.
+	size_t blocks = 0;
+	do
+	{
+		if (SRT_ERROR == srt_getsndbuffer(dst_sock.id(), &blocks, nullptr))
+			break;
 
-	//	if (blocks)
-	//		this_thread::sleep_for(chrono::milliseconds(5));
-	//} while (blocks != 0);
+		if (blocks)
+			this_thread::sleep_for(chrono::milliseconds(5));
+	} while (blocks != 0);
 
 	local_break = true;
 	stats_logger.wait();
