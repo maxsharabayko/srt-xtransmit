@@ -320,6 +320,8 @@ int main(int argc, char **argv)
 	CLI::App* sc_sendfile = app.add_subcommand("sendfile", "Send file or folder")->fallthrough();
 	sc_sendfile->add_option("src", cfg_file.src_path, "Source path to file/folder");
 	sc_sendfile->add_option("dst", dst, "Destination URI");
+	sc_sendfile->add_flag("--printout", cfg_file.only_print, "Print files found in a folder ad subfolders. No transfer.");
+	sc_sendfile->add_option("--segment", cfg_file.segment_size, "Size of the transmission segment");
 	
 #endif
 

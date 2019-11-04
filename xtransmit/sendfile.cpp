@@ -2,6 +2,7 @@
 #include <iostream>
 #include <iterator>
 #include <filesystem>	// Requires C++17
+#include <functional>
 #include <string>
 #include <vector>
 #include <deque>
@@ -19,13 +20,16 @@ namespace fs = std::filesystem;
 using shared_srt_socket = std::shared_ptr<srt::socket>;
 
 
-bool send_file(const string &filename, const string &upload_name, srt::socket &dst, const config &cfg, vector<char> &buf)
+/// Sendt one file in the messaging mode.
+/// @return true on success, false if an error happened during transmission
+bool send_file(const string &filename, const string &upload_name, srt::socket &dst
+	, vector<char> &buf, const atomic_bool& force_break)
 {
 	ifstream ifile(filename, ios::binary);
 	if (!ifile)
 	{
-		cerr << "Error opening file: '" << filename << "'\n";
-		return true;
+		cerr << "Error opening file : " << filename << endl;
+		return false;
 	}
 
 	const chrono::steady_clock::time_point time_start = chrono::steady_clock::now();
@@ -43,7 +47,7 @@ bool send_file(const string &filename, const string &upload_name, srt::socket &d
 	 */
 	int hdr_size = snprintf(buf.data() + 1, buf.size(), "%s", upload_name.c_str()) + 2;
 
-	for (;;)
+	while (!force_break)
 	{
 		const int n = (int)ifile.read(buf.data() + hdr_size, streamsize(buf.size() - hdr_size)).gcount();
 		const bool is_eof = ifile.eof();
@@ -61,7 +65,8 @@ bool send_file(const string &filename, const string &upload_name, srt::socket &d
 				cerr << "Upload: SRT error: " << srt_getlasterror_str() << endl;
 				return false;
 			}
-			if (st != n + hdr_size) {
+			if (st != n + hdr_size)
+			{
 				cerr << "Upload error: not full delivery" << endl;
 				return false;
 			}
@@ -91,19 +96,14 @@ bool send_file(const string &filename, const string &upload_name, srt::socket &d
 }
 
 
-struct path_leaf_string
+/// Enumerate files in the folder and subfolders. Or return file if path is file.
+/// With NRVO no copy of the vector being returned will be made
+/// @param path    a path to a file or folder to enumerate
+/// @return        a list of filenames found in the path
+const std::vector<string> read_directory(const string& path)
 {
-	string operator()(const filesystem::directory_entry& entry) const
-	{
-		entry.is_directory();
-		return entry.path().string();
-	}
-};
-
-// TODO: Read subfolders
-void read_directory(const string& name, vector<string>& v)
-{
-	deque<string> subdirs = { name };
+	vector<string> filenames;
+	deque<string> subdirs = { path };
 
 	while (!subdirs.empty())
 	{
@@ -112,7 +112,7 @@ void read_directory(const string& name, vector<string>& v)
 
 		if (!fs::is_directory(p))
 		{
-			v.push_back(p.string());
+			filenames.push_back(p.string());
 			continue;
 		}
 
@@ -121,84 +121,40 @@ void read_directory(const string& name, vector<string>& v)
 			if (entry.is_directory())
 				subdirs.push_back(entry.path().string());
 			else
-				v.push_back(entry.path().string());
+				filenames.push_back(entry.path().string());
 		}
 	}
+
+	return filenames;
 }
 
 
-bool send_folder(UriParser& ut, string path)
+/// Get file path relative to root directory.
+/// Transmission preserves only relative dir structure.
+///
+/// @return    filename if filepath matches dirpath (dirpath is a file)
+///            relative file path if dirpath is a folder
+const string relative_path(const string& filepath, const string &dirpath)
 {
+	const fs::path dir(dirpath);
+	const fs::path file(filepath);
+	if (dir == file)
+		return file.filename().string();
 
-	// Use a manual loop for reading from SRT
-	vector<char> buf(::g_buffer_size);
-
-	while (!processing_list.empty())
+	const size_t pos = file.string().find(dir.string());
+	if (pos != 0)
 	{
-		dirent* ent = processing_list.front().first;
-		string dir = processing_list.front().second;
-		processing_list.pop_front();
+		cerr << "Failed to find substring" << endl;
+		return string();
+	}
 
-		if (ent->d_type == DT_DIR)
-		{
-			get_files(dir + ent->d_name);
-			free(ent);
-			continue;
-		}
-
-		if (ent->d_type != DT_REG)
-		{
-			free(ent);
-			continue;
-		}
-
-		cerr << "File: '" << dir << ent->d_name << "'\n";
-		const bool transmit_res = send_file(dir + ent->d_name, dir + ent->d_name,
-			m.Socket(), buf);
-		free(ent);
-
-		if (!transmit_res)
-			break;
-	};
-
-	while (!processing_list.empty())
-	{
-		dirent* ent = processing_list.front().first;
-		processing_list.pop_front();
-		free(ent);
-	};
-
-	// We have to check if the sending buffer is empty.
-	// Or we will loose this data, because SRT is not waiting
-	// for all the data to be sent in a general live streaming use case,
-	// as it might be not something it is expected to do, and may lead to
-	// to unnesessary waits on destroy.
-	// srt_getsndbuffer() is designed to handle such cases.
-	const SRTSOCKET sock = m.Socket();
-	size_t blocks = 0;
-	do
-	{
-		if (SRT_ERROR == srt_getsndbuffer(sock, &blocks, nullptr))
-			break;
-
-		if (blocks)
-			this_thread::sleep_for(chrono::milliseconds(5));
-	} while (blocks != 0);
-
-	return true;
+	return file.generic_string().erase(pos, dir.generic_string().size());
+	//file.filename().string().replace(;
 }
 
 
-void enum_dir(const config& cfg)
-{
-	vector<string> v;
-	read_directory(cfg.src_path, v);
-	copy(v.begin(), v.end(),
-		ostream_iterator<string>(cout, "\n"));
-}
-
-
-void start_filesender(future<shared_srt_socket> connection, const config& cfg, const atomic_bool& force_break)
+void start_filesender(future<shared_srt_socket> connection, const config& cfg,
+	const vector<string> &filenames, const atomic_bool& force_break)
 {
 	if (!connection.valid())
 	{
@@ -213,26 +169,95 @@ void start_filesender(future<shared_srt_socket> connection, const config& cfg, c
 		return;
 	}
 
+	srt::socket dst_sock = *sock.get();
+
+	vector<char> buf(cfg.segment_size);
+	//using namespace placeholders;
+	//auto send = std::bind(send_file, _1, _1, dst_sock, buf);
+	//for_each(filenames.begin(), filenames.end(), send);
+
+	//for (const string& filename : filenames)
+	//{
+	//	const bool transmit_res = send_file(dir + ent->d_name, dir + ent->d_name,
+	//		dst_sock, buf);
+
+	//	if (!transmit_res)
+	//		break;
+
+	//	if (force_break)
+	//		break;
+	//}
 
 
-	//run(sock, cfg, force_break);
+	//for ()
+	//{
+	//	cerr << "File: '" << dir << ent->d_name << "'\n";
+	//	const bool transmit_res = send_file(dir + ent->d_name, dir + ent->d_name,
+	//		dst_sock, buf);
+	//	free(ent);
+
+	//	if (!transmit_res)
+	//		break;
+	//}
+
+
+
+
+	//// We have to check if the sending buffer is empty.
+	//// Or we will loose this data, because SRT is not waiting
+	//// for all the data to be sent in a general live streaming use case,
+	//// as it might be not something it is expected to do, and may lead to
+	//// to unnesessary waits on destroy.
+	//// srt_getsndbuffer() is designed to handle such cases.
+	//const SRTSOCKET sock = m.Socket();
+	//size_t blocks = 0;
+	//do
+	//{
+	//	if (SRT_ERROR == srt_getsndbuffer(sock, &blocks, nullptr))
+	//		break;
+
+	//	if (blocks)
+	//		this_thread::sleep_for(chrono::milliseconds(5));
+	//} while (blocks != 0);
+
 }
 
 
 void xtransmit::file::send(const string& dst_url, const config& cfg, const atomic_bool& force_break)
 {
-	return enum_dir(cfg);
+	const vector<string> filenames = read_directory(cfg.src_path);
+
+	if (filenames.empty())
+	{
+		cerr << "Found no files to transmit (path " << cfg.src_path << ")" << endl;
+		return;
+	}
+
+	if (cfg.only_print)
+	{
+		cout << "Files found in " << cfg.src_path << endl;
+
+		for_each(filenames.begin(), filenames.end(),
+			[&dirpath = std::as_const(cfg.src_path)](const string& fname) {
+				cout << fname << endl;
+				cout << "RELATIVE: " << relative_path(fname, dirpath) << endl;
+			});
+		//copy(filenames.begin(), filenames.end(),
+		//	ostream_iterator<string>(cout, "\n"));
+		return;
+	}
 
 	UriParser ut(dst_url);
 	ut["transtype"]  = string("file");
 	ut["messageapi"] = string("true");
-	ut["sndbuf"] = to_string(1061313/*g_buffer_size*/ /* 1456*/);
+	ut["sndbuf"] = to_string(cfg.segment_size * 10);
 
 	shared_srt_socket socket = make_shared<srt::socket>(ut);
 	const bool        accept = socket->mode() == srt::socket::LISTENER;
 	try
 	{
-		start_filesender(accept ? socket->async_accept() : socket->async_connect(), cfg, force_break);
+		start_filesender(accept ? socket->async_accept() : socket->async_connect()
+			, cfg, filenames, force_break);
 	}
 	catch (const srt::socket_exception & e)
 	{
