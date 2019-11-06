@@ -16,8 +16,13 @@ target_include_directories(srt-xtransmit PUBLIC
 	${PTHREAD_INCLUDE_DIR}
 	)
 
+if (${CMAKE_CXX_COMPILER_ID} MATCHES "GNU|Intel|Clang|AppleClang")
+	set(LINKSTDCPP_FS stdc++fs)
+endif()
+
 set (VIRTUAL_srtsupport $<TARGET_OBJECTS:srtsupport_virtual>)
-target_link_libraries(srt-xtransmit CLI11::CLI11 ${TARGET_srt}_static ${VIRTUAL_srtsupport})
+target_compile_options(srt-xtransmit PRIVATE "-lstdc++fs")
+target_link_libraries(srt-xtransmit CLI11::CLI11 ${TARGET_srt}_static ${VIRTUAL_srtsupport} ${LINKSTDCPP_FS})
 
 set_target_properties(srt-xtransmit
 	PROPERTIES
