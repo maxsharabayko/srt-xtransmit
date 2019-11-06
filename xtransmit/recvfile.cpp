@@ -198,7 +198,8 @@ void xtransmit::file::receive(const string& dst_url, const rcvconfig& cfg, const
 	UriParser ut(dst_url);
 	ut["transtype"] = string("file");
 	ut["messageapi"] = string("true");
-	ut["rcvbuf"] = to_string(cfg.segment_size * 10);
+	if (!ut["rcvbuf"].exists())
+		ut["rcvbuf"] = to_string(cfg.segment_size * 10);
 
 	shared_srt_socket socket = make_shared<srt::socket>(ut);
 	const bool        accept = socket->mode() == srt::socket::LISTENER;

@@ -261,7 +261,8 @@ void xtransmit::file::send(const string& dst_url, const config& cfg, const atomi
 	UriParser ut(dst_url);
 	ut["transtype"]  = string("file");
 	ut["messageapi"] = string("true");
-	ut["sndbuf"] = to_string(cfg.segment_size * 10);
+	if (!ut["sndbuf"].exists())
+		ut["sndbuf"] = to_string(cfg.segment_size * 10);
 
 	shared_srt_socket socket = make_shared<srt::socket>(ut);
 	const bool        accept = socket->mode() == srt::socket::LISTENER;

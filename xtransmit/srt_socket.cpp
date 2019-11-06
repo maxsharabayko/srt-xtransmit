@@ -349,8 +349,18 @@ int srt::socket::write(const const_buffer &buffer, int timeout_ms)
 
 	const int res = srt_sendmsg2(m_bind_socket, static_cast<const char*>(buffer.data()), static_cast<int>(buffer.size()), nullptr);
 	if (res == SRT_ERROR)
+	{
+		size_t blocks, bytes;
+		srt_getsndbuffer(m_bind_socket, &blocks, &bytes);
+		int sndbuf = 0;
+		int optlen = sizeof sndbuf;
+		srt_getsockopt(m_bind_socket, 0, SRTO_SNDBUF, &sndbuf, &optlen);
+		ss << " SND Buffer: " << bytes << " / " << sndbuf << " bytes";
+		ss << " (" << sndbuf - bytes << " bytes remaining)";
+		ss << "trying to write " << buffer.size() << "bytes";
 		raise_exception("socket::write::send", srt_getlasterror_str() + ss.str());
-	//	raise_exception("socket::write::send", UDT::getlasterror());
+		//	raise_exception("socket::write::send", UDT::getlasterror());
+	}
 
 	return res;
 }
