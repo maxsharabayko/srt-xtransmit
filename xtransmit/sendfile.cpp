@@ -261,6 +261,9 @@ void xtransmit::file::send(const string& dst_url, const config& cfg, const atomi
 	UriParser ut(dst_url);
 	ut["transtype"]  = string("file");
 	ut["messageapi"] = string("true");
+	// Non-blocking mode will not notify when there is enough space in the sender buffer
+	// to write a message. Therefore a message can be sent properly only in the blocking mode.
+	ut["blocking"] = string("true");
 	if (!ut["sndbuf"].exists())
 		ut["sndbuf"] = to_string(cfg.segment_size * 10);
 
