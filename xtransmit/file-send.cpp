@@ -1,6 +1,6 @@
-#if 1 //def ENABLE_FILE
 #include <iostream>
 #include <iterator>
+// https://en.cppreference.com/w/cpp/compiler_support
 #include <filesystem>	// Requires C++17
 #include <functional>
 #include <string>
@@ -8,21 +8,21 @@
 #include <deque>
 #include <chrono>
 
-#include "sendfile.h"
+#include "file-send.hpp"
 #include "srt_socket.hpp"
 
 
 using namespace std;
 using namespace std::chrono;
 using namespace xtransmit;
-using namespace xtransmit::file;
+using namespace xtransmit::file::send;
 namespace fs = std::filesystem;
 
 
 using shared_srt_socket = std::shared_ptr<srt::socket>;
 
 
-/// Sendt one file in the messaging mode.
+/// Send one file in the messaging mode.
 /// @return true on success, false if an error happened during transmission
 bool send_file(const string &filename, const string &upload_name, srt::socket &dst
 	, vector<char> &buf, const atomic_bool& force_break)
@@ -234,7 +234,7 @@ void start_filesender(future<shared_srt_socket> connection, const config& cfg,
 }
 
 
-void xtransmit::file::send(const string& dst_url, const config& cfg, const atomic_bool& force_break)
+void xtransmit::file::send::run(const string& dst_url, const config& cfg, const atomic_bool& force_break)
 {
 	const vector<string> filenames = read_directory(cfg.src_path);
 
@@ -281,4 +281,20 @@ void xtransmit::file::send(const string& dst_url, const config& cfg, const atomi
 	}
 }
 
-#endif
+CLI::App* xtransmit::file::send::add_subcommand(CLI::App& app, config& cfg, string& dst_url)
+{
+	const map<string, int> to_ms{ {"s", 1'000}, {"ms", 1} };
+
+	CLI::App* sc_file_send = app.add_subcommand("send", "Send file or folder")->fallthrough();
+	sc_file_send->add_option("src", cfg.src_path, "Source path to file/folder");
+	sc_file_send->add_option("dst", dst_url, "Destination URI");
+	sc_file_send->add_flag("--printout", cfg.only_print, "Print files found in a folder ad subfolders. No transfer.");
+	sc_file_send->add_option("--segment", cfg.segment_size, "Size of the transmission segment");
+	sc_file_send->add_option("--statsfile", cfg.stats_file, "output stats report filename");
+	sc_file_send->add_option("--statsfreq", cfg.stats_freq_ms, "output stats report frequency (ms)")
+		->transform(CLI::AsNumberWithUnit(to_ms, CLI::AsNumberWithUnit::CASE_SENSITIVE));
+
+	return sc_file_send;
+}
+
+

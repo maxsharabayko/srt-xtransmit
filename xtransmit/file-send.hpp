@@ -2,11 +2,11 @@
 #include <atomic>
 #include <string>
 
+// Third party libraries
+#include "CLI/CLI.hpp"
 
-#define ENABLE_FILE
-#ifdef ENABLE_FILE
 
-namespace xtransmit::file
+namespace xtransmit::file::send
 {
 
 	struct config
@@ -19,10 +19,11 @@ namespace xtransmit::file
 	};
 
 
-	void send(const std::string& dst_url, const config& cfg,
+	void run(const std::string& dst_url, const config& cfg,
 		const std::atomic_bool& force_break);
 
+	CLI::App* add_subcommand(CLI::App& app, config& cfg, std::string& dst_url);
 
-} // namespace xtransmit::file
 
-#endif
+} // namespace xtransmit::file::send
+

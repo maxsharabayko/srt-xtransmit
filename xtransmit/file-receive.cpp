@@ -1,4 +1,3 @@
-#if 1 //def ENABLE_FILE
 #include <iostream>
 #include <iterator>
 #include <filesystem>	// Requires C++17
@@ -8,14 +7,14 @@
 #include <deque>
 #include <chrono>
 
-#include "recvfile.h"
+#include "file-receive.hpp"
 #include "srt_socket.hpp"
 
 
 using namespace std;
 using namespace std::chrono;
 using namespace xtransmit;
-using namespace xtransmit::file;
+using namespace xtransmit::file::receive;
 namespace fs = std::filesystem;
 
 
@@ -142,7 +141,7 @@ bool receive_files(srt::socket& src, const string& dstpath
 
 
 
-void start_filereceiver(future<shared_srt_socket> connection, const rcvconfig& cfg,
+void start_filereceiver(future<shared_srt_socket> connection, const config& cfg,
 	const atomic_bool& force_break)
 {
 	if (!connection.valid())
@@ -193,9 +192,9 @@ void start_filereceiver(future<shared_srt_socket> connection, const rcvconfig& c
 }
 
 
-void xtransmit::file::receive(const string& dst_url, const rcvconfig& cfg, const atomic_bool& force_break)
+void xtransmit::file::receive::run(const string& src_url, const config& cfg, const atomic_bool& force_break)
 {
-	UriParser ut(dst_url);
+	UriParser ut(src_url);
 	ut["transtype"] = string("file");
 	ut["messageapi"] = string("true");
 	if (!ut["rcvbuf"].exists())
@@ -215,5 +214,20 @@ void xtransmit::file::receive(const string& dst_url, const rcvconfig& cfg, const
 	}
 }
 
-#endif
+
+CLI::App* xtransmit::file::receive::add_subcommand(CLI::App& app, config& cfg, string& src_url)
+{
+	const map<string, int> to_ms{ {"s", 1'000}, {"ms", 1} };
+
+	CLI::App* sc_file_recv = app.add_subcommand("receive", "Receive file or folder")->fallthrough();
+	sc_file_recv->add_option("src", src_url, "Source URI");
+	sc_file_recv->add_option("dst", cfg.dst_path, "Destination path to file/folder");
+	sc_file_recv->add_option("--segment", cfg.segment_size, "Size of the transmission segment");
+	sc_file_recv->add_option("--statsfile", cfg.stats_file, "output stats report filename");
+	sc_file_recv->add_option("--statsfreq", cfg.stats_freq_ms, "output stats report frequency (ms)")
+		->transform(CLI::AsNumberWithUnit(to_ms, CLI::AsNumberWithUnit::CASE_SENSITIVE));
+
+	return sc_file_recv;
+}
+
 

@@ -26,8 +26,8 @@
 
 #include "generate.hpp"
 #include "receive.hpp"
-#include "sendfile.h"
-#include "recvfile.h"
+#include "file-send.hpp"
+#include "file-receive.hpp"
 
 
 
@@ -279,14 +279,14 @@ int main(int argc, char **argv)
 	}, "log level [debug, error, note, info, fatal]");
 
 	app.add_option("--logfa",
-	               [](CLI::results_t val) {
-		               set<srt_logging::LogFA>     fas = SrtParseLogFA(val[0]);
-		               for (set<srt_logging::LogFA>::iterator i = fas.begin(); i != fas.end(); ++i)
-			               srt_addlogfa(*i);
-		               Verb() << "Logfa set to " << val[0];
-		               return true;
-	               },
-	               "log functional area [ all, general, bstats, control, data, tsbpd, rexmit ]");
+				   [](CLI::results_t val) {
+					   set<srt_logging::LogFA>     fas = SrtParseLogFA(val[0]);
+					   for (set<srt_logging::LogFA>::iterator i = fas.begin(); i != fas.end(); ++i)
+						   srt_addlogfa(*i);
+					   Verb() << "Logfa set to " << val[0];
+					   return true;
+				   },
+				   "log functional area [ all, general, bstats, control, data, tsbpd, rexmit ]");
 
 	CLI::App* sc_async   = app.add_subcommand("async",   "Check async staff");
 	CLI::App *sc_forward = app.add_subcommand("forward", "Bidirectional data forwarding");
@@ -316,41 +316,21 @@ int main(int argc, char **argv)
 	sc_receive->add_flag("--timestamp", cfg_receive.check_timestamp, "Check a timestamp in the message payload");
 	sc_receive->add_flag("--twoway", cfg_receive.send_reply, "Both send and receive data");
 
-#ifdef ENABLE_FILE
-	xtransmit::file::config cfg_file;
-	CLI::App* sc_sendfile = app.add_subcommand("sendfile", "Send file or folder")->fallthrough();
-	sc_sendfile->add_option("src", cfg_file.src_path, "Source path to file/folder");
-	sc_sendfile->add_option("dst", dst, "Destination URI");
-	sc_sendfile->add_flag("--printout", cfg_file.only_print, "Print files found in a folder ad subfolders. No transfer.");
-	sc_sendfile->add_option("--segment", cfg_file.segment_size, "Size of the transmission segment");
-	sc_sendfile->add_option("--statsfile", cfg_file.stats_file, "output stats report filename");
-	sc_sendfile->add_option("--statsfreq", cfg_file.stats_freq_ms, "output stats report frequency (ms)")
-		->transform(CLI::AsNumberWithUnit(to_ms, CLI::AsNumberWithUnit::CASE_SENSITIVE));
+	CLI::App* sc_file = app.add_subcommand("file", "Send/receive a single file or folder contents")->fallthrough();
+
+	xtransmit::file::send::config cfg_file_send;
+	CLI::App* sc_file_send = file::send::add_subcommand(*sc_file, cfg_file_send, dst);
 	
-	xtransmit::file::rcvconfig rcvcfg_file;
-	CLI::App* sc_recvfile = app.add_subcommand("recvfile", "Receive file or folder")->fallthrough();
-	sc_recvfile->add_option("src", src, "Source URI");
-	sc_recvfile->add_option("dst", rcvcfg_file.dst_path, "Destination path to file/folder");
-	sc_recvfile->add_option("--segment", rcvcfg_file.segment_size, "Size of the transmission segment");
-	sc_recvfile->add_option("--statsfile", rcvcfg_file.stats_file, "output stats report filename");
-	sc_recvfile->add_option("--statsfreq", rcvcfg_file.stats_freq_ms, "output stats report frequency (ms)")
-		->transform(CLI::AsNumberWithUnit(to_ms, CLI::AsNumberWithUnit::CASE_SENSITIVE));
-#endif
+	xtransmit::file::receive::config cfg_file_recv;
+	CLI::App* sc_file_recv = file::receive::add_subcommand(*sc_file, cfg_file_recv, src);
 
 
 	// TODO:
 	// CLI::App* sc_echo    = app.add_subcommand("echo",    "Echo back all the packets received on the connection");
 	// CLI::App *sc_test    = app.add_subcommand("test",    "Receive/send a test content generated");
-	// CLI::App *sc_file    = app.add_subcommand("file",    "Receive/send a file");
-	// CLI::App *sc_folder  = app.add_subcommand("folder",  "Receive/send a folder");
 	// CLI::App *sc_live    = app.add_subcommand("live",    "Receive/send a live source");
 
 	app.require_subcommand(1);
-
-	//std::string file;
-	//start->add_option("-f,--file", file, "File name");
-
-	//CLI::Option *s = stop->add_flag("-c,--count", "Counter");
 
 	CLI11_PARSE(app, argc, argv);
 
@@ -375,16 +355,6 @@ int main(int argc, char **argv)
 
 	srt_startup();
 
-	// Register your own Controller
-	//SrtCongestion::add<WAGCongController>("flow");
-
-	//std::cout << "Working on --file from start: " << file << std::endl;
-	//std::cout << "Working on --count from stop: " << s->count() << ", direct count: " << stop->count("--count")
-	//	<< std::endl;
-	//std::cout << "Count of --random flag: " << app.count("--random") << std::endl;
-	//for (auto subcom : app.get_subcommands())
-	//	std::cout << "Subcommand: " << subcom->get_name() << std::endl;
-
 	// TODO: Callback for subcommands
 	// https://cliutils.gitlab.io/CLI11Tutorial/chapters/an-advanced-example.html
 	if (sc_forward->parsed())
@@ -401,18 +371,16 @@ int main(int argc, char **argv)
 		xtransmit::receive::receive_main(src, cfg_receive, force_break);
 		return 0;
 	}
-#ifdef ENABLE_FILE
-	else if (sc_sendfile->parsed())
+	else if (sc_file_send->parsed())
 	{
-		xtransmit::file::send(dst, cfg_file, force_break);
+		file::send::run(dst, cfg_file_send, force_break);
 		return 0;
 	}
-	else if (sc_recvfile->parsed())
+	else if (sc_file_recv->parsed())
 	{
-		xtransmit::file::receive(src, rcvcfg_file, force_break);
+		file::receive::run(src, cfg_file_recv, force_break);
 		return 0;
 	}
-#endif
 	else
 	{
 

@@ -2,14 +2,14 @@
 #include <atomic>
 #include <string>
 
+// Third party libraries
+#include "CLI/CLI.hpp"
 
-#define ENABLE_FILE
-#ifdef ENABLE_FILE
 
-namespace xtransmit::file
+namespace xtransmit::file::receive
 {
 
-	struct rcvconfig
+	struct config
 	{
 		std::string dst_path;
 		size_t      segment_size = 1456 * 1000;
@@ -18,11 +18,12 @@ namespace xtransmit::file
 	};
 
 
-	void receive(const std::string& src_url, const rcvconfig& cfg,
+	void run(const std::string& src_url, const config& cfg,
 		const std::atomic_bool& force_break);
+
+	CLI::App* add_subcommand(CLI::App& app, config& cfg, std::string& src_url);
 
 
 } // namespace xtransmit::file
 
-#endif
 
