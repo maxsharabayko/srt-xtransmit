@@ -316,14 +316,13 @@ int main(int argc, char **argv)
 	sc_receive->add_flag("--timestamp", cfg_receive.check_timestamp, "Check a timestamp in the message payload");
 	sc_receive->add_flag("--twoway", cfg_receive.send_reply, "Both send and receive data");
 
+#if ENABLE_FILE_TRANSFER
 	CLI::App* sc_file = app.add_subcommand("file", "Send/receive a single file or folder contents")->fallthrough();
-
 	xtransmit::file::send::config cfg_file_send;
 	CLI::App* sc_file_send = file::send::add_subcommand(*sc_file, cfg_file_send, dst);
-	
 	xtransmit::file::receive::config cfg_file_recv;
 	CLI::App* sc_file_recv = file::receive::add_subcommand(*sc_file, cfg_file_recv, src);
-
+#endif
 
 	// TODO:
 	// CLI::App* sc_echo    = app.add_subcommand("echo",    "Echo back all the packets received on the connection");
@@ -371,6 +370,7 @@ int main(int argc, char **argv)
 		xtransmit::receive::receive_main(src, cfg_receive, force_break);
 		return 0;
 	}
+#if ENABLE_FILE_TRANSFER
 	else if (sc_file_send->parsed())
 	{
 		file::send::run(dst, cfg_file_send, force_break);
@@ -381,6 +381,7 @@ int main(int argc, char **argv)
 		file::receive::run(src, cfg_file_recv, force_break);
 		return 0;
 	}
+#endif
 	else
 	{
 

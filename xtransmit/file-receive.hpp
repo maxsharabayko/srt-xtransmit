@@ -1,4 +1,5 @@
 #pragma once
+#if ENABLE_FILE_TRANSFER
 #include <atomic>
 #include <string>
 
@@ -26,4 +27,4 @@ namespace xtransmit::file::receive
 
 } // namespace xtransmit::file
 
-
+#endif // ENABLE_FILE_TRANSFER

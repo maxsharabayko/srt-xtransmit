@@ -1,3 +1,4 @@
+#if ENABLE_FILE_TRANSFER
 #include <iostream>
 #include <iterator>
 #include <filesystem>	// Requires C++17
@@ -230,4 +231,4 @@ CLI::App* xtransmit::file::receive::add_subcommand(CLI::App& app, config& cfg, s
 	return sc_file_recv;
 }
 
-
+#endif // ENABLE_FILE_TRANSFER

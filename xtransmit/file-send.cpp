@@ -1,3 +1,4 @@
+#if ENABLE_FILE_TRANSFER
 #include <iostream>
 #include <iterator>
 // https://en.cppreference.com/w/cpp/compiler_support
@@ -297,4 +298,4 @@ CLI::App* xtransmit::file::send::add_subcommand(CLI::App& app, config& cfg, stri
 	return sc_file_send;
 }
 
-
+#endif ENABLE_FILE_TRANSFER

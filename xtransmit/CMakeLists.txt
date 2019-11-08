@@ -1,8 +1,9 @@
 project(srt-xtransmit)
 
+option(ENABLE_CXX17 "Should the c++17 parts (file receive/send) be enabled" ON)
+
 #AUX_SOURCE_DIRECTORY(SOURCES ./) 
 FILE(GLOB SOURCES *.cpp *.hpp)
-
 
 add_executable(srt-xtransmit ${SOURCES})
 
@@ -16,17 +17,26 @@ target_include_directories(srt-xtransmit PUBLIC
 	${PTHREAD_INCLUDE_DIR}
 	)
 
-if (${CMAKE_CXX_COMPILER_ID} MATCHES "GNU|Intel|Clang|AppleClang")
-	set(LINKSTDCPP_FS stdc++fs)
+
+if (ENABLE_CXX17)
+	set(REQUIRE_CXX_VER 17)
+	if (${CMAKE_CXX_COMPILER_ID} MATCHES "GNU|Intel|Clang|AppleClang")
+		target_compile_options(srt-xtransmit PRIVATE "-lstdc++fs")
+		set(LINKSTDCPP_FS stdc++fs)
+	endif()
+	target_compile_options(srt-xtransmit PRIVATE "-DENABLE_FILE_TRANSFER")
+	message(STATUS "C++17 features: ENABLED")
+else()
+	set(REQUIRE_CXX_VER 14)
+	message(STATUS "C++17 features: DISABLED")
 endif()
 
 set (VIRTUAL_srtsupport $<TARGET_OBJECTS:srtsupport_virtual>)
-target_compile_options(srt-xtransmit PRIVATE "-lstdc++fs")
 target_link_libraries(srt-xtransmit CLI11::CLI11 ${TARGET_srt}_static ${VIRTUAL_srtsupport} ${LINKSTDCPP_FS})
 
 set_target_properties(srt-xtransmit
 	PROPERTIES
-	CXX_STANDARD 17
+	CXX_STANDARD ${REQUIRE_CXX_VER}
 	ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
 	LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
 	RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
