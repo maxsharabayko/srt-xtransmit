@@ -281,6 +281,7 @@ int main(int argc, char **argv)
 	app.add_option("--logfa",
 				   [](CLI::results_t val) {
 					   set<srt_logging::LogFA>     fas = SrtParseLogFA(val[0]);
+					   srt_resetlogfa(nullptr, 0);
 					   for (set<srt_logging::LogFA>::iterator i = fas.begin(); i != fas.end(); ++i)
 						   srt_addlogfa(*i);
 					   Verb() << "Logfa set to " << val[0];
