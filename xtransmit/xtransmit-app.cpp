@@ -289,7 +289,6 @@ int main(int argc, char **argv)
 				   },
 				   "log functional area [ all, general, bstats, control, data, tsbpd, rexmit ]");
 
-	CLI::App* sc_async   = app.add_subcommand("async",   "Check async staff");
 	CLI::App *sc_forward = app.add_subcommand("forward", "Bidirectional data forwarding");
 	string src, dst;
 	sc_forward->add_option("src", src, "Source URI");
