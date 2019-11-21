@@ -1,8 +1,22 @@
 # Requirements
 
-* cmake (as build system)
-* OpenSSL
-* Pthreads (use pthreads4w on Windows)
+* cmake (as a build configuration system)
+* OpenSSL (for encryption - required by SRT)
+* Pthreads (use pthreads4w on Windows - required by SRT)
+
+# Functionality
+
+## Commands
+
+* **generate** -  dummy content streaming over SRT for performance tests
+* **receive** - receiving SRT streaming to null for performance tests
+* **forward** - forward packets bidirectionally between two SRT connections
+* **file send** - segment-based file/folder sender (C++17)
+* **file receive** - segment-based file/folder receiver (C++17)
+
+## Common
+
+Collecting SRT statistics in CSV format.
 
 # Build Instructions
 
@@ -35,32 +49,51 @@ cmake --build ./
 ```
 
 
-# Example Usage
+# Example Use Cases
 
-## Test Flow CC
+## Test Live Transfer Performance
+
+### Sender
+
+```
+srt-xtransmit generate "srt://127.0.0.1:4200?transtype=live&rcvbuf=1000000000&sndbuf=1000000000" --msgsize 1316 --sendrate 15Mbps --duration 10s --statsfile stats-snd.csv --statsfreq 100ms
+```
+
+### Receiver
+
+```
+srt-xtransmit receive "srt://:4200?transtype=live&rcvbuf=1000000000&sndbuf=1000000000" --msgsize 1316 --statsfile stats-rcv.csv --statsfreq 100ms
+```
+
+## Test File CC Performance
+
+### Sender
+
+```
+srt-xtransmit generate "srt://127.0.0.1:4200?transtype=file&messageapi=1&payloadsize=1456&rcvbuf=1000000000&sndbuf=1000000000&fc=800000" --msgsize 1456 --num 1000 --statsfile stats-snd.csv --statsfreq 1s
+```
+
+### Receiver
+
+```
+srt-xtransmit receive "srt://:4200?transtype=file&messageapi=1&payloadsize=1456&rcvbuf=1000000000&sndbuf=1000000000&fc=800000" --msgsize 1456  --statsfile stats-rcv.csv --statsfreq 1s
+```
+
+## 
+
+## Transmit File/Folder
+
+Requires C++17 compliant compiler. Build with `-DENABLE_CXX17` build option (enabled by default).
+
+Send all files in folder "srcfolder", and  receive into a current folder "./".
 
 ### Sender
 ```
-srt-xtransmit generate "srt://127.0.0.1:4200?transtype=file&messageapi=1&payloadsize=1456&congestion=flow&rcvbuf=1000000000&sndbuf=1000000000&fc=800000" --msgsize 1456 --num 1000 --statsfile stats-snd.csv --statsfreq 1s
+srt-xtransmit file send srcfolder/ "srt://127.0.0.1:4200" --statsfile stats-snd.csv --statsfreq 1s
 ```
 
 ### Receiver
 ```
-srt-xtransmit receive "srt://:4200?transtype=file&messageapi=1&payloadsize=1456&congestion=flow&rcvbuf=1000000000&sndbuf=1000000000&fc=800000" --msgsize 1456  --statsfile stats-rcv.csv --statsfreq 1s
+srt-xtransmit file receive "srt://:4200" ./ --statsfile stats-rcv.csv --statsfreq 1s
 ```
 
-## Generate with live mode
-
-### Send
-```
-srt-xtransmit generate "srt://127.0.0.1:4200?transtype=live&messageapi=1&payloadsize=1456" --msgsize 1456 --num -1 --sendrate 6Mbps
-```
-
-### Receive
-```
-srt-xtransmit receive "srt://:4200?transtype=live&messageapi=1&payloadsize=1456" --msgsize 1456
-```
-or with `srt-test-messaging` app:
-```
-srt-test-messaging "srt://:4200?rcvbuf=12058624&smoother=live" -reply 0 -msgsize 1456 -printmsg 1
-```
