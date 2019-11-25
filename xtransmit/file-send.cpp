@@ -298,4 +298,4 @@ CLI::App* xtransmit::file::send::add_subcommand(CLI::App& app, config& cfg, stri
 	return sc_file_send;
 }
 
-#endif ENABLE_FILE_TRANSFER
+#endif // ENABLE_FILE_TRANSFER
