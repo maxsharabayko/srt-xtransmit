@@ -19,7 +19,7 @@ using namespace chrono;
 using namespace xtransmit;
 using namespace xtransmit::generate;
 
-using shared_srt_socket = std::shared_ptr<srt::socket>;
+using shared_srt = std::shared_ptr<socket::srt>;
 
 
 void write_timestamp(vector<char> &message_to_send)
@@ -35,11 +35,11 @@ void write_timestamp(vector<char> &message_to_send)
 }
 
 
-void run(shared_srt_socket dst, const config &cfg, const atomic_bool &force_break)
+void run(shared_srt dst, const config &cfg, const atomic_bool &force_break)
 {
 	atomic_bool local_break(false);
 
-	auto stats_func = [&cfg, &force_break, &local_break](shared_srt_socket sock) {
+	auto stats_func = [&cfg, &force_break, &local_break](shared_srt sock) {
 		if (cfg.stats_freq_ms == 0)
 			return;
 		if (cfg.stats_file.empty())
@@ -76,7 +76,7 @@ void run(shared_srt_socket dst, const config &cfg, const atomic_bool &force_brea
 
 	const int num_messages = cfg.duration > 0 ? -1 : cfg.num_messages;
 
-	srt::socket *target = dst.get();
+	socket::srt *target = dst.get();
 
 	for (int i = 0; (num_messages < 0 || i < num_messages) && !force_break; ++i)
 	{
@@ -114,7 +114,7 @@ void run(shared_srt_socket dst, const config &cfg, const atomic_bool &force_brea
 	stats_logger.wait();
 }
 
-void start_generator(future<shared_srt_socket> connection, const config &cfg, const atomic_bool &force_break)
+void start_generator(future<shared_srt> connection, const config &cfg, const atomic_bool &force_break)
 {
 	if (!connection.valid())
 	{
@@ -122,7 +122,7 @@ void start_generator(future<shared_srt_socket> connection, const config &cfg, co
 		return;
 	}
 
-	const shared_srt_socket sock = connection.get();
+	const shared_srt sock = connection.get();
 	if (!sock)
 	{
 		cerr << "Error: Unexpected socket connection failure!" << endl;
@@ -134,13 +134,13 @@ void start_generator(future<shared_srt_socket> connection, const config &cfg, co
 
 void xtransmit::generate::run(const string &dst_url, const config &cfg, const atomic_bool &force_break)
 {
-	shared_srt_socket socket = make_shared<srt::socket>(UriParser(dst_url));
-	const bool        accept = socket->mode() == srt::socket::LISTENER;
+	shared_srt socket = make_shared<socket::srt>(UriParser(dst_url));
+	const bool        accept = socket->mode() == socket::srt::LISTENER;
 	try
 	{
 		start_generator(accept ? socket->async_accept() : socket->async_connect(), cfg, force_break);
 	}
-	catch (const srt::socket_exception &e)
+	catch (const socket::exception &e)
 	{
 		cerr << e.what() << endl;
 		return;

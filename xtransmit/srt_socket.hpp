@@ -8,6 +8,7 @@
 
 // xtransmit
 #include "buffer.hpp"
+#include "socket.hpp"
 
 // OpenSRT
 #include "srt.h"
@@ -20,62 +21,40 @@ namespace xtransmit {
 namespace srt {
 
 
-class socket_exception : public std::exception
+class srt
+	: public std::enable_shared_from_this<srt>
+	, public isocket
 {
+	using string		= std::string;
+	using shared_srt	= std::shared_ptr<srt>;
 
 public:
 
-	socket_exception(const std::string&& err)
-		: m_error_msg(err)
-	{
+	srt(const UriParser& src_uri);
 
-	}
+	srt(const int sock, bool blocking);
 
-public:
+	virtual ~srt();
 
-	virtual const char* what() const throw()
-	{
-		return m_error_msg.c_str();
-	}
-
-private:
-
-	const std::string m_error_msg;
-};
-
-
-class socket
-	: public std::enable_shared_from_this<socket>
-{
-	using string			= std::string;
-	using shared_socket		= std::shared_ptr<socket>;
-
-public:
-
-	socket(const UriParser& src_uri);
-
-	~socket();
-
-	socket(const int sock, bool blocking);
 
 private:
 
 
 public:
 
-	std::future<shared_socket> async_connect() noexcept(false);
-	std::future<shared_socket> async_accept()  noexcept(false);
+	std::future<shared_srt> async_connect() noexcept(false);
+	std::future<shared_srt> async_accept()  noexcept(false);
 
 
-	shared_socket				connect();
-	shared_socket				accept();
+	shared_srt				connect();
+	shared_srt				accept();
 
 	/**
 	 * Start listening on the incomming connection requests.
 	 *
 	 * May throw a socket_exception.
 	 */
-	void                        listen() noexcept(false);
+	void					listen() noexcept(false);
 
 public:
 
@@ -86,7 +65,7 @@ public:
 
 public:
 
-	std::future<shared_socket>  async_read(std::vector<char> &buffer);
+	std::future<shared_srt>  async_read(std::vector<char> &buffer);
 	void async_write();
 
 	/**
@@ -95,7 +74,7 @@ public:
 	 * @throws socket_exception Thrown on failure.
 	 */
 	size_t read(const mutable_buffer& buffer, int timeout_ms = -1);
-	int write(const const_buffer& buffer, int timeout_ms = -1);
+	int   write(const const_buffer& buffer, int timeout_ms = -1);
 
 	enum connection_mode
 	{
@@ -112,7 +91,7 @@ public:
 	int id() const { return m_bind_socket; }
 	int statistics(SRT_TRACEBSTATS &stats);
 
-	const std::string statistics_csv(bool print_header);
+	const std::string statistics_csv(bool print_header) final;
 
 
 private:

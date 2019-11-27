@@ -10,16 +10,16 @@
 
 using namespace std;
 using namespace xtransmit;
-using shared_socket = shared_ptr<srt::socket>;
+using shared_srt = shared_ptr<socket::srt>;
 
-srt::socket::socket(const UriParser &src_uri)
+socket::srt::srt(const UriParser &src_uri)
 	: m_host(src_uri.host())
 	, m_port(src_uri.portno())
 	, m_options(src_uri.parameters())
 {
 	m_bind_socket = srt_create_socket();
 	if (m_bind_socket == SRT_INVALID_SOCK)
-		throw socket_exception(srt_getlasterror_str());
+		throw socket::exception(srt_getlasterror_str());
 
 	if (m_options.count("blocking"))
 	{
@@ -31,23 +31,23 @@ srt::socket::socket(const UriParser &src_uri)
 	{
 		m_epoll_connect = srt_epoll_create();
 		if (m_epoll_connect == -1)
-			throw socket_exception(srt_getlasterror_str());
+			throw socket::exception(srt_getlasterror_str());
 
 		int modes = SRT_EPOLL_OUT | SRT_EPOLL_ERR;
 		if (SRT_ERROR == srt_epoll_add_usock(m_epoll_connect, m_bind_socket, &modes))
-			throw socket_exception(srt_getlasterror_str());
+			throw socket::exception(srt_getlasterror_str());
 
 		m_epoll_io = srt_epoll_create();
 		modes      = SRT_EPOLL_IN | SRT_EPOLL_OUT | SRT_EPOLL_ERR;
 		if (SRT_ERROR == srt_epoll_add_usock(m_epoll_io, m_bind_socket, &modes))
-			throw socket_exception(srt_getlasterror_str());
+			throw socket::exception(srt_getlasterror_str());
 	}
 
 	if (SRT_SUCCESS != configure_pre(m_bind_socket))
-		throw socket_exception(srt_getlasterror_str());
+		throw socket::exception(srt_getlasterror_str());
 }
 
-srt::socket::socket(const int sock, bool blocking)
+socket::srt::srt(const int sock, bool blocking)
 	: m_bind_socket(sock)
 	, m_blocking_mode(blocking)
 {
@@ -56,11 +56,11 @@ srt::socket::socket(const int sock, bool blocking)
 		m_epoll_io = srt_epoll_create();
 		int modes  = SRT_EPOLL_IN | SRT_EPOLL_OUT | SRT_EPOLL_ERR;
 		if (SRT_ERROR == srt_epoll_add_usock(m_epoll_io, m_bind_socket, &modes))
-			throw socket_exception(srt_getlasterror_str());
+			throw socket::exception(srt_getlasterror_str());
 	}
 }
 
-srt::socket::~socket()
+socket::srt::~srt()
 {
 	if (!m_blocking_mode)
 	{
@@ -73,7 +73,7 @@ srt::socket::~socket()
 	srt_close(m_bind_socket);
 }
 
-void srt::socket::listen()
+void socket::srt::listen()
 {
 	int         num_clients = 2;
 	sockaddr_in sa;
@@ -109,7 +109,7 @@ void srt::socket::listen()
 		raise_exception("configure_post", UDT::getlasterror());
 }
 
-shared_socket srt::socket::accept()
+shared_srt socket::srt::accept()
 {
 	sockaddr_in scl;
 	int         sclen = sizeof scl;
@@ -152,27 +152,27 @@ shared_socket srt::socket::accept()
 	if (res == SRT_ERROR)
 		raise_exception("configure_post", UDT::getlasterror());
 
-	return make_shared<socket>(sock, m_blocking_mode);
+	return make_shared<srt>(sock, m_blocking_mode);
 }
 
-void srt::socket::raise_exception(const string &&place, UDT::ERRORINFO &udt_error)
+void socket::srt::raise_exception(const string &&place, UDT::ERRORINFO &udt_error)
 {
 	const int    udt_result = udt_error.getErrorCode();
 	const string message    = udt_error.getErrorMessage();
 	Verb() << place << " ERROR #" << udt_result << ": " << message;
 
 	udt_error.clear();
-	throw socket_exception("error at " + place + ": " + message);
+	throw socket::exception("error at " + place + ": " + message);
 }
 
-void srt::socket::raise_exception(const string &&place, const string &&reason)
+void socket::srt::raise_exception(const string &&place, const string &&reason)
 {
 	Verb() << "raise exception at " << place << ": " << reason;
 
-	throw socket_exception("Error at " + place + ": " + reason);
+	throw socket::exception("Error at " + place + ": " + reason);
 }
 
-shared_socket srt::socket::connect()
+shared_srt socket::srt::connect()
 {
 	sockaddr_in sa;
 	try
@@ -225,14 +225,14 @@ shared_socket srt::socket::connect()
 	return shared_from_this();
 }
 
-std::future<shared_socket> srt::socket::async_connect()
+std::future<shared_srt> socket::srt::async_connect()
 {
 	auto self = shared_from_this();
 
 	return async(std::launch::async, [self]() { return self->connect(); });
 }
 
-std::future<shared_socket> srt::socket::async_accept()
+std::future<shared_srt> socket::srt::async_accept()
 {
 	listen();
 
@@ -240,9 +240,12 @@ std::future<shared_socket> srt::socket::async_accept()
 	return async(std::launch::async, [self]() { return self->accept(); });
 }
 
-std::future<shared_socket> srt::socket::async_read(std::vector<char> &buffer) { return std::future<shared_socket>(); }
+std::future<shared_srt> socket::srt::async_read(std::vector<char> &buffer)
+{
+	return std::future<shared_srt>();
+}
 
-int srt::socket::configure_pre(SRTSOCKET sock)
+int socket::srt::configure_pre(SRTSOCKET sock)
 {
 	int maybe  = m_blocking_mode ? 1 : 0;
 	int result = srt_setsockopt(sock, 0, SRTO_RCVSYN, &maybe, sizeof maybe);
@@ -275,7 +278,7 @@ int srt::socket::configure_pre(SRTSOCKET sock)
 	return SRT_SUCCESS;
 }
 
-int srt::socket::configure_post(SRTSOCKET sock)
+int socket::srt::configure_post(SRTSOCKET sock)
 {
 	int is_blocking = m_blocking_mode ? 1 : 0;
 
@@ -305,7 +308,7 @@ int srt::socket::configure_post(SRTSOCKET sock)
 	return 0;
 }
 
-size_t srt::socket::read(const mutable_buffer &buffer, int timeout_ms)
+size_t socket::srt::read(const mutable_buffer &buffer, int timeout_ms)
 {
 	if (!m_blocking_mode)
 	{
@@ -329,7 +332,7 @@ size_t srt::socket::read(const mutable_buffer &buffer, int timeout_ms)
 	return static_cast<size_t>(res);
 }
 
-int srt::socket::write(const const_buffer &buffer, int timeout_ms)
+int socket::srt::write(const const_buffer &buffer, int timeout_ms)
 {
 	stringstream ss;
 	if (!m_blocking_mode)
@@ -365,11 +368,17 @@ int srt::socket::write(const const_buffer &buffer, int timeout_ms)
 	return res;
 }
 
-srt::socket::connection_mode srt::socket::mode() const { return m_mode; }
+socket::srt::connection_mode socket::srt::mode() const
+{
+	return m_mode;
+}
 
-int srt::socket::statistics(SRT_TRACEBSTATS &stats) { return srt_bstats(m_bind_socket, &stats, true); }
+int socket::srt::statistics(SRT_TRACEBSTATS &stats)
+{
+	return srt_bstats(m_bind_socket, &stats, true);
+}
 
-const string srt::socket::statistics_csv(bool print_header)
+const string socket::srt::statistics_csv(bool print_header)
 {
 	SRT_TRACEBSTATS stats;
 	if (SRT_ERROR == srt_bstats(m_bind_socket, &stats, true))

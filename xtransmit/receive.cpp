@@ -19,7 +19,7 @@ using namespace xtransmit;
 using namespace xtransmit::receive;
 using namespace std::chrono;
 
-using shared_srt_socket = std::shared_ptr<srt::socket>;
+using shared_srt = std::shared_ptr<socket::srt>;
 
 
 void read_timestamp(const vector<char>& buffer)
@@ -62,11 +62,11 @@ void trace_message(const size_t bytes, const vector<char> &buffer, int conn_id)
 	::cout << endl;
 }
 
-void run(shared_srt_socket src, const config &cfg, const atomic_bool &force_break)
+void run(shared_srt src, const config &cfg, const atomic_bool &force_break)
 {
 	atomic_bool local_break(false);
 
-	auto stats_func = [&cfg, &force_break, &local_break](shared_srt_socket sock) {
+	auto stats_func = [&cfg, &force_break, &local_break](shared_srt sock) {
 		if (cfg.stats_freq_ms == 0)
 			return;
 		if (cfg.stats_file.empty())
@@ -93,7 +93,7 @@ void run(shared_srt_socket src, const config &cfg, const atomic_bool &force_brea
 
 	auto stats_logger = async(launch::async, stats_func, src);
 
-	srt::socket &sock = *src.get();
+	socket::srt &sock = *src.get();
 
 	vector<char> buffer(cfg.message_size);
 	try
@@ -123,7 +123,7 @@ void run(shared_srt_socket src, const config &cfg, const atomic_bool &force_brea
 			}
 		}
 	}
-	catch (const srt::socket_exception &)
+	catch (const socket::exception &)
 	{
 		local_break = true;
 	}
@@ -137,17 +137,17 @@ void run(shared_srt_socket src, const config &cfg, const atomic_bool &force_brea
 	stats_logger.wait();
 }
 
-void start_receiver(future<shared_srt_socket> &&connection, const config &cfg, const atomic_bool &force_break)
+void start_receiver(future<shared_srt> &&connection, const config &cfg, const atomic_bool &force_break)
 {
 	try
 	{
-		const shared_srt_socket sock = connection.get();
+		const shared_srt sock = connection.get();
 		if (!sock)
 			return;
 
 		run(sock, cfg, force_break);
 	}
-	catch (const srt::socket_exception &e)
+	catch (const socket::exception &e)
 	{
 		::cerr << e.what();
 		return;
@@ -156,7 +156,7 @@ void start_receiver(future<shared_srt_socket> &&connection, const config &cfg, c
 
 void xtransmit::receive::receive_main(const string &url, const config &cfg, const atomic_bool &force_break)
 {
-	shared_srt_socket socket = make_shared<srt::socket>(UriParser(url));
-	const bool        accept = socket->mode() == srt::socket::LISTENER;
+	shared_srt socket = make_shared<socket::srt>(UriParser(url));
+	const bool        accept = socket->mode() == socket::srt::LISTENER;
 	start_receiver(accept ? socket->async_accept() : socket->async_connect(), cfg, force_break);
 }

@@ -19,7 +19,7 @@ using namespace xtransmit::file::receive;
 namespace fs = std::filesystem;
 
 
-using shared_srt_socket = std::shared_ptr<srt::socket>;
+using shared_srt = std::shared_ptr<socket::srt>;
 
 
 // Returns true on success, false on error
@@ -68,7 +68,7 @@ bool create_subfolders(const string& path)
 
 
 
-bool receive_files(srt::socket& src, const string& dstpath
+bool receive_files(socket::srt& src, const string& dstpath
 	, vector<char>& buf, const atomic_bool& force_break)
 {
 	cerr << "Downloading to '" << dstpath << endl;
@@ -142,7 +142,7 @@ bool receive_files(srt::socket& src, const string& dstpath
 
 
 
-void start_filereceiver(future<shared_srt_socket> connection, const config& cfg,
+void start_filereceiver(future<shared_srt> connection, const config& cfg,
 	const atomic_bool& force_break)
 {
 	if (!connection.valid())
@@ -151,7 +151,7 @@ void start_filereceiver(future<shared_srt_socket> connection, const config& cfg,
 		return;
 	}
 
-	const shared_srt_socket sock = connection.get();
+	const shared_srt sock = connection.get();
 	if (!sock)
 	{
 		cerr << "Error: Unexpected socket connection failure!" << endl;
@@ -160,7 +160,7 @@ void start_filereceiver(future<shared_srt_socket> connection, const config& cfg,
 
 	atomic_bool local_break(false);
 
-	auto stats_func = [&cfg, &force_break, &local_break](shared_srt_socket sock) {
+	auto stats_func = [&cfg, &force_break, &local_break](shared_srt sock) {
 		if (cfg.stats_freq_ms == 0)
 			return;
 		if (cfg.stats_file.empty())
@@ -201,14 +201,14 @@ void xtransmit::file::receive::run(const string& src_url, const config& cfg, con
 	if (!ut["rcvbuf"].exists())
 		ut["rcvbuf"] = to_string(cfg.segment_size * 10);
 
-	shared_srt_socket socket = make_shared<srt::socket>(ut);
-	const bool        accept = socket->mode() == srt::socket::LISTENER;
+	shared_srt socket = make_shared<socket::srt>(ut);
+	const bool accept = socket->mode() == socket::srt::LISTENER;
 	try
 	{
 		start_filereceiver(accept ? socket->async_accept() : socket->async_connect()
 			, cfg, force_break);
 	}
-	catch (const srt::socket_exception & e)
+	catch (const socket::exception & e)
 	{
 		cerr << e.what() << endl;
 		return;

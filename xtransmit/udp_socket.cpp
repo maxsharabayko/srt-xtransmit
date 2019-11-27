@@ -24,12 +24,12 @@ typedef int SOCKET;
 
 using namespace std;
 using namespace xtransmit;
-using shared_socket = shared_ptr<udp::socket>;
+using shared_udp = shared_ptr<socket::udp>;
 
-udp::socket::socket(const UriParser &src_uri)
-    : m_host(src_uri.host())
-    , m_port(src_uri.portno())
-    , m_options(src_uri.parameters())
+socket::udp::udp(const UriParser &src_uri)
+	: m_host(src_uri.host())
+	, m_port(src_uri.portno())
+	, m_options(src_uri.parameters())
 {
 	sockaddr_in sa     = sockaddr_in();
 	sa.sin_family      = AF_INET;
@@ -40,25 +40,13 @@ udp::socket::socket(const UriParser &src_uri)
 	//	throw socket_exception("");
 }
 
-udp::socket::~socket() { closesocket(m_bind_socket); }
-
-
-shared_socket udp::socket::connect()
+socket::udp::~udp()
 {
-	try
-	{
-		m_dst_addr = CreateAddrInet(m_host, m_port);
-	}
-	catch (const std::invalid_argument &e)
-	{
-		throw socket_exception("Error at create_addr_inet");
-	}
-
-	return shared_from_this();
+	closesocket(m_bind_socket);
 }
 
 
-size_t udp::socket::read(const mutable_buffer &buffer, int timeout_ms)
+size_t socket::udp::read(const mutable_buffer &buffer, int timeout_ms)
 {
 	if (!m_blocking_mode)
 	{
@@ -75,10 +63,9 @@ size_t udp::socket::read(const mutable_buffer &buffer, int timeout_ms)
 	//	}
 	}
 
-	recvfrom(m_bind_socket, static_cast<char *>(buffer.data()), (int)buffer.size())
-	const int res = srt_recvmsg2(m_bind_socket, static_cast<char *>(buffer.data()), (int)buffer.size(), nullptr);
-	if (SRT_ERROR == res)
-		raise_exception("socket::read::recv", UDT::getlasterror());
+	const int res = ::recvfrom(m_bind_socket, static_cast<char*>(buffer.data()), (int)buffer.size(), 0, nullptr, nullptr);
+	if (res == -1)
+		throw socket::exception("udp::read::recv");
 
 	return static_cast<size_t>(res);
 }

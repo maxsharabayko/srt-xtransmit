@@ -5,46 +5,48 @@
 
 // xtransmit
 #include "buffer.hpp"
+#include "socket.hpp"
 
 // OpenSRT
 #include "uriparser.hpp"
 
 namespace xtransmit
 {
-namespace udp
+namespace socket
 {
 
-class socket : public std::enable_shared_from_this<socket>
+class udp
+	: public std::enable_shared_from_this<udp>
+	, public isocket
 {
-	using shared_socket = std::shared_ptr<socket>;
+	using shared_udp = std::shared_ptr<udp>;
 
   public:
-	socket(const UriParser &src_uri);
-	~socket();
+	udp(const UriParser &src_uri);
+	~udp();
 
   public:
-	void                  listen();
-	future<shared_socket> async_connect() noexcept(false);
-	future<shared_socket> async_accept() noexcept(false);
+	void               listen();
+	future<shared_udp> async_connect() noexcept(false);
+	future<shared_udp> async_accept() noexcept(false);
 
-	shared_socket connect();
-	shared_socket accept();
+	shared_udp connect();
+	shared_udp accept();
 
   public:
-	std::future<shared_socket> async_read(std::vector<char> &buffer);
-	void                       async_write();
+	std::future<shared_udp> async_read(std::vector<char> &buffer);
+	void                    async_write();
 
 	/**
 	 * @returns The number of bytes received.
 	 *
 	 * @throws socket_exception Thrown on failure.
 	 */
-	size_t read(const mutable_buffer &buffer, int timeout_ms = -1);
+	size_t read (const mutable_buffer &buffer, int timeout_ms = -1);
 	int    write(const const_buffer &buffer, int timeout_ms = -1);
 
   private:
 	SOCKET m_bind_socket   = -1; // INVALID_SOCK;
-	int    m_epoll_connect = -1;
 	int    m_epoll_io      = -1;
 
 	sockaddr_in m_dst_addr = {};

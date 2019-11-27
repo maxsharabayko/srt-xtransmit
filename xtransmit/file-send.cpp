@@ -20,12 +20,12 @@ using namespace xtransmit::file::send;
 namespace fs = std::filesystem;
 
 
-using shared_srt_socket = std::shared_ptr<srt::socket>;
+using shared_srt = std::shared_ptr<socket::srt>;
 
 
 /// Send one file in the messaging mode.
 /// @return true on success, false if an error happened during transmission
-bool send_file(const string &filename, const string &upload_name, srt::socket &dst
+bool send_file(const string &filename, const string &upload_name, socket::srt &dst
 	, vector<char> &buf, const atomic_bool& force_break)
 {
 	ifstream ifile(filename, ios::binary);
@@ -155,7 +155,7 @@ const string relative_path(const string& filepath, const string &dirpath)
 }
 
 
-void start_filesender(future<shared_srt_socket> connection, const config& cfg,
+void start_filesender(future<shared_srt> connection, const config& cfg,
 	const vector<string> &filenames, const atomic_bool& force_break)
 {
 	if (!connection.valid())
@@ -164,7 +164,7 @@ void start_filesender(future<shared_srt_socket> connection, const config& cfg,
 		return;
 	}
 
-	const shared_srt_socket sock = connection.get();
+	const shared_srt sock = connection.get();
 	if (!sock)
 	{
 		cerr << "Error: Unexpected socket connection failure!" << endl;
@@ -173,7 +173,7 @@ void start_filesender(future<shared_srt_socket> connection, const config& cfg,
 
 	atomic_bool local_break(false);
 
-	auto stats_func = [&cfg, &force_break, &local_break](shared_srt_socket sock) {
+	auto stats_func = [&cfg, &force_break, &local_break](shared_srt sock) {
 		if (cfg.stats_freq_ms == 0)
 			return;
 		if (cfg.stats_file.empty())
@@ -199,7 +199,7 @@ void start_filesender(future<shared_srt_socket> connection, const config& cfg,
 	auto stats_logger = async(launch::async, stats_func, sock);
 
 
-	srt::socket dst_sock = *sock.get();
+	socket::srt dst_sock = *sock.get();
 
 	vector<char> buf(cfg.segment_size);
 	for (const string& fname : filenames)
@@ -268,14 +268,14 @@ void xtransmit::file::send::run(const string& dst_url, const config& cfg, const 
 	if (!ut["sndbuf"].exists())
 		ut["sndbuf"] = to_string(cfg.segment_size * 10);
 
-	shared_srt_socket socket = make_shared<srt::socket>(ut);
-	const bool        accept = socket->mode() == srt::socket::LISTENER;
+	shared_srt socket = make_shared<socket::srt>(ut);
+	const bool        accept = socket->mode() == socket::srt::LISTENER;
 	try
 	{
 		start_filesender(accept ? socket->async_accept() : socket->async_connect()
 			, cfg, filenames, force_break);
 	}
-	catch (const srt::socket_exception & e)
+	catch (const socket::exception & e)
 	{
 		cerr << e.what() << endl;
 		return;
