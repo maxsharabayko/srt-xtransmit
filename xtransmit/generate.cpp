@@ -19,7 +19,8 @@ using namespace chrono;
 using namespace xtransmit;
 using namespace xtransmit::generate;
 
-using shared_srt = std::shared_ptr<socket::srt>;
+using shared_srt  = std::shared_ptr<socket::srt>;
+using shared_sock = std::shared_ptr<socket::isocket>;
 
 
 void write_timestamp(vector<char> &message_to_send)
@@ -35,11 +36,11 @@ void write_timestamp(vector<char> &message_to_send)
 }
 
 
-void run(shared_srt dst, const config &cfg, const atomic_bool &force_break)
+void run_pipe(shared_sock dst, const config &cfg, const atomic_bool &force_break)
 {
 	atomic_bool local_break(false);
 
-	auto stats_func = [&cfg, &force_break, &local_break](shared_srt sock) {
+	auto stats_func = [&cfg, &force_break, &local_break](shared_sock sock) {
 		if (cfg.stats_freq_ms == 0)
 			return;
 		if (cfg.stats_file.empty())
@@ -76,7 +77,7 @@ void run(shared_srt dst, const config &cfg, const atomic_bool &force_break)
 
 	const int num_messages = cfg.duration > 0 ? -1 : cfg.num_messages;
 
-	socket::srt *target = dst.get();
+	socket::isocket *target = dst.get();
 
 	for (int i = 0; (num_messages < 0 || i < num_messages) && !force_break; ++i)
 	{
@@ -129,7 +130,7 @@ void start_generator(future<shared_srt> connection, const config &cfg, const ato
 		return;
 	}
 
-	run(sock, cfg, force_break);
+	run_pipe(sock, cfg, force_break);
 }
 
 void xtransmit::generate::run(const string &dst_url, const config &cfg, const atomic_bool &force_break)
