@@ -29,7 +29,6 @@ using shared_udp = shared_ptr<socket::udp>;
 socket::udp::udp(const UriParser &src_uri)
 	: m_host(src_uri.host())
 	, m_port(src_uri.portno())
-	, m_options(src_uri.parameters())
 {
 	sockaddr_in sa     = sockaddr_in();
 	sa.sin_family      = AF_INET;
@@ -69,3 +68,11 @@ size_t socket::udp::read(const mutable_buffer &buffer, int timeout_ms)
 
 	return static_cast<size_t>(res);
 }
+
+
+int socket::udp::write(const const_buffer& buffer, int timeout_ms)
+{
+	return 0;
+}
+
+

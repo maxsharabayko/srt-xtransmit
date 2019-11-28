@@ -20,6 +20,7 @@ class udp
 	, public isocket
 {
 	using shared_udp = std::shared_ptr<udp>;
+	using string     = std::string;
 
   public:
 	udp(const UriParser &src_uri);
@@ -27,23 +28,16 @@ class udp
 
   public:
 	void               listen();
-	future<shared_udp> async_connect() noexcept(false);
-	future<shared_udp> async_accept() noexcept(false);
-
-	shared_udp connect();
-	shared_udp accept();
 
   public:
-	std::future<shared_udp> async_read(std::vector<char> &buffer);
-	void                    async_write();
 
 	/**
 	 * @returns The number of bytes received.
 	 *
 	 * @throws socket_exception Thrown on failure.
 	 */
-	size_t read (const mutable_buffer &buffer, int timeout_ms = -1);
-	int    write(const const_buffer &buffer, int timeout_ms = -1);
+	size_t read (const mutable_buffer &buffer, int timeout_ms = -1) final;
+	int    write(const const_buffer   &buffer, int timeout_ms = -1) final;
 
   private:
 	SOCKET m_bind_socket   = -1; // INVALID_SOCK;
@@ -54,7 +48,7 @@ class udp
 	bool                m_blocking_mode = false;
 	string              m_host;
 	int                 m_port;
-	map<string, string> m_options; // All other options, as provided in the URI
+	std::map<string, string> m_options; // All other options, as provided in the URI
 };
 
 } // namespace udp
