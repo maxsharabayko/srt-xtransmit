@@ -48,6 +48,22 @@ cmake ../ -G"Visual Studio 16 2019" -A x64 -DPTHREAD_INCLUDE_DIR="_build\cinegy.
 cmake --build ./
 ```
 
+# Switching SRT version
+
+Before building the project with cmake, checkout the desired SRT library version.
+
+After 
+```
+git submodule init
+git submodule update
+```
+go to srt submodule and checkout, e.g. v1.3.4
+
+```
+cd submodule/srt
+git checkout v1.3.4
+```
+
 
 # Example Use Cases
 
