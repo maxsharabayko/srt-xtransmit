@@ -386,6 +386,9 @@ const string socket::srt::statistics_csv(bool print_header)
 
 	std::ostringstream output;
 
+
+#define HAS_PKT_REORDER_TOL (SRT_VERSION_MAJOR >= 1) && (SRT_VERSION_MINOR >= 4) && (SRT_VERSION_PATCH > 0)
+
 	if (print_header)
 	{
 		output << "Time,SocketID,pktFlowWindow,pktCongestionWindow,pktFlightSize,";
@@ -393,6 +396,9 @@ const string socket::srt::statistics_csv(bool print_header)
 		output << "pktRetrans,byteSent,byteAvailSndBuf,byteSndDrop,mbpsSendRate,usPktSndPeriod,";
 		output << "pktRecv,pktRcvLoss,pktRcvDrop,pktRcvRetrans,pktRcvBelated,";
 		output << "byteRecv,byteAvailRcvBuf,byteRcvLoss,byteRcvDrop,mbpsRecvRate,msRcvTsbPdDelay";
+#if HAS_PKT_REORDER_TOL
+		output << ",msRcvTsbPdDelay";
+#endif
 		output << endl;
 	}
 
@@ -428,6 +434,10 @@ const string socket::srt::statistics_csv(bool print_header)
 	output << stats.byteRcvDrop << ",";
 	output << stats.mbpsRecvRate << ",";
 	output << stats.msRcvTsbPdDelay;
+
+#if	HAS_PKT_REORDER_TOL
+	output << "," << stats.pktReorderTolerance;
+#endif
 
 	output << endl;
 
