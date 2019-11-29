@@ -8,6 +8,7 @@
 #include <thread>
 #include <vector>
 #include "srt_socket.hpp"
+#include "udp_socket.hpp"
 #include "generate.hpp"
 
 // OpenSRT
@@ -115,31 +116,29 @@ void run_pipe(shared_sock dst, const config &cfg, const atomic_bool &force_break
 	stats_logger.wait();
 }
 
-void start_generator(future<shared_srt> connection, const config &cfg, const atomic_bool &force_break)
-{
-	if (!connection.valid())
-	{
-		cerr << "Error: Unexpected socket creation failure!" << endl;
-		return;
-	}
-
-	const shared_srt sock = connection.get();
-	if (!sock)
-	{
-		cerr << "Error: Unexpected socket connection failure!" << endl;
-		return;
-	}
-
-	run_pipe(sock, cfg, force_break);
-}
 
 void xtransmit::generate::run(const string &dst_url, const config &cfg, const atomic_bool &force_break)
 {
-	shared_srt socket = make_shared<socket::srt>(UriParser(dst_url));
-	const bool        accept = socket->mode() == socket::srt::LISTENER;
+	const UriParser uri(dst_url);
+
+	shared_sock socket;
+	shared_sock connection;
+
+	if (uri.proto() == "udp")
+	{
+		connection = make_shared<socket::udp>(uri);
+	}
+	else
+	{
+		socket = make_shared<socket::srt>(uri);
+		socket::srt* s = static_cast<socket::srt *>(socket.get());
+		const bool  accept = s->mode() == socket::srt::LISTENER;
+		connection = accept ? s->accept() : s->connect();
+	}
+
 	try
 	{
-		start_generator(accept ? socket->async_accept() : socket->async_connect(), cfg, force_break);
+		run_pipe(connection, cfg, force_break);
 	}
 	catch (const socket::exception &e)
 	{
