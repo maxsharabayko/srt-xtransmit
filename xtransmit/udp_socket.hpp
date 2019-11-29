@@ -32,6 +32,8 @@ public:
 public:
 	bool is_caller() const final { return m_is_caller; }
 
+	int id() const final { return m_bind_socket; }
+
 public:
 	/**
 	 * @returns The number of bytes received.

@@ -90,7 +90,7 @@ public:
 
 public:
 
-	int id() const { return m_bind_socket; }
+	int id() const final { return m_bind_socket; }
 	int statistics(SRT_TRACEBSTATS &stats);
 
 	const std::string statistics_csv(bool print_header) final;

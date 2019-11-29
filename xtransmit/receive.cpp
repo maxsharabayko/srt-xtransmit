@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "srt_socket.hpp"
+#include "udp_socket.hpp"
 #include "receive.hpp"
 
 // OpenSRT
@@ -19,7 +20,8 @@ using namespace xtransmit;
 using namespace xtransmit::receive;
 using namespace std::chrono;
 
-using shared_srt = std::shared_ptr<socket::srt>;
+using shared_srt  = std::shared_ptr<socket::srt>;
+using shared_sock = std::shared_ptr<socket::isocket>;
 
 
 void read_timestamp(const vector<char>& buffer)
@@ -62,11 +64,11 @@ void trace_message(const size_t bytes, const vector<char> &buffer, int conn_id)
 	::cout << endl;
 }
 
-void run(shared_srt src, const config &cfg, const atomic_bool &force_break)
+void run_pipe(shared_sock src, const config &cfg, const atomic_bool &force_break)
 {
 	atomic_bool local_break(false);
 
-	auto stats_func = [&cfg, &force_break, &local_break](shared_srt sock) {
+	auto stats_func = [&cfg, &force_break, &local_break](shared_sock sock) {
 		if (cfg.stats_freq_ms == 0)
 			return;
 		if (cfg.stats_file.empty())
@@ -93,7 +95,7 @@ void run(shared_srt src, const config &cfg, const atomic_bool &force_break)
 
 	auto stats_logger = async(launch::async, stats_func, src);
 
-	socket::srt &sock = *src.get();
+	socket::isocket &sock = *src.get();
 
 	vector<char> buffer(cfg.message_size);
 	try
@@ -145,7 +147,7 @@ void start_receiver(future<shared_srt> &&connection, const config &cfg, const at
 		if (!sock)
 			return;
 
-		run(sock, cfg, force_break);
+		run_pipe(sock, cfg, force_break);
 	}
 	catch (const socket::exception &e)
 	{
