@@ -1,6 +1,6 @@
 Language:      Cpp
 BasedOnStyle:  LLVM
-# AccessModifierOffset: -2
+AccessModifierOffset: -4
 # AlignAfterOpenBracket: Align
 AlignConsecutiveAssignments: true
 AlignConsecutiveDeclarations: true
@@ -17,7 +17,7 @@ AlignTrailingComments: true
 # AlwaysBreakAfterDefinitionReturnType: None
 # AlwaysBreakAfterReturnType: None
 # AlwaysBreakBeforeMultilineStrings: false
-# AlwaysBreakTemplateDeclarations: false
+AlwaysBreakTemplateDeclarations: true
 BinPackArguments: false
 BinPackParameters: false
 # BraceWrapping:   
@@ -34,7 +34,7 @@ BinPackParameters: false
 #   IndentBraces:    false
 # BreakBeforeBinaryOperators: None
 BreakBeforeBraces: Allman
-# BreakInheritanceList: BeforeComma
+BreakInheritanceList: BeforeComma
 # BreakBeforeTernaryOperators: true
 BreakConstructorInitializers: BeforeComma
 # BreakAfterJavaFieldAnnotations: false
@@ -85,4 +85,4 @@ SpaceBeforeParens: true
 # SpacesInParentheses: false
 # SpacesInSquareBrackets: false
 TabWidth:        4
-UseTab:          ForIndentation
+UseTab:          ForContinuationAndIndentation
