@@ -86,6 +86,8 @@ public:
 
 	connection_mode mode() const;
 
+	bool is_caller() const final { return m_mode == CALLER; }
+
 public:
 
 	int id() const { return m_bind_socket; }
