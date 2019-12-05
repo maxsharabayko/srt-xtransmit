@@ -149,8 +149,8 @@ void xtransmit::generate::run(const string &dst_url, const config &cfg, const at
 
 CLI::App* xtransmit::generate::add_subcommand(CLI::App &app, config &cfg, string &dst_url)
 {
-	const map<string, int> to_bps{ {"kbps", 1'000}, {"Mbps", 1'000'000}, {"Gbps", 1'000'000'000} };
-	const map<string, int> to_ms{ {"s", 1'000}, {"ms", 1} };
+	const map<string, int> to_bps{ {"kbps", 1000}, {"Mbps", 1000000}, {"Gbps", 1000000000} };
+	const map<string, int> to_ms{ {"s", 1000}, {"ms", 1} };
 	const map<string, int> to_sec{ {"s", 1}, {"min", 60}, {"mins", 60} };
 
 	CLI::App* sc_generate = app.add_subcommand("generate", "Send generated data")->fallthrough();

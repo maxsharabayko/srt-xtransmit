@@ -295,10 +295,10 @@ int main(int argc, char **argv)
 	sc_forward->add_option("dst", dst, "Destination URI");
 	sc_forward->add_flag("--oneway", "Forward only from SRT to DST");
 
-	const map<string, int> to_bps{ {"kbps", 1'000}, {"Mbps", 1'000'000}, {"Gbps", 1'000'000'000} };
-	const map<string, int> to_ms{ {"s", 1'000}, {"ms", 1} };
+	const map<string, int> to_bps{ {"kbps", 1000}, {"Mbps", 1000000}, {"Gbps", 1000000000} };
+	const map<string, int> to_ms{ {"s", 1000}, {"ms", 1} };
 	const map<string, int> to_sec{{"s", 1}, {"min", 60}, {"mins", 60}};
-	const map<string, int> to_bytes{ {"kB", 1'000}, {"MB", 1'000'000}, {"GB", 1'000'000'000}, {"Gb", 1'000'000'000 / 8} };
+	const map<string, int> to_bytes{ {"kB", 1000}, {"MB", 1000000}, {"GB", 1000000000}, {"Gb", 1000000000 / 8} };
 
 	// SUBCOMMAND: generate
 	generate::config cfg_generate;
