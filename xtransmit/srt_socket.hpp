@@ -16,7 +16,8 @@
 
 
 
-namespace xtransmit::srt {
+namespace xtransmit {
+namespace srt {
 
 
 class socket_exception : public std::exception
@@ -132,5 +133,6 @@ private:
 	std::map<string, string> m_options; // All other options, as provided in the URI
 };
 
-} // namespace xtransmit::srt
+} // namespace srt
+} // namespace xtransmit
 
