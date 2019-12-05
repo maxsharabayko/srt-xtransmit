@@ -6,10 +6,8 @@
 #include "CLI/CLI.hpp"
 
 
-namespace xtransmit
-{
+namespace xtransmit {
 namespace generate {
-{
 
 	struct config
 	{
