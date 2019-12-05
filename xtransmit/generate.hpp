@@ -6,7 +6,9 @@
 #include "CLI/CLI.hpp"
 
 
-namespace xtransmit::generate
+namespace xtransmit
+{
+namespace generate {
 {
 
 	struct config
@@ -26,6 +28,6 @@ namespace xtransmit::generate
 			 const std::atomic_bool& force_break);
 
 	CLI::App* add_subcommand(CLI::App &app, config& cfg, std::string& dst_url);
-
+} // namespace generate
 } // namespace xtransmit::generate
 
