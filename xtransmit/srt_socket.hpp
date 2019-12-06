@@ -18,7 +18,7 @@
 
 
 namespace xtransmit {
-namespace srt {
+namespace socket {
 
 
 class srt
@@ -114,6 +114,6 @@ private:
 	std::map<string, string> m_options; // All other options, as provided in the URI
 };
 
-} // namespace srt
+} // namespace socket
 } // namespace xtransmit
 
