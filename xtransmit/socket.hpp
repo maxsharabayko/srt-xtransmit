@@ -1,5 +1,12 @@
 #pragma once
-#include <map>;
+#include <map>
+
+#if !defined(_WIN32)
+#include <sys/ioctl.h>
+typedef int SOCKET;
+#define INVALID_SOCKET ((SOCKET)-1)
+#define closesocket close
+#endif
 
 // xtransmit
 #include "buffer.hpp"
