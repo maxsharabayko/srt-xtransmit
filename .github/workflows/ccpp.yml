@@ -6,7 +6,7 @@ jobs:
   build:
     strategy:
       matrix:
-        compiler: [g++, clang, g++-4.8]
+        compiler: [g++, g++-4.8]
 
     runs-on: ubuntu-latest
     
