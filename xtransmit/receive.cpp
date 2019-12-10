@@ -26,6 +26,8 @@ using shared_sock = std::shared_ptr<socket::isocket>;
 
 void read_timestamp(const vector<char>& buffer)
 {
+	// Note: std::put_time is supported only in GCC 5 and higher
+#if !defined(__GNUC__) || (__GNUC__ >= 5)
 	const time_t    send_time    = *(reinterpret_cast<const time_t*>   (buffer.data()));
 	const long long send_time_us = *(reinterpret_cast<const long long*>(buffer.data() + 8));
 
@@ -42,6 +44,7 @@ void read_timestamp(const vector<char>& buffer)
 	const auto delay = systime_now - (system_clock::from_time_t(send_time) + microseconds(send_time_us));
 	::cout << " delta " << duration_cast<milliseconds>(delay).count() << " ms";
 	::cout << endl;
+#endif
 }
 
 
