@@ -9,4 +9,4 @@
 	url = https://github.com/CLIUtils/CLI11.git
 [submodule "submodule/srt"]
 	path = submodule/srt
-	url = https://github.com/maxlovic/srt.git
+	url = https://github.com/maxsharabayko/srt.git
