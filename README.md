@@ -41,7 +41,7 @@ cmake --build ./
 
 ### Build the Project
 ```
-git clone https://stash.haivision.com/scm/~maxsharabayko/srt-xtransmit.git srt-xtransmit
+git clone https://github.com/maxsharabayko/srt-xtransmit.git srt-xtransmit
 cd srt-xtransmit
 git submodule init
 git submodule update
