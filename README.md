@@ -1,9 +1,3 @@
-# Requirements
-
-* cmake (as a build configuration system)
-* OpenSSL (for encryption - required by SRT)
-* Pthreads (use pthreads4w on Windows - required by SRT)
-
 # Functionality
 
 ## Commands
@@ -19,6 +13,15 @@
 Collecting SRT statistics in CSV format.
 
 # Build Instructions
+
+[![Actions Status](https://github.com/maxsharabayko/srt-xtransmit/workflows/C/C++%20CI/badge.svg)](https://github.com/maxsharabayko/srt-xtransmit/actions)
+
+## Requirements
+
+* C++14 compliant compiler (GCC 4.8+)
+* cmake (as a build configuration system)
+* OpenSSL (for encryption - required by SRT)
+* Pthreads (use pthreads4w on Windows - required by SRT)
 
 ## Linux
 
@@ -48,7 +51,7 @@ cmake ../ -G"Visual Studio 16 2019" -A x64 -DPTHREAD_INCLUDE_DIR="_build\cinegy.
 cmake --build ./
 ```
 
-# Switching SRT version
+## Switching SRT version
 
 Before building the project with cmake, checkout the desired SRT library version.
 
