@@ -68,11 +68,11 @@ void trace_message(const size_t bytes, const vector<char> &buffer, int conn_id)
 #endif
 	::cout << endl;
 
-	CHandShake hs;
-	if (hs.load_from(buffer.data(), buffer.size()) < 0)
-		return;
-
-	::cout << "SRT HS: " << hs.show() << endl;
+	//CHandShake hs;
+	//if (hs.load_from(buffer.data(), buffer.size()) < 0)
+	//	return;
+	//
+	//::cout << "SRT HS: " << hs.show() << endl;
 }
 
 void run_pipe(shared_sock src, const config &cfg, const atomic_bool &force_break)
@@ -168,6 +168,8 @@ void xtransmit::receive::run(const string &src_url, const config &cfg, const ato
 			socket = make_shared<socket::srt>(uri);
 			socket::srt* s = static_cast<socket::srt*>(socket.get());
 			const bool  accept = s->mode() == socket::srt::LISTENER;
+			if (accept)
+				s->listen();
 			connection = accept ? s->accept() : s->connect();
 		}
 

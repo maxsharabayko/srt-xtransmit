@@ -135,6 +135,8 @@ void xtransmit::generate::run(const string &dst_url, const config &cfg, const at
 			socket = make_shared<socket::srt>(uri);
 			socket::srt* s = static_cast<socket::srt *>(socket.get());
 			const bool  accept = s->mode() == socket::srt::LISTENER;
+			if (accept)
+				s->listen();
 			connection = accept ? s->accept() : s->connect();
 		}
 
