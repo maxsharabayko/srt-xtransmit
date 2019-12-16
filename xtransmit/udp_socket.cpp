@@ -108,7 +108,7 @@ int socket::udp::write(const const_buffer &buffer, int timeout_ms)
 							 sizeof m_dst_addr);
 	if (res == -1)
 	{
-		throw socket::exception("udp::read::recv");
+		throw socket::exception("udp::write::send");
 	}
 
 	return static_cast<size_t>(res);

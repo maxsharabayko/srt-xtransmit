@@ -153,7 +153,7 @@ CLI::App* xtransmit::generate::add_subcommand(CLI::App &app, config &cfg, string
 	const map<string, int> to_ms{ {"s", 1000}, {"ms", 1} };
 	const map<string, int> to_sec{ {"s", 1}, {"min", 60}, {"mins", 60} };
 
-	CLI::App* sc_generate = app.add_subcommand("generate", "Send generated data")->fallthrough();
+	CLI::App* sc_generate = app.add_subcommand("generate", "Send generated data (SRT, UDP)")->fallthrough();
 	sc_generate->add_option("dst", dst_url, "Destination URI");
 	sc_generate->add_option("--msgsize", cfg.message_size, "Size of a message to send");
 	sc_generate->add_option("--sendrate", cfg.sendrate, "Bitrate to generate")

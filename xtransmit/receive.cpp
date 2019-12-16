@@ -142,26 +142,51 @@ void run_pipe(shared_sock src, const config &cfg, const atomic_bool &force_break
 	stats_logger.wait();
 }
 
-void start_receiver(future<shared_srt> &&connection, const config &cfg, const atomic_bool &force_break)
+void xtransmit::receive::run(const string &src_url, const config &cfg, const atomic_bool &force_break)
 {
+	const UriParser uri(src_url);
+
+	shared_sock socket;
+	shared_sock connection;
+
+	if (uri.proto() == "udp")
+	{
+		connection = make_shared<socket::udp>(uri);
+	}
+	else
+	{
+		socket = make_shared<socket::srt>(uri);
+		socket::srt* s = static_cast<socket::srt*>(socket.get());
+		const bool  accept = s->mode() == socket::srt::LISTENER;
+		connection = accept ? s->accept() : s->connect();
+	}
+
 	try
 	{
-		const shared_srt sock = connection.get();
-		if (!sock)
-			return;
-
-		run_pipe(sock, cfg, force_break);
+		run_pipe(connection, cfg, force_break);
 	}
-	catch (const socket::exception &e)
+	catch (const socket::exception & e)
 	{
-		::cerr << e.what();
-		return;
+		cerr << e.what() << endl;
 	}
 }
 
-void xtransmit::receive::receive_main(const string &url, const config &cfg, const atomic_bool &force_break)
+CLI::App* xtransmit::receive::add_subcommand(CLI::App& app, config& cfg, string& src_url)
 {
-	shared_srt socket = make_shared<socket::srt>(UriParser(url));
-	const bool        accept = socket->mode() == socket::srt::LISTENER;
-	start_receiver(accept ? socket->async_accept() : socket->async_connect(), cfg, force_break);
+	const map<string, int> to_ms{ {"s", 1000}, {"ms", 1} };
+
+	CLI::App* sc_receive = app.add_subcommand("receive", "Receive data (SRT, UDP)")->fallthrough();
+	sc_receive->add_option("src", src_url, "Source URI");
+	sc_receive->add_option("--msgsize", cfg.message_size, "Size of a buffer to receive message payload");
+	sc_receive->add_option("--statsfile", cfg.stats_file, "output stats report filename");
+	sc_receive->add_option("--statsfreq", cfg.stats_freq_ms, "output stats report frequency (ms)")
+		->transform(CLI::AsNumberWithUnit(to_ms, CLI::AsNumberWithUnit::CASE_SENSITIVE));
+	sc_receive->add_flag("--printmsg", cfg.print_notifications, "print message into to stdout");
+	sc_receive->add_flag("--timestamp", cfg.check_timestamp, "Check a timestamp in the message payload");
+	sc_receive->add_flag("--twoway", cfg.send_reply, "Both send and receive data");
+
+	return sc_receive;
 }
+
+
+

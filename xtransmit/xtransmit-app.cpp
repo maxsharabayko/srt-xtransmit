@@ -306,15 +306,7 @@ int main(int argc, char **argv)
 
 
 	xtransmit::receive::config cfg_receive;
-	CLI::App* sc_receive = app.add_subcommand("receive", "Receive data")->fallthrough();
-	sc_receive->add_option("src", src, "Source URI");
-	sc_receive->add_option("--msgsize", cfg_receive.message_size, "Size of a buffer to receive message payload");
-	sc_receive->add_option("--statsfile", cfg_receive.stats_file, "output stats report filename");
-	sc_receive->add_option("--statsfreq", cfg_receive.stats_freq_ms, "output stats report frequency (ms)")
-		->transform(CLI::AsNumberWithUnit(to_ms, CLI::AsNumberWithUnit::CASE_SENSITIVE));
-	sc_receive->add_flag("--printmsg", cfg_receive.print_notifications, "print message into to stdout");
-	sc_receive->add_flag("--timestamp", cfg_receive.check_timestamp, "Check a timestamp in the message payload");
-	sc_receive->add_flag("--twoway", cfg_receive.send_reply, "Both send and receive data");
+	CLI::App* sc_receive = receive::add_subcommand(app, cfg_receive, src);
 
 #if ENABLE_FILE_TRANSFER
 	CLI::App* sc_file = app.add_subcommand("file", "Send/receive a single file or folder contents")->fallthrough();
@@ -367,7 +359,7 @@ int main(int argc, char **argv)
 	}
 	else if (sc_receive->parsed())
 	{
-		xtransmit::receive::receive_main(src, cfg_receive, force_break);
+		xtransmit::receive::run(src, cfg_receive, force_break);
 		return 0;
 	}
 #if ENABLE_FILE_TRANSFER

@@ -2,6 +2,9 @@
 #include <atomic>
 #include <string>
 
+// Third party libraries
+#include "CLI/CLI.hpp"
+
 
 namespace xtransmit {
 	namespace receive {
@@ -19,8 +22,10 @@ namespace xtransmit {
 
 
 
-		void receive_main(const std::string& url, const config& cfg,
+		void run(const std::string& url, const config& cfg,
 			const std::atomic_bool& force_break);
+
+		CLI::App* add_subcommand(CLI::App& app, config& cfg, std::string& src_url);
 
 
 	} // namespace receive
