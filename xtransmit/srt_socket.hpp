@@ -30,7 +30,7 @@ class srt
 
 public:
 
-	srt(const UriParser& src_uri);
+	explicit srt(const UriParser& src_uri);
 
 	srt(const int sock, bool blocking);
 
@@ -73,8 +73,8 @@ public:
 	 *
 	 * @throws socket_exception Thrown on failure.
 	 */
-	size_t read(const mutable_buffer& buffer, int timeout_ms = -1);
-	int   write(const const_buffer& buffer, int timeout_ms = -1);
+	size_t read(const mutable_buffer& buffer, int timeout_ms = -1) final;
+	int   write(const const_buffer&   buffer, int timeout_ms = -1) final;
 
 	enum connection_mode
 	{
@@ -107,7 +107,7 @@ private:
 	int m_epoll_connect	= -1;
 	int m_epoll_io		= -1;
 
-	connection_mode           m_mode;
+	connection_mode m_mode = FAILURE;
 	bool m_blocking_mode = false;
 	string m_host;
 	int m_port;
