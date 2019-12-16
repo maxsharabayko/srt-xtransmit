@@ -83,19 +83,12 @@ void fwd_route(shared_ptr<SrtNode> src, shared_ptr<SrtNode> dst, SRTSOCKET dst_s
 
 			break;
 		}
-
-		if (force_break)
-		{
-			g_fwdlog.Debug() << description << "Breaking on request";
-			break;
-		}
 	}
 
-	if (!force_break)
-	{
+	if (force_break)
+		g_fwdlog.Debug() << description << "Breaking on request";
+	else
 		g_fwdlog.Debug() << description << "Force reconnection";
-		//force_break = true;
-	}
 
 	src->Close();
 	dst->Close();

@@ -110,7 +110,7 @@ private:
 	connection_mode m_mode = FAILURE;
 	bool m_blocking_mode = false;
 	string m_host;
-	int m_port;
+	int m_port = -1;
 	std::map<string, string> m_options; // All other options, as provided in the URI
 };
 
