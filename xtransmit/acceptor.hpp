@@ -8,7 +8,7 @@
 std::vector<std::future<void>> accepting_threads;
 
 
-void inline async_accept(std::shared_ptr< xtransmit::srt::socket> s)
+void inline async_accept(std::shared_ptr< xtransmit::socket::srt> s)
 {
 	// 1. Wait for acccept
 	auto s_accepted = s->async_accept();

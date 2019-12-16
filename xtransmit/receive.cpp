@@ -15,6 +15,8 @@
 #include "apputil.hpp"
 #include "uriparser.hpp"
 
+#include "handshake.h"
+
 using namespace std;
 using namespace xtransmit;
 using namespace xtransmit::receive;
@@ -65,6 +67,12 @@ void trace_message(const size_t bytes, const vector<char> &buffer, int conn_id)
 	}
 #endif
 	::cout << endl;
+
+	CHandShake hs;
+	if (hs.load_from(buffer.data(), buffer.size()) < 0)
+		return;
+
+	::cout << "SRT HS: " << hs.show() << endl;
 }
 
 void run_pipe(shared_sock src, const config &cfg, const atomic_bool &force_break)
