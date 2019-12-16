@@ -149,20 +149,20 @@ void xtransmit::receive::run(const string &src_url, const config &cfg, const ato
 	shared_sock socket;
 	shared_sock connection;
 
-	if (uri.proto() == "udp")
-	{
-		connection = make_shared<socket::udp>(uri);
-	}
-	else
-	{
-		socket = make_shared<socket::srt>(uri);
-		socket::srt* s = static_cast<socket::srt*>(socket.get());
-		const bool  accept = s->mode() == socket::srt::LISTENER;
-		connection = accept ? s->accept() : s->connect();
-	}
-
 	try
 	{
+		if (uri.proto() == "udp")
+		{
+			connection = make_shared<socket::udp>(uri);
+		}
+		else
+		{
+			socket = make_shared<socket::srt>(uri);
+			socket::srt* s = static_cast<socket::srt*>(socket.get());
+			const bool  accept = s->mode() == socket::srt::LISTENER;
+			connection = accept ? s->accept() : s->connect();
+		}
+
 		run_pipe(connection, cfg, force_break);
 	}
 	catch (const socket::exception & e)
