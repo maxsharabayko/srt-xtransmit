@@ -29,7 +29,6 @@ class srt
 	using shared_srt	= std::shared_ptr<srt>;
 
 public:
-
 	explicit srt(const UriParser& src_uri);
 
 	srt(const int sock, bool blocking);
@@ -37,11 +36,7 @@ public:
 	virtual ~srt();
 
 
-private:
-
-
 public:
-
 	std::future<shared_srt> async_connect() noexcept(false);
 	std::future<shared_srt> async_accept()  noexcept(false);
 
@@ -57,14 +52,12 @@ public:
 	void					listen() noexcept(false);
 
 public:
-
 	void configure(const std::map<string, string> &options);
 
 	int configure_pre(SRTSOCKET sock);
 	int configure_post(SRTSOCKET sock);
 
 public:
-
 	std::future<shared_srt>  async_read(std::vector<char> &buffer);
 	void async_write();
 
@@ -89,7 +82,6 @@ public:
 	bool is_caller() const final { return m_mode == CALLER; }
 
 public:
-
 	int id() const final { return m_bind_socket; }
 	int statistics(SRT_TRACEBSTATS &stats);
 
@@ -97,12 +89,10 @@ public:
 
 
 private:
-
 	static void raise_exception(const string&& place, UDT::ERRORINFO& udt_error);
 	static void raise_exception(const string &&place, const string&& reason);
 
 private:
-
 	int m_bind_socket	= SRT_INVALID_SOCK;
 	int m_epoll_connect	= -1;
 	int m_epoll_io		= -1;
