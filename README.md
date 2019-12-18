@@ -15,6 +15,7 @@ Collecting SRT statistics in CSV format.
 # Build Instructions
 
 [![Actions Status](https://github.com/maxsharabayko/srt-xtransmit/workflows/C/C++%20CI/badge.svg)](https://github.com/maxsharabayko/srt-xtransmit/actions)
+[![CodeFactor](https://www.codefactor.io/repository/github/maxsharabayko/srt-xtransmit/badge)](https://www.codefactor.io/repository/github/maxsharabayko/srt-xtransmit)
 
 ## Requirements
 
