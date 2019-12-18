@@ -70,7 +70,7 @@ int main(int argc, char **argv)
 {
 	using namespace xtransmit;
 
-	CLI::App app("SRT xtransmit tool.");
+	CLI::App app("SRT xtransmit tool. SRT library v" SRT_VERSION_STRING);
 	app.set_config("--config");
 	app.set_help_all_flag("--help-all", "Expand all help");
 
@@ -93,6 +93,9 @@ int main(int argc, char **argv)
 					   return true;
 				   },
 				   "log functional area [ all, general, bstats, control, data, tsbpd, rexmit ]");
+
+	CLI::App* cmd_version = app.add_subcommand("version", "Show version info")
+		->callback([]() { cerr << "SRT library v" << SRT_VERSION_STRING << endl; });
 
 	string src, dst;
 
