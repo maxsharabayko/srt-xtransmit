@@ -44,6 +44,27 @@ void OnINT_ForceExit(int)
 }
 
 
+struct NetworkInit
+{
+	NetworkInit()
+	{
+		// This is mainly required on Windows to initialize the network system,
+		// for a case when the instance would use UDP. SRT does it on its own, independently.
+		if (!SysInitializeNetwork())
+			throw std::runtime_error("Can't initialize network!");
+		srt_startup();
+	}
+
+	// Symmetrically, this does a cleanup; put into a local destructor to ensure that
+	// it's called regardless of how this function returns.
+	~NetworkInit()
+	{
+		SysCleanupNetwork();
+		srt_cleanup();
+	}
+};
+
+
 
 int main(int argc, char **argv)
 {
@@ -99,35 +120,16 @@ int main(int argc, char **argv)
 	CLI::App* sc_file_recv = file::receive::add_subcommand(*sc_file, cfg_file_recv, src);
 #endif
 
-	// TODO:
-	// CLI::App* sc_echo    = app.add_subcommand("echo",    "Echo back all the packets received on the connection");
-	// CLI::App *sc_test    = app.add_subcommand("test",    "Receive/send a test content generated");
-	// CLI::App *sc_live    = app.add_subcommand("live",    "Receive/send a live source");
-
 	app.require_subcommand(1);
 
+	// Startup and cleanup network sockets library
+	const NetworkInit nwobject;
+
 	CLI11_PARSE(app, argc, argv);
-
-	// This is mainly required on Windows to initialize the network system,
-	// for a case when the instance would use UDP. SRT does it on its own, independently.
-	if (!SysInitializeNetwork())
-		throw std::runtime_error("Can't initialize network!");
-
-	// Symmetrically, this does a cleanup; put into a local destructor to ensure that
-	// it's called regardless of how this function returns.
-	struct NetworkCleanup
-	{
-		~NetworkCleanup()
-		{
-			SysCleanupNetwork();
-		}
-	} cleanupobj;
-
 
 	//signal(SIGINT, OnINT_ForceExit);
 	//signal(SIGTERM, OnINT_ForceExit);
 
-	srt_startup();
 
 	// TODO: Callback for subcommands
 	// https://cliutils.gitlab.io/CLI11Tutorial/chapters/an-advanced-example.html
