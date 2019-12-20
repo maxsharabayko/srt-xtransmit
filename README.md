@@ -106,7 +106,7 @@ srt-xtransmit receive "srt://:4200?transtype=file&messageapi=1&payloadsize=1456&
 Send all files in folder "srcfolder", and  receive into a current folder "./".
 
 Requires C++17 compliant compiler with support for `file_system` (GCC 8 and higher). See [compiler support](https://en.cppreference.com/w/cpp/compiler_support) matrix. \
-Build with `-DENABLE_CXX17=OFF` build option to disable (enabled by default).
+Build with `-DENABLE_CXX17=ON` build option to enable (default -DENABLE_CXX17=OFF).
 
 ### Sender
 ```

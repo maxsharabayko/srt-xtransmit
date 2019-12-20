@@ -1,6 +1,6 @@
 project(srt-xtransmit)
 
-option(ENABLE_CXX17 "Should the c++17 parts (file receive/send) be enabled" ON)
+option(ENABLE_CXX17 "Should the c++17 parts (file receive/send) be enabled" OFF)
 
 #AUX_SOURCE_DIRECTORY(SOURCES ./) 
 FILE(GLOB SOURCES *.cpp *.hpp)
