@@ -130,8 +130,8 @@ int main(int argc, char **argv)
 
 	CLI11_PARSE(app, argc, argv);
 
-	//signal(SIGINT, OnINT_ForceExit);
-	//signal(SIGTERM, OnINT_ForceExit);
+	signal(SIGINT, OnINT_ForceExit);
+	signal(SIGTERM, OnINT_ForceExit);
 
 
 	// TODO: Callback for subcommands
