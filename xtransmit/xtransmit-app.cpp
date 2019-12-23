@@ -74,7 +74,12 @@ int main(int argc, char **argv)
 	app.set_config("--config");
 	app.set_help_all_flag("--help-all", "Expand all help");
 
-	app.add_flag_function("--verbose,-v", [](size_t) { Verbose::on = true; }, "enable verbose output");
+	app.add_flag("--verbose,-v", [](size_t) { Verbose::on = true; }, "enable verbose output");
+
+	app.add_flag("--handle-sigint", [](size_t) {
+			signal(SIGINT, OnINT_ForceExit);
+			signal(SIGTERM, OnINT_ForceExit);
+		}, "Handle Ctrl+C interrupt");
 
 	app.add_option("--loglevel", [](CLI::results_t val) {
 		srt_logging::LogLevel::type lev = SrtParseLogLevel(val[0]);
@@ -102,15 +107,8 @@ int main(int argc, char **argv)
 	xtransmit::forward::config cfg_forward;
 	CLI::App* sc_forward = xtransmit::forward::add_subcommand(app, cfg_forward, src, dst);
 
-	const map<string, int> to_bps{ {"kbps", 1000}, {"Mbps", 1000000}, {"Gbps", 1000000000} };
-	const map<string, int> to_ms{ {"s", 1000}, {"ms", 1} };
-	const map<string, int> to_sec{{"s", 1}, {"min", 60}, {"mins", 60}};
-	const map<string, int> to_bytes{ {"kB", 1000}, {"MB", 1000000}, {"GB", 1000000000}, {"Gb", 1000000000 / 8} };
-
-	// SUBCOMMAND: generate
 	generate::config cfg_generate;
 	CLI::App* sc_generate = generate::add_subcommand(app, cfg_generate, dst);
-
 
 	xtransmit::receive::config cfg_receive;
 	CLI::App* sc_receive = receive::add_subcommand(app, cfg_receive, src);
@@ -124,15 +122,10 @@ int main(int argc, char **argv)
 #endif
 
 	app.require_subcommand(1);
+	CLI11_PARSE(app, argc, argv);
 
 	// Startup and cleanup network sockets library
 	const NetworkInit nwobject;
-
-	CLI11_PARSE(app, argc, argv);
-
-	//signal(SIGINT, OnINT_ForceExit);
-	//signal(SIGTERM, OnINT_ForceExit);
-
 
 	// TODO: Callback for subcommands
 	// https://cliutils.gitlab.io/CLI11Tutorial/chapters/an-advanced-example.html
@@ -164,13 +157,7 @@ int main(int argc, char **argv)
 #endif
 	else
 	{
-
-		//std::shared_ptr<xtransmit::srt::socket> sock = std::make_shared<xtransmit::srt::socket>();
-
-		/*auto sconnected = sock->async_connect();
-		cerr << "Main\n";
-		auto socket = sconnected.get();
-		cerr << "Connected\n";*/
+		cerr << "Failed to recognize subcommand" << endl;
 	}
 
 	return 0;
