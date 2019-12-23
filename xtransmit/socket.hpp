@@ -44,7 +44,7 @@ public:
 public:
 	/** Read data from socket.
 	 *
-	 * @returns The number of bytes received.
+	 * @returns The number of bytes read.
 	 *
 	 * @throws socket::exception Thrown on failure.
 	 */
@@ -52,7 +52,7 @@ public:
 
 	/** Write data to socket.
 	 *
-	 * @returns The number of bytes received.
+	 * @returns The number of bytes written.
 	 *
 	 * @throws socket::exception Thrown on failure.
 	 */

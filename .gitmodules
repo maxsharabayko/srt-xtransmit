@@ -10,3 +10,6 @@
 [submodule "submodule/srt"]
 	path = submodule/srt
 	url = https://github.com/maxsharabayko/srt.git
+[submodule "submodule/spdlog"]
+	path = submodule/spdlog
+	url = https://github.com/gabime/spdlog.git

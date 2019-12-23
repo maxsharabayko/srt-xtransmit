@@ -13,9 +13,6 @@
 #include "udt.h"	// srt_logger_config
 #include "apputil.hpp"
 #include "uriparser.hpp"
-//#include "smoother.h" // Specific smoother for testing
-//#include "srt-flow-smoother.h"
-//#include "testmedia.hpp"
 #include "srt_node.hpp"
 #include "logging.h"
 #include "logsupport.hpp"
@@ -27,6 +24,7 @@
 #include "forward.h"
 #include "generate.hpp"
 #include "receive.hpp"
+#include "route.hpp"
 #include "file-send.hpp"
 #include "file-receive.hpp"
 
@@ -113,6 +111,9 @@ int main(int argc, char **argv)
 	xtransmit::receive::config cfg_receive;
 	CLI::App* sc_receive = receive::add_subcommand(app, cfg_receive, src);
 
+	xtransmit::route::config cfg_route;
+	CLI::App* sc_route = route::add_subcommand(app, cfg_route, src, dst);
+
 #if ENABLE_FILE_TRANSFER
 	CLI::App* sc_file = app.add_subcommand("file", "Send/receive a single file or folder contents")->fallthrough();
 	xtransmit::file::send::config cfg_file_send;
@@ -141,6 +142,11 @@ int main(int argc, char **argv)
 	else if (sc_receive->parsed())
 	{
 		xtransmit::receive::run(src, cfg_receive, force_break);
+		return 0;
+	}
+	else if (sc_route->parsed())
+	{
+		xtransmit::route::run(src, dst, cfg_route, force_break);
 		return 0;
 	}
 #if ENABLE_FILE_TRANSFER
