@@ -10,6 +10,7 @@
 #include "srt_socket.hpp"
 #include "udp_socket.hpp"
 #include "route.hpp"
+#include "socket_stats.hpp"
 
 // OpenSRT
 #include "apputil.hpp"
@@ -28,73 +29,6 @@ namespace xtransmit
 {
 namespace route
 {
-
-	/*class stats_writer
-	{
-	public:
-		stats_writer(const config& cfg)
-			: m_logfile(cfg.stats_file.c_str())
-			, m_interval(milliseconds(cfg.stats_freq_ms))
-		{
-			if (!m_logfile)
-			{
-				cerr << "ERROR: Can't open '" << cfg.stats_file << "' for writing stats. No output.\n";
-				return;
-			}
-		}
-
-	public:
-		void add_socket(shared_sock sock)
-		{
-			m_sock.push_back(sock);
-
-			if (m_stat_future.valid())
-				return;
-
-			m_stat_future = launch();
-		}
-
-		void stop()
-		{
-			m_stop = true;
-			m_stat_future.wait();
-		}
-
-	private:
-
-		future<void> launch()
-		{
-			auto stats_func = [](vector<shared_sock> &sock, ofstream& out, const milliseconds interval,
-				mutex& stats_lock, const atomic_bool& stop_stats)
-			{
-				bool print_header = true;
-
-				while (!stop_stats)
-				{
-					this_thread::sleep_for(interval);
-
-					scoped_lock lock(stats_lock);
-					for_each(sock.begin(), sock.end(), [&out, &print_header](shared_sock& s) {
-							out << s->statistics_csv(print_header) << flush;
-						});
-
-					print_header = false;
-				}
-			};
-
-			return async(launch::async, stats_func, ref(m_sock), m_logfile, m_interval, ref(m_lock), ref(m_stop));
-		}
-
-
-	private:
-		atomic<bool> m_stop;
-		ofstream m_logfile;
-		vector<shared_sock> m_sock;
-		future<void> m_stat_future;
-		const milliseconds m_interval;
-		mutex m_lock;
-	};*/
-
 
 	void route(shared_sock src, shared_sock dst,
 		const config& cfg, const string&& desc, const atomic_bool& force_break)
@@ -151,9 +85,17 @@ namespace route
 void xtransmit::route::run(const string& src_url, const string& dst_url,
 	const config& cfg, const atomic_bool& force_break)
 {
+	unique_ptr<socket::stats_writer> stats;
 	try {
 		shared_sock dst = create_connection(dst_url);
 		shared_sock src = create_connection(src_url);
+
+		if (cfg.stats_file != "" && cfg.stats_freq_ms > 0)
+		{
+			socket::stats_writer stats(cfg.stats_file, milliseconds(cfg.stats_freq_ms));
+			stats.add_socket(src);
+			stats.add_socket(dst);
+		}
 
 		route(src, dst, cfg, "[SRC->DST]", force_break);
 	}
