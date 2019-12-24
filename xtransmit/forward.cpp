@@ -18,15 +18,19 @@ srt_logging::Logger g_fwdlog(SRT_LOGFA_FORWARDER, srt_logger_config, "SRT.fwd");
 shared_ptr<SrtNode> create_node(const config& cfg, const char* uri, bool is_caller)
 {
 	UriParser urlp(uri);
-	urlp["transtype"] = string("file");
-	urlp["messageapi"] = string("true");
 	urlp["mode"] = is_caller ? string("caller") : string("listener");
+	
+	if (cfg.planck)
+	{
+		urlp["transtype"] = string("file");
+		urlp["messageapi"] = string("true");
 
-	// If we have this parameter provided, probably someone knows better
-	if (!urlp["sndbuf"].exists())
-		urlp["sndbuf"] = to_string(3 * (cfg.message_size * 1472 / 1456 + 1472));
-	if (!urlp["rcvbuf"].exists())
-		urlp["rcvbuf"] = to_string(3 * (cfg.message_size * 1472 / 1456 + 1472));
+		// If we have this parameter provided, probably someone knows better
+		if (!urlp["sndbuf"].exists())
+			urlp["sndbuf"] = to_string(3 * (cfg.message_size * 1472 / 1456 + 1472));
+		if (!urlp["rcvbuf"].exists())
+			urlp["rcvbuf"] = to_string(3 * (cfg.message_size * 1472 / 1456 + 1472));
+	}
 
 	return shared_ptr<SrtNode>(new SrtNode(urlp));
 }
@@ -185,6 +189,7 @@ CLI::App* xtransmit::forward::add_subcommand(CLI::App& app, config& cfg, string&
 	sc_forward->add_option("src", src_url, "Source URI");
 	sc_forward->add_option("dst", dst_url, "Destination URI");
 	sc_forward->add_flag("--oneway", cfg.one_way, "Forward only from SRT to DST");
+	sc_forward->add_flag("--planck", cfg.planck, "Apply default config for SRT Planck use case");
 
 	return sc_forward;
 }

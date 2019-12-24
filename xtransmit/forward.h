@@ -12,6 +12,7 @@ namespace forward {
 	struct config
 	{
 		int message_size = 1456;
+		bool planck = false;	// Default settings for Planck project
 		bool one_way = false;
 	};
 
