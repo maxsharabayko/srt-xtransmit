@@ -3,6 +3,8 @@ project(SRT-XTRANSMIT C CXX)
 
 
 add_subdirectory(submodule/CLI11)
+
+add_subdirectory(submodule/spdlog)
 # Adds ${CLI11_SOURCE_DIR} etc.
 
 # BOOST is not used at the moment
