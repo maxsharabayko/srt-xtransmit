@@ -256,12 +256,19 @@ std::future<shared_srt> socket::srt::async_read(std::vector<char> &buffer)
 
 void socket::srt::check_options_exist() const
 {
+#ifdef ENABLE_CXX17
+	for (const auto& [key, val] : myMap)
+	{
+#else
 	for (const auto el : m_options)
 	{
+		const string& key = el.first;
+		const string& val = el.second;
+#endif
 		bool opt_found = false;
 		for (const auto o : srt_options)
 		{
-			if (o.name != el.first)
+			if (o.name != key)
 				continue;
 
 			opt_found = true;
@@ -272,7 +279,7 @@ void socket::srt::check_options_exist() const
 			continue;
 
 		spdlog::warn(LOG_SOCK_SRT "srt://{}:{:d}: Ignoring socket option '{}={}' (not recognized)!",
-			m_host, m_port, el.first, el.second);
+			m_host, m_port, key, val);
 	}
 }
 
