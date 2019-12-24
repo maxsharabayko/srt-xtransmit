@@ -51,9 +51,10 @@ public:
 	 */
 	void					listen() noexcept(false);
 
-public:
+private:
 	void configure(const std::map<string, string> &options);
 
+	void check_options_exist() const;
 	int configure_pre(SRTSOCKET sock);
 	int configure_post(SRTSOCKET sock);
 
@@ -89,8 +90,8 @@ public:
 
 
 private:
-	static void raise_exception(const string&& place, UDT::ERRORINFO& udt_error);
-	static void raise_exception(const string &&place, const string&& reason);
+	void raise_exception(const string&& place, UDT::ERRORINFO& udt_error) const;
+	void raise_exception(const string &&place, const string&& reason) const;
 
 private:
 	int m_bind_socket	= SRT_INVALID_SOCK;

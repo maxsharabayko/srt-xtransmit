@@ -32,7 +32,11 @@ else()
 endif()
 
 set (VIRTUAL_srtsupport $<TARGET_OBJECTS:srtsupport_virtual>)
-target_link_libraries(srt-xtransmit CLI11::CLI11 ${TARGET_srt}_static ${VIRTUAL_srtsupport} ${LINKSTDCPP_FS})
+#spdlog_enable_warnings(srt-xtransmit)
+target_link_libraries(srt-xtransmit
+	PRIVATE CLI11::CLI11
+	PRIVATE spdlog::spdlog
+	PRIVATE ${TARGET_srt}_static ${VIRTUAL_srtsupport} ${LINKSTDCPP_FS})
 
 set_target_properties(srt-xtransmit
 	PROPERTIES

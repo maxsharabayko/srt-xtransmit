@@ -8,6 +8,7 @@
 
 // Third party libraries
 #include "CLI/CLI.hpp"
+#include "spdlog/spdlog.h"
 
 // SRT libraries
 #include "udt.h"	// srt_logger_config
@@ -39,6 +40,7 @@ void OnINT_ForceExit(int)
 {
 	cerr << "\n-------- REQUESTED INTERRUPT!\n";
 	force_break = true;
+	srt_cleanup();
 }
 
 
@@ -72,7 +74,11 @@ int main(int argc, char **argv)
 	app.set_config("--config");
 	app.set_help_all_flag("--help-all", "Expand all help");
 
-	app.add_flag("--verbose,-v", [](size_t) { Verbose::on = true; }, "enable verbose output");
+	spdlog::set_pattern("%H:%M:%S.%f %^[%L]%$ %v");
+	app.add_flag("--verbose,-v", [](size_t) {
+			Verbose::on = true;
+			spdlog::set_level(spdlog::level::trace);
+		}, "enable verbose output");
 
 	app.add_flag("--handle-sigint", [](size_t) {
 			signal(SIGINT, OnINT_ForceExit);
