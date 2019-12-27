@@ -128,7 +128,6 @@ shared_srt socket::srt::accept()
 	// Wait for REAL connected state if nonblocking mode
 	if (!m_blocking_mode)
 	{
-
 		// Socket readiness for connection is checked by polling on WRITE allowed sockets.
 		constexpr int timeout_ms = -1;
 		int           len        = 2;

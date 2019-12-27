@@ -75,12 +75,12 @@ int main(int argc, char **argv)
 	app.set_help_all_flag("--help-all", "Expand all help");
 
 	spdlog::set_pattern("%H:%M:%S.%f %^[%L]%$ %v");
-	app.add_flag("--verbose,-v", [](size_t) {
+	app.add_flag_function("--verbose,-v", [](size_t) {
 			Verbose::on = true;
 			spdlog::set_level(spdlog::level::trace);
 		}, "enable verbose output");
 
-	app.add_flag("--handle-sigint", [](size_t) {
+	app.add_flag_function("--handle-sigint", [](size_t) {
 			signal(SIGINT, OnINT_ForceExit);
 			signal(SIGTERM, OnINT_ForceExit);
 		}, "Handle Ctrl+C interrupt");
