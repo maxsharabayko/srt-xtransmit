@@ -22,7 +22,9 @@ xtransmit::socket::stats_writer::stats_writer(const std::string& filename, const
 
 void xtransmit::socket::stats_writer::add_socket(shared_sock sock)
 {
+	m_lock.lock();
 	m_sock.push_back(sock);
+	m_lock.unlock();
 
 	if (m_stat_future.valid())
 		return;
@@ -48,7 +50,11 @@ future<void> xtransmit::socket::stats_writer::launch()
 		{
 			this_thread::sleep_for(interval);
 
+#ifdef ENABLE_CXX17
 			scoped_lock lock(stats_lock);
+#else
+			lock_guard<std::mutex> lock(stats_lock);
+#endif
 			for_each(sock.begin(), sock.end(), [&out, &print_header](shared_sock& s) {
 				out << s->statistics_csv(print_header) << flush;
 				});
@@ -57,10 +63,5 @@ future<void> xtransmit::socket::stats_writer::launch()
 		}
 	};
 
-	auto test_func = [](vector<shared_sock>& sock, ofstream& out, const milliseconds interval, mutex& stats_lock, const atomic_bool& stop_stats)
-	{
-		return;
-	};
-
-	return async(launch::async, stats_func, ref(m_sock), ref(m_logfile), m_interval, ref(m_lock), ref(m_stop));
+	return async(::launch::async, stats_func, ref(m_sock), ref(m_logfile), m_interval, ref(m_lock), ref(m_stop));
 }
