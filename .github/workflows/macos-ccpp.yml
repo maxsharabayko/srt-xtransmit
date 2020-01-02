@@ -13,6 +13,8 @@ jobs:
       run: |
         git submodule init
         git submodule update
+    - name: brew install openssl
+      run: brew install openssl
     - name: cmake
       run: mkdir _build && cd _build && export PKG_CONFIG_PATH=$(brew --prefix openssl)"/lib/pkgconfig" && cmake ../ -DENABLE_CXX17=OFF
     - name: build
