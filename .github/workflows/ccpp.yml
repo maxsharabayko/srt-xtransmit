@@ -17,7 +17,7 @@ jobs:
       run: |
         git submodule init
         git submodule update
-    - if: matrix.compiler == 'g++-4.8' && matrix.os != macOS-latest
+    - if: matrix.compiler == 'g++-4.8' && matrix.os != 'macOS-latest'
       name: install gcc 4.8
       run: |
         sudo apt-get install g++-4.8
