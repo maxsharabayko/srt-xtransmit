@@ -51,9 +51,9 @@ future<void> xtransmit::socket::stats_writer::launch()
 			this_thread::sleep_for(interval);
 
 #ifdef ENABLE_CXX17
-			scoped_lock lock(stats_lock);
+			scoped_lock<mutex> lock(stats_lock);
 #else
-			lock_guard<std::mutex> lock(stats_lock);
+			lock_guard<mutex> lock(stats_lock);
 #endif
 			for_each(sock.begin(), sock.end(), [&out, &print_header](shared_sock& s) {
 				out << s->statistics_csv(print_header) << flush;
