@@ -104,20 +104,20 @@ void socket::srt::listen()
 	if (res == SRT_ERROR)
 	{
 		srt_close(m_bind_socket);
-		raise_exception("bind", UDT::getlasterror());
+		raise_exception("bind");
 	}
 
 	res = srt_listen(m_bind_socket, num_clients);
 	if (res == SRT_ERROR)
 	{
 		srt_close(m_bind_socket);
-		raise_exception("listen", UDT::getlasterror());
+		raise_exception("listen");
 	}
 
 	spdlog::debug(LOG_SOCK_SRT "0x{:X} (srt://{}:{:d}) Listening", m_bind_socket, m_host, m_port);
 	res = configure_post(m_bind_socket);
 	if (res == SRT_ERROR)
-		raise_exception("listen::configure_post", UDT::getlasterror());
+		raise_exception("listen::configure_post");
 }
 
 shared_srt socket::srt::accept()
@@ -137,7 +137,7 @@ shared_srt socket::srt::accept()
 			// if (srt_getlasterror(nullptr) == SRT_ETIMEOUT)
 			//	continue;
 
-			raise_exception("accept::epoll_wait", UDT::getlasterror());
+			raise_exception("accept::epoll_wait");
 		}
 	}
 
@@ -146,7 +146,7 @@ shared_srt socket::srt::accept()
 	const SRTSOCKET sock = srt_accept(m_bind_socket, (sockaddr *)&scl, &sclen);
 	if (sock == SRT_INVALID_SOCK)
 	{
-		raise_exception("accept", UDT::getlasterror());
+		raise_exception("accept");
 	}
 
 	// we do one client connection at a time,
@@ -159,17 +159,16 @@ shared_srt socket::srt::accept()
 
 	const int res = configure_post(sock);
 	if (res == SRT_ERROR)
-		raise_exception("accept::configure_post", UDT::getlasterror());
+		raise_exception("accept::configure_post");
 
 	return make_shared<srt>(sock, m_blocking_mode);
 }
 
-void socket::srt::raise_exception(const string &&place, UDT::ERRORINFO &udt_error) const
+void socket::srt::raise_exception(const string &&place) const
 {
-	const int    udt_result = udt_error.getErrorCode();
-	const string message    = udt_error.getErrorMessage();
+	const int    udt_result = srt_getlasterror(nullptr);
+	const string message = srt_getlasterror_str();
 	spdlog::debug(LOG_SOCK_SRT "0x{:X} {} ERROR {} {}", m_bind_socket, place, udt_result, message);
-	udt_error.clear();
 	throw socket::exception(place + ": " + message);
 }
 
@@ -200,7 +199,7 @@ shared_srt socket::srt::connect()
 		if (res == SRT_ERROR)
 		{
 			srt_close(m_bind_socket);
-			raise_exception("connect", UDT::getlasterror());
+			raise_exception("connect");
 		}
 	}
 
@@ -218,7 +217,7 @@ shared_srt socket::srt::connect()
 		}
 		else
 		{
-			raise_exception("connect.epoll_wait", UDT::getlasterror());
+			raise_exception("connect.epoll_wait");
 		}
 	}
 
@@ -227,7 +226,7 @@ shared_srt socket::srt::connect()
 	{
 		const int res = configure_post(m_bind_socket);
 		if (res == SRT_ERROR)
-			raise_exception("connect::onfigure_post", UDT::getlasterror());
+			raise_exception("connect::onfigure_post");
 	}
 
 	return shared_from_this();
@@ -359,13 +358,13 @@ size_t socket::srt::read(const mutable_buffer &buffer, int timeout_ms)
 			if (srt_getlasterror(nullptr) == SRT_ETIMEOUT)
 				return 0;
 
-			raise_exception("read::epoll", UDT::getlasterror());
+			raise_exception("read::epoll");
 		}
 	}
 
 	const int res = srt_recvmsg2(m_bind_socket, static_cast<char *>(buffer.data()), (int)buffer.size(), nullptr);
 	if (SRT_ERROR == res)
-		raise_exception("read::recv", UDT::getlasterror());
+		raise_exception("read::recv");
 
 	return static_cast<size_t>(res);
 }
@@ -382,7 +381,7 @@ int socket::srt::write(const const_buffer &buffer, int timeout_ms)
 		// TODO: check error fds
 		const int res = srt_epoll_wait(m_epoll_io, rready, &rlen, ready, &len, timeout_ms, 0, 0, 0, 0);
 		if (res == SRT_ERROR)
-			raise_exception("write::epoll", UDT::getlasterror());
+			raise_exception("write::epoll");
 
 		ss << "write::epoll_wait result " << res << " rlen " << rlen << " wlen " << len << " wsocket " << ready[0];
 		//Verb() << "srt::socket::write: srt_epoll_wait set len " << len << " socket " << ready[0];
@@ -420,7 +419,7 @@ const string socket::srt::statistics_csv(bool print_header)
 {
 	SRT_TRACEBSTATS stats;
 	if (SRT_ERROR == srt_bstats(m_bind_socket, &stats, true))
-		raise_exception("statistics", UDT::getlasterror());
+		raise_exception("statistics");
 
 	std::ostringstream output;
 

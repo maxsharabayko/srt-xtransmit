@@ -90,7 +90,7 @@ public:
 
 
 private:
-	void raise_exception(const string&& place, UDT::ERRORINFO& udt_error) const;
+	void raise_exception(const string&& place) const;
 	void raise_exception(const string &&place, const string&& reason) const;
 
 private:
