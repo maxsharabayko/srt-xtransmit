@@ -52,7 +52,7 @@ void read_timestamp(const vector<char>& buffer)
 		return;
 
 	::cerr << "The --timestamp feature requires GCC 5.0 abd higher, sorry." << endl;
-	printwanr = false;
+	printwarn = false;
 #endif
 }
 
