@@ -76,6 +76,8 @@ namespace route
 				s->listen();
 			return accept ? s->accept() : s->connect();
 		}
+
+		return nullptr;
 	}
 
 }
