@@ -32,12 +32,17 @@ void read_timestamp(const vector<char>& buffer)
 #if !defined(__GNUC__) || defined(__clang__) || (__GNUC__ >= 5)
 	const time_t    send_time    = *(reinterpret_cast<const time_t*>   (buffer.data()));
 	const long long send_time_us = *(reinterpret_cast<const long long*>(buffer.data() + 8));
+	const std::tm* tm_send = std::localtime(&send_time);
+	if (!tm_send)
+	{
+		::cout << "Failed to extract send time" << endl;
+		return;
+	}
 
 	const auto   systime_now = system_clock::now();
 	const time_t read_time   = system_clock::to_time_t(systime_now);
 
-	std::tm tm_send = *std::localtime(&send_time);
-	::cout << " snd_time " << std::put_time(&tm_send, "%T.") << std::setfill('0') << std::setw(6) << send_time_us;
+	::cout << " snd_time " << std::put_time(tm_send, "%T.") << std::setfill('0') << std::setw(6) << send_time_us;
 	std::tm                tm_read = *std::localtime(&read_time);
 	system_clock::duration read_time_frac =
 		systime_now.time_since_epoch() - duration_cast<seconds>(systime_now.time_since_epoch());
