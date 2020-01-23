@@ -7,6 +7,11 @@
 #include <string>
 #include <thread>
 #include <vector>
+
+// submodules
+#include "spdlog/spdlog.h"
+
+// xtransmit
 #include "srt_socket.hpp"
 #include "udp_socket.hpp"
 #include "generate.hpp"
@@ -23,6 +28,7 @@ using namespace xtransmit::generate;
 using shared_srt  = std::shared_ptr<socket::srt>;
 using shared_sock = std::shared_ptr<socket::isocket>;
 
+#define LOG_SC_GENERATE "GENERATE "
 
 void write_timestamp(vector<char> &message_to_send)
 {
@@ -73,12 +79,20 @@ void run_pipe(shared_sock dst, const config &cfg, const atomic_bool &force_break
 	const auto start_time      = steady_clock::now();
 	auto       time_prev       = steady_clock::now();
 	long       time_dev_us     = 0;
-	const long msgs_per_s      = static_cast<long long>(cfg.sendrate / 8) / cfg.message_size;
-	const long msg_interval_us = msgs_per_s ? 1000000 / msgs_per_s : 0;
+	const long msgs_per_10s      = static_cast<long long>(cfg.sendrate / 8) * 10 / cfg.message_size;
+	const long msg_interval_us = msgs_per_10s ? 10000000 / msgs_per_10s : 0;
+
+	spdlog::info(LOG_SC_GENERATE "sendrate {} bps ({} msgs/s with interval {} us)",
+		cfg.sendrate,
+		msgs_per_10s / 10.0,
+		msg_interval_us);
 
 	const int num_messages = cfg.duration > 0 ? -1 : cfg.num_messages;
 
 	socket::isocket *target = dst.get();
+
+	auto stat_time = steady_clock::now();
+	int prev_i = 0;
 
 	for (int i = 0; (num_messages < 0 || i < num_messages) && !force_break; ++i)
 	{
@@ -110,6 +124,17 @@ void run_pipe(shared_sock dst, const config &cfg, const atomic_bool &force_break
 			write_timestamp(message_to_send);
 
 		target->write(const_buffer(message_to_send.data(), message_to_send.size()));
+
+		const auto tnow = steady_clock::now();
+		if (tnow > (stat_time + 1s))
+		{
+			const int n = i - prev_i;
+			const auto elapsed = tnow - stat_time;
+			const long long bps = (8 * n * cfg.message_size) / duration_cast<milliseconds>(elapsed).count() * 1000;
+			spdlog::info(LOG_SC_GENERATE "Sending at {} kbps", bps / 1000);
+			stat_time = tnow;
+			prev_i = i;
+		}
 	}
 
 	local_break = true;

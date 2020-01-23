@@ -29,7 +29,7 @@ using namespace std::chrono;
 using shared_srt  = std::shared_ptr<socket::srt>;
 using shared_sock = std::shared_ptr<socket::isocket>;
 
-#define LOG_SOCK_SRT "RECEIVE "
+#define LOG_SC_RECEIVE "RECEIVE "
 
 void read_timestamp(const vector<char>& buffer)
 {
@@ -40,7 +40,7 @@ void read_timestamp(const vector<char>& buffer)
 	const std::tm* tm_send = std::localtime(&send_time);
 	if (!tm_send)
 	{
-		spdlog::error(LOG_SOCK_SRT "Failed to extract send time");
+		spdlog::error(LOG_SC_RECEIVE "Failed to extract send time");
 		return;
 	}
 
@@ -50,7 +50,7 @@ void read_timestamp(const vector<char>& buffer)
 	::stringstream send_time_str; 
 	send_time_str << std::put_time(tm_send, "%T.") << std::setfill('0') << std::setw(6) << send_time_us;;
 
-	spdlog::info(LOG_SOCK_SRT "packet send time {} delay {} ms",
+	spdlog::info(LOG_SC_RECEIVE "packet send time {} delay {} ms",
 		send_time_str.str(),
 		duration_cast<milliseconds>(delay).count());
 
@@ -59,7 +59,7 @@ void read_timestamp(const vector<char>& buffer)
 	if (!printwarn)
 		return;
 
-	spdlog::error(LOG_SOCK_SRT "The --timestamp feature requires GCC 5.0 abd higher, sorry.");
+	spdlog::error(LOG_SC_RECEIVE "The --timestamp feature requires GCC 5.0 abd higher, sorry.");
 	printwarn = false;
 #endif
 }
