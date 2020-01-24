@@ -126,7 +126,7 @@ void run_pipe(shared_sock dst, const config &cfg, const atomic_bool &force_break
 		target->write(const_buffer(message_to_send.data(), message_to_send.size()));
 
 		const auto tnow = steady_clock::now();
-		if (tnow > (stat_time + 1s))
+		if (tnow > (stat_time + chrono::seconds(1)))
 		{
 			const int n = i - prev_i;
 			const auto elapsed = tnow - stat_time;
