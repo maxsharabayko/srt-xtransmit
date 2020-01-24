@@ -26,6 +26,7 @@ add_subdirectory(submodule/spdlog)
 
 SET(ENABLE_APPS ON)
 SET(ENABLE_SHARED OFF)
+SET(ENABLE_ENCRYPTION ON)
 add_subdirectory(submodule/srt)
 
 #set_target_properties(srt-live-transmit
