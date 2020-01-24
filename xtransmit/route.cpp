@@ -115,9 +115,9 @@ CLI::App* xtransmit::route::add_subcommand(CLI::App& app, config& cfg, string& s
 	sc_route->add_option("src", src_url, "Source URI");
 	sc_route->add_option("dst", dst_url, "Destination URI");
 	sc_route->add_option("--msgsize", cfg.message_size, "Size of a buffer to receive message payload");
-	sc_route->add_option("--statsfile", cfg.stats_file, "output stats report filename");
-	sc_route->add_option("--statsfreq", cfg.stats_freq_ms, "output stats report frequency (ms)")
-		->transform(CLI::AsNumberWithUnit(to_ms, CLI::AsNumberWithUnit::CASE_SENSITIVE));
+	//sc_route->add_option("--statsfile", cfg.stats_file, "output stats report filename");
+	//sc_route->add_option("--statsfreq", cfg.stats_freq_ms, "output stats report frequency (ms)")
+	//	->transform(CLI::AsNumberWithUnit(to_ms, CLI::AsNumberWithUnit::CASE_SENSITIVE));
 
 	return sc_route;
 }
