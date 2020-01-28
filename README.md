@@ -48,9 +48,9 @@ git submodule update
 
 <!-- https://git-scm.com/book/en/v2/Git-Tools-Submodules -->
 
-**Tipp:** There is another way to do this which is a little simpler, however. If you pass `--recurse-submodules` to the `git clone` command, it will automatically initialize and update each submodule in the repository, including nested submodules if any of the submodules in the repository have submodules themselves.
+**Tip:** There is another way to do this which is a little simpler, however. If you pass `--recurse-submodules` to the `git clone` command, it will automatically initialize and update each submodule in the repository, including nested submodules if any of the submodules in the repository have submodules themselves.
 
-**Tipp:** If you already cloned the project and forgot `--recurse-submodules`, you can combine the `git submodule init` and `git submodule update` steps by running `git submodule update --init`. To also initialize, fetch and checkout any nested submodules, you can use the foolproof `git submodule update --init --recursive`.
+**Tip:** If you already cloned the project and forgot `--recurse-submodules`, you can combine the `git submodule init` and `git submodule update` steps by running `git submodule update --init`. To also initialize, fetch and checkout any nested submodules, you can use the foolproof `git submodule update --init --recursive`.
 
 ### 3. Install submodules dependencies, in particular, [SRT library](https://github.com/Haivision/srt) dependencies
 
@@ -165,7 +165,7 @@ srt-xtransmit generate "srt://127.0.0.1:4200?transtype=file&messageapi=1&payload
 srt-xtransmit receive "srt://:4200?transtype=file&messageapi=1&payloadsize=1456&rcvbuf=1000000000&sndbuf=1000000000&fc=800000" --msgsize 1456  --statsfile stats-rcv.csv --statsfreq 1s
 ```
 
-## 
+
 
 ## Transmit File/Folder
 
