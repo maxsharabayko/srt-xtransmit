@@ -1,3 +1,8 @@
+# srt-xtransmit
+
+TODO: Brief description
+
+
 # Functionality
 
 ## Commands
@@ -12,6 +17,7 @@
 
 Collecting SRT statistics in CSV format.
 
+
 # Build Instructions
 
 [![Actions Status](https://github.com/maxsharabayko/srt-xtransmit/workflows/C/C++%20CI/badge.svg)](https://github.com/maxsharabayko/srt-xtransmit/actions)
@@ -24,16 +30,76 @@ Collecting SRT statistics in CSV format.
 * OpenSSL (for encryption - required by SRT)
 * Pthreads (use pthreads4w on Windows - required by SRT)
 
-## Linux
+## Building on Linux/Mac
 
+### 1. Create the directory for the project and clone the source code in here
 ```
+mkdir -p projects/srt/srt-xtransmit
+cd projects/srt
+git clone https://github.com/maxsharabayko/srt-xtransmit.git srt-xtransmit
+```
+
+### 2. Initialize, fetch and checkout submodules
+```
+cd srt-xtransmit
 git submodule init
 git submodule update
+```
+
+<!-- https://git-scm.com/book/en/v2/Git-Tools-Submodules -->
+
+**Tipp:** There is another way to do this which is a little simpler, however. If you pass `--recurse-submodules` to the `git clone` command, it will automatically initialize and update each submodule in the repository, including nested submodules if any of the submodules in the repository have submodules themselves.
+
+**Tipp:** If you already cloned the project and forgot `--recurse-submodules`, you can combine the `git submodule init` and `git submodule update` steps by running `git submodule update --init`. To also initialize, fetch and checkout any nested submodules, you can use the foolproof `git submodule update --init --recursive`.
+
+### 3. Install submodules dependencies, in particular, [SRT library](https://github.com/Haivision/srt) dependencies
+
+Install CMake dependencies and set the environment variables for CMake to find openssl:
+
+**Ubuntu 18.04**
+```
+sudo apt-get update
+sudo apt-get upgrade
+sudo apt-get install tclsh pkg-config cmake libssl-dev build-essential
+```
+
+**CentOS**
+
+TODO
+
+**MacOS**
+```
+brew install cmake
+brew install openssl
+export OPENSSL_ROOT_DIR=$(brew --prefix openssl)
+export OPENSSL_LIB_DIR=$(brew --prefix openssl)"/lib"
+export OPENSSL_INCLUDE_DIR=$(brew --prefix openssl)"/include"
+```
+
+On macOS, you may also need to set
+
+export PKG_CONFIG_PATH="/usr/local/opt/openssl/lib/pkgconfig"
+for pkg-config to find openssl. Run `brew info openssl` to check the exact path.
+
+### 4. Build srt-xtransmit
+
+**Ubuntu 18.04 / CentOS**
+```
 mkdir _build && cd _build
 cmake ../
 cmake --build ./
 ```
-## Windows
+
+**MacOS**
+```
+mkdir _build && cd _build
+cmake ../ -DENABLE_CXX17=OFF
+cmake --build ./
+```
+
+## Building on Windows
+
+TODO: Revise and update build instructions.
 
 ### Install Pre-requirements
 
@@ -117,4 +183,3 @@ srt-xtransmit file send srcfolder/ "srt://127.0.0.1:4200" --statsfile stats-snd.
 ```
 srt-xtransmit file receive "srt://:4200" ./ --statsfile stats-rcv.csv --statsfreq 1s
 ```
-
