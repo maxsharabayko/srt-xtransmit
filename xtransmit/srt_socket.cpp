@@ -423,11 +423,19 @@ const string socket::srt::statistics_csv(bool print_header)
 
 	std::ostringstream output;
 
+	// Note: std::put_time is supported only in GCC 5 and higher
+
+#if !defined(__GNUC__) || defined(__clang__) || (__GNUC__ >= 5)
+#define HAS_PUT_TIME
+#endif
 
 #define HAS_PKT_REORDER_TOL (SRT_VERSION_MAJOR >= 1) && (SRT_VERSION_MINOR >= 4) && (SRT_VERSION_PATCH > 0)
 
 	if (print_header)
 	{
+#ifdef HAS_PUT_TIME
+		output << "Timepoint,";
+#endif
 		output << "Time,SocketID,pktFlowWindow,pktCongestionWindow,pktFlightSize,";
 		output << "msRTT,mbpsBandwidth,mbpsMaxBW,pktSent,pktSndLoss,pktSndDrop,";
 		output << "pktRetrans,byteSent,byteAvailSndBuf,byteSndDrop,mbpsSendRate,usPktSndPeriod,";
@@ -438,6 +446,30 @@ const string socket::srt::statistics_csv(bool print_header)
 #endif
 		output << endl;
 	}
+
+#ifdef HAS_PUT_TIME
+	auto print_timestamp = [&output]() {
+		using namespace std;
+		using namespace std::chrono;
+
+		const auto systime_now = system_clock::now();
+		const time_t time_now = system_clock::to_time_t(systime_now);
+		std::tm*     tm_now   = std::localtime(&time_now);
+		if (!tm_now)
+		{
+			spdlog::warn(LOG_SOCK_SRT "Failed to get current time for stats");
+			return;
+		}
+
+		output << std::put_time(tm_now, "%T.") << std::setfill('0') << std::setw(6);
+		const auto since_epoch = systime_now.time_since_epoch();
+		const seconds s = duration_cast<seconds>(since_epoch);
+		output << duration_cast<microseconds>(since_epoch - s).count();
+		output << ",";
+	};
+
+	print_timestamp();
+#endif // HAS_PUT_TIME
 
 	output << stats.msTimeStamp << ",";
 	output << m_bind_socket << ",";
@@ -479,4 +511,6 @@ const string socket::srt::statistics_csv(bool print_header)
 	output << endl;
 
 	return output.str();
+
+#undef HAS_PUT_TIME
 }
