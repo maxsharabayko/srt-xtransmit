@@ -60,14 +60,13 @@ void run_pipe(shared_sock dst, const config &cfg, const atomic_bool &force_break
 			return;
 		}
 
-		bool               print_header = true;
+		logfile_stats << sock->statistics_csv(true) << flush;
 		const milliseconds interval(cfg.stats_freq_ms);
 		while (!force_break && !local_break)
 		{
 			this_thread::sleep_for(interval);
 
-			logfile_stats << sock->statistics_csv(print_header) << flush;
-			print_header = false;
+			logfile_stats << sock->statistics_csv(false) << flush;
 		}
 	};
 
