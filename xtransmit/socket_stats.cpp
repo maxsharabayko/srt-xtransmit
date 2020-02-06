@@ -27,7 +27,7 @@ xtransmit::socket::stats_writer::~stats_writer()
 
 void xtransmit::socket::stats_writer::add_socket(shared_sock sock)
 {
-	if (!sock->supports_statistics())
+	if (!sock || !sock->supports_statistics())
 		return;
 
 	m_lock.lock();
