@@ -11,6 +11,7 @@
 #include "spdlog/spdlog.h"
 
 // xtransmit
+#include "socket_stats.hpp"
 #include "srt_socket.hpp"
 #include "udp_socket.hpp"
 #include "receive.hpp"
@@ -92,35 +93,6 @@ void trace_message(const size_t bytes, const vector<char> &buffer, int conn_id)
 
 void run_pipe(shared_sock src, const config &cfg, const atomic_bool &force_break)
 {
-	atomic_bool local_break(false);
-
-	auto stats_func = [&cfg, &force_break, &local_break](shared_sock sock) {
-		if (cfg.stats_freq_ms == 0)
-			return;
-		if (cfg.stats_file.empty())
-			return;
-
-		ofstream logfile_stats(cfg.stats_file.c_str());
-		if (!logfile_stats)
-		{
-			cerr << "ERROR: Can't open '" << cfg.stats_file << "' for writing stats. No output.\n";
-			return;
-		}
-
-		// Print the start time for stats (zeros)
-		logfile_stats << sock->statistics_csv(true) << flush;
-
-		const milliseconds interval(cfg.stats_freq_ms);
-		while (!force_break && !local_break)
-		{
-			this_thread::sleep_for(interval);
-
-			logfile_stats << sock->statistics_csv(false) << flush;
-		}
-	};
-
-	auto stats_logger = async(launch::async, stats_func, src);
-
 	socket::isocket &sock = *src.get();
 
 	vector<char> buffer(cfg.message_size);
@@ -151,18 +123,16 @@ void run_pipe(shared_sock src, const config &cfg, const atomic_bool &force_break
 			}
 		}
 	}
-	catch (const socket::exception &)
+	catch (const socket::exception &e)
 	{
-		local_break = true;
+		spdlog::warn(LOG_SC_RECEIVE "{}", e.what());
 	}
 
 	if (force_break)
 	{
-		cerr << "\n (interrupted on request)\n";
+		spdlog::info(LOG_SC_RECEIVE "interrupted by request!");
 	}
-
-	local_break = true;
-	stats_logger.wait();
+;
 }
 
 void xtransmit::receive::run(const string &src_url, const config &cfg, const atomic_bool &force_break)
@@ -174,6 +144,11 @@ void xtransmit::receive::run(const string &src_url, const config &cfg, const ato
 
 	try
 	{
+		const bool write_stats = cfg.stats_file != "" && cfg.stats_freq_ms > 0;
+		unique_ptr<socket::stats_writer> stats = write_stats
+			? make_unique<socket::stats_writer>(cfg.stats_file, milliseconds(cfg.stats_freq_ms))
+			: nullptr;
+
 		if (uri.proto() == "udp")
 		{
 			connection = make_shared<socket::udp>(uri);
@@ -188,6 +163,7 @@ void xtransmit::receive::run(const string &src_url, const config &cfg, const ato
 			connection = accept ? s->accept() : s->connect();
 		}
 
+		stats->add_socket(connection);
 		run_pipe(connection, cfg, force_break);
 	}
 	catch (const socket::exception & e)
