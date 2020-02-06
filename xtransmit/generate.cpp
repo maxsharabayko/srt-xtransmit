@@ -46,8 +46,6 @@ void write_timestamp(vector<char> &message_to_send)
 
 void run_pipe(shared_sock dst, const config &cfg, const atomic_bool &force_break)
 {
-	atomic_bool local_break(false);
-
 	vector<char> message_to_send(cfg.message_size);
 	iota(message_to_send.begin(), message_to_send.end(), (char)0);
 
@@ -111,8 +109,6 @@ void run_pipe(shared_sock dst, const config &cfg, const atomic_bool &force_break
 			prev_i = i;
 		}
 	}
-
-	local_break = true;
 }
 
 
@@ -149,7 +145,7 @@ void xtransmit::generate::run(const string &dst_url, const config &cfg, const at
 	}
 	catch (const socket::exception &e)
 	{
-		cerr << e.what() << endl;
+		spdlog::warn(LOG_SC_GENERATE "{}", e.what());
 		return;
 	}
 }
