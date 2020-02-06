@@ -87,16 +87,19 @@ namespace route
 void xtransmit::route::run(const string& src_url, const string& dst_url,
 	const config& cfg, const atomic_bool& force_break)
 {
-	unique_ptr<socket::stats_writer> stats;
 	try {
+		const bool write_stats = cfg.stats_file != "" && cfg.stats_freq_ms > 0;
+		unique_ptr<socket::stats_writer> stats = write_stats
+			? make_unique<socket::stats_writer>(cfg.stats_file, milliseconds(cfg.stats_freq_ms))
+			: nullptr;
+
 		shared_sock dst = create_connection(dst_url);
 		shared_sock src = create_connection(src_url);
 
-		if (cfg.stats_file != "" && cfg.stats_freq_ms > 0)
+		if (write_stats)
 		{
-			socket::stats_writer stats(cfg.stats_file, milliseconds(cfg.stats_freq_ms));
-			stats.add_socket(src);
-			stats.add_socket(dst);
+			stats->add_socket(src);
+			stats->add_socket(dst);
 		}
 
 		route(src, dst, cfg, "[SRC->DST]", force_break);
@@ -115,9 +118,9 @@ CLI::App* xtransmit::route::add_subcommand(CLI::App& app, config& cfg, string& s
 	sc_route->add_option("src", src_url, "Source URI");
 	sc_route->add_option("dst", dst_url, "Destination URI");
 	sc_route->add_option("--msgsize", cfg.message_size, "Size of a buffer to receive message payload");
-	//sc_route->add_option("--statsfile", cfg.stats_file, "output stats report filename");
-	//sc_route->add_option("--statsfreq", cfg.stats_freq_ms, "output stats report frequency (ms)")
-	//	->transform(CLI::AsNumberWithUnit(to_ms, CLI::AsNumberWithUnit::CASE_SENSITIVE));
+	sc_route->add_option("--statsfile", cfg.stats_file, "output stats report filename");
+	sc_route->add_option("--statsfreq", cfg.stats_freq_ms, "output stats report frequency (ms)")
+		->transform(CLI::AsNumberWithUnit(to_ms, CLI::AsNumberWithUnit::CASE_SENSITIVE));
 
 	return sc_route;
 }
