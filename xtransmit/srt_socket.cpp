@@ -461,10 +461,11 @@ const string socket::srt::statistics_csv(bool print_header)
 			return;
 		}
 
-		output << std::put_time(tm_now, "%T.") << std::setfill('0') << std::setw(6);
+		output << std::put_time(tm_now, "%d.%m.%Y %T.") << std::setfill('0') << std::setw(6);
 		const auto since_epoch = systime_now.time_since_epoch();
 		const seconds s = duration_cast<seconds>(since_epoch);
 		output << duration_cast<microseconds>(since_epoch - s).count();
+		output << std::put_time(tm_now, " %z");
 		output << ",";
 	};
 
