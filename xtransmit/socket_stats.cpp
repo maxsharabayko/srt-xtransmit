@@ -20,8 +20,16 @@ xtransmit::socket::stats_writer::stats_writer(const std::string& filename, const
 	}
 }
 
+xtransmit::socket::stats_writer::~stats_writer()
+{
+	stop();
+}
+
 void xtransmit::socket::stats_writer::add_socket(shared_sock sock)
 {
+	if (!sock->supports_statistics())
+		return;
+
 	m_lock.lock();
 	m_sock.push_back(sock);
 	m_lock.unlock();
@@ -29,13 +37,15 @@ void xtransmit::socket::stats_writer::add_socket(shared_sock sock)
 	if (m_stat_future.valid())
 		return;
 
+	m_stop = false;
 	m_stat_future = launch();
 }
 
 void xtransmit::socket::stats_writer::stop()
 {
 	m_stop = true;
-	m_stat_future.wait();
+	if (m_stat_future.valid())
+		m_stat_future.wait();
 }
 
 
@@ -48,8 +58,6 @@ future<void> xtransmit::socket::stats_writer::launch()
 
 		while (!stop_stats)
 		{
-			this_thread::sleep_for(interval);
-
 #ifdef ENABLE_CXX17
 			scoped_lock<mutex> lock(stats_lock);
 #else
@@ -57,9 +65,10 @@ future<void> xtransmit::socket::stats_writer::launch()
 #endif
 			for_each(sock.begin(), sock.end(), [&out, &print_header](shared_sock& s) {
 				out << s->statistics_csv(print_header) << flush;
+				print_header = false;
 				});
 
-			print_header = false;
+			this_thread::sleep_for(interval);
 		}
 	};
 

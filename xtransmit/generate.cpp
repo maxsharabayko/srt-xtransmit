@@ -12,6 +12,7 @@
 #include "spdlog/spdlog.h"
 
 // xtransmit
+#include "socket_stats.hpp"
 #include "srt_socket.hpp"
 #include "udp_socket.hpp"
 #include "generate.hpp"
@@ -46,31 +47,6 @@ void write_timestamp(vector<char> &message_to_send)
 void run_pipe(shared_sock dst, const config &cfg, const atomic_bool &force_break)
 {
 	atomic_bool local_break(false);
-
-	auto stats_func = [&cfg, &force_break, &local_break](shared_sock sock) {
-		if (cfg.stats_freq_ms == 0)
-			return;
-		if (cfg.stats_file.empty())
-			return;
-
-		ofstream logfile_stats(cfg.stats_file.c_str());
-		if (!logfile_stats)
-		{
-			cerr << "ERROR: Can't open '" << cfg.stats_file << "' for writing stats. No output.\n";
-			return;
-		}
-
-		logfile_stats << sock->statistics_csv(true) << flush;
-		const milliseconds interval(cfg.stats_freq_ms);
-		while (!force_break && !local_break)
-		{
-			this_thread::sleep_for(interval);
-
-			logfile_stats << sock->statistics_csv(false) << flush;
-		}
-	};
-
-	auto stats_logger = async(launch::async, stats_func, dst);
 
 	vector<char> message_to_send(cfg.message_size);
 	iota(message_to_send.begin(), message_to_send.end(), (char)0);
@@ -137,7 +113,6 @@ void run_pipe(shared_sock dst, const config &cfg, const atomic_bool &force_break
 	}
 
 	local_break = true;
-	stats_logger.wait();
 }
 
 
@@ -150,6 +125,11 @@ void xtransmit::generate::run(const string &dst_url, const config &cfg, const at
 
 	try
 	{
+		const bool write_stats = cfg.stats_file != "" && cfg.stats_freq_ms > 0;
+		unique_ptr<socket::stats_writer> stats = write_stats
+			? make_unique<socket::stats_writer>(cfg.stats_file, milliseconds(cfg.stats_freq_ms))
+			: nullptr;
+
 		if (uri.proto() == "udp")
 		{
 			connection = make_shared<socket::udp>(uri);
@@ -164,6 +144,7 @@ void xtransmit::generate::run(const string &dst_url, const config &cfg, const at
 			connection = accept ? s->accept() : s->connect();
 		}
 
+		stats->add_socket(connection);
 		run_pipe(connection, cfg, force_break);
 	}
 	catch (const socket::exception &e)
