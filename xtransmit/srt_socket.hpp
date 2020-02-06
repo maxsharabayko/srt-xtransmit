@@ -86,6 +86,7 @@ public:
 	int id() const final { return m_bind_socket; }
 	int statistics(SRT_TRACEBSTATS &stats);
 
+	bool supports_statistics() const final { return true; }
 	const std::string statistics_csv(bool print_header) final;
 
 

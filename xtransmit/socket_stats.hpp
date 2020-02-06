@@ -20,6 +20,7 @@ class stats_writer
 {
 public:
 	stats_writer(const std::string& filename, const std::chrono::milliseconds& interval);
+	~stats_writer();
 
 public:
 	void add_socket(std::shared_ptr<socket::isocket> sock);
