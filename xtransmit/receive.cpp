@@ -145,8 +145,9 @@ void xtransmit::receive::run(const string &src_url, const config &cfg, const ato
 	try
 	{
 		const bool write_stats = cfg.stats_file != "" && cfg.stats_freq_ms > 0;
+		// make_unique is not supported by GCC 4.8, only starting from GCC 4.9 :(
 		unique_ptr<socket::stats_writer> stats = write_stats
-			? make_unique<socket::stats_writer>(cfg.stats_file, milliseconds(cfg.stats_freq_ms))
+			? unique_ptr<socket::stats_writer>(new socket::stats_writer(cfg.stats_file, milliseconds(cfg.stats_freq_ms)))
 			: nullptr;
 
 		if (uri.proto() == "udp")
