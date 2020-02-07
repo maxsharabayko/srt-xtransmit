@@ -91,11 +91,66 @@ void trace_message(const size_t bytes, const vector<char> &buffer, int conn_id)
 	//::cout << "SRT HS: " << hs.show() << endl;
 }
 
+namespace xtransmit
+{
+	namespace rfc4737
+	{
+		class validator
+		{
+		public:
+			validator() {}
+
+		public:
+			inline void validate_packet(const vector<char>& message_received)
+			{
+				++m_pkts_rcvd;
+				const uint64_t pkt_seqno = *(reinterpret_cast<const uint64_t*>(message_received.data()));
+
+				if (m_next_time <= steady_clock::now())
+				{
+					spdlog::info(LOG_SC_RECEIVE "Overal pkts received: {}, lost: {}", m_pkts_rcvd, m_pkts_lost);
+					m_next_time += 1s;
+				}
+
+				if (pkt_seqno == m_seqno)
+				{
+					++m_seqno;
+					return;
+				}
+
+				if (pkt_seqno > m_seqno)
+				{
+					const uint32_t lost = pkt_seqno - m_seqno;
+					m_pkts_lost += lost;
+					spdlog::warn(LOG_SC_RECEIVE "Detected loss of {} packets", lost);
+				}
+				else // pkt_seqno < m_seqno
+				{
+					const uint32_t reorder_dist = pkt_seqno - m_seqno;
+					spdlog::warn(LOG_SC_RECEIVE "Detected reordered packet, dist {}", reorder_dist);
+				}
+
+				++m_seqno;
+			}
+
+		private:
+
+
+		private:
+			steady_clock::time_point m_next_time = steady_clock::now() + 1s;
+			uint64_t m_seqno = 0;
+			uint64_t m_pkts_lost = 0;
+			uint64_t m_pkts_rcvd = 0;
+		};
+	}
+}
+
 void run_pipe(shared_sock src, const config &cfg, const atomic_bool &force_break)
 {
 	socket::isocket &sock = *src.get();
 
 	vector<char> buffer(cfg.message_size);
+	rfc4737::validator rfc4737;
 	try
 	{
 		while (!force_break)
@@ -112,6 +167,8 @@ void run_pipe(shared_sock src, const config &cfg, const atomic_bool &force_break
 				trace_message(bytes, buffer, sock.id());
 			if (cfg.check_timestamp)
 				read_timestamp(buffer);
+			if (cfg.rfc4737_metrics)
+				rfc4737.validate_packet(buffer);
 
 			if (cfg.send_reply)
 			{
@@ -164,7 +221,8 @@ void xtransmit::receive::run(const string &src_url, const config &cfg, const ato
 			connection = accept ? s->accept() : s->connect();
 		}
 
-		stats->add_socket(connection);
+		if (stats)
+			stats->add_socket(connection);
 		run_pipe(connection, cfg, force_break);
 	}
 	catch (const socket::exception & e)
@@ -185,6 +243,7 @@ CLI::App* xtransmit::receive::add_subcommand(CLI::App& app, config& cfg, string&
 		->transform(CLI::AsNumberWithUnit(to_ms, CLI::AsNumberWithUnit::CASE_SENSITIVE));
 	sc_receive->add_flag("--printmsg", cfg.print_notifications, "print message into to stdout");
 	sc_receive->add_flag("--timestamp", cfg.check_timestamp, "Check a timestamp in the message payload");
+	sc_receive->add_flag("--rfc4737", cfg.rfc4737_metrics, "Check packet reordering based on the message payload");
 	sc_receive->add_flag("--twoway", cfg.send_reply, "Both send and receive data");
 
 	return sc_receive;

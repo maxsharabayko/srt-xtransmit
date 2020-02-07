@@ -14,6 +14,7 @@ namespace xtransmit {
 			bool print_notifications	= false;		// Print notifications about the messages received
 			bool send_reply				= false;
 			bool check_timestamp		= false;
+			bool rfc4737_metrics		= false;
 			int max_connections			= 1;		// Maximum number of connections on a socket
 			int message_size			= 1316;
 			int stats_freq_ms			= 0;
