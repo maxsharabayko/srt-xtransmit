@@ -18,6 +18,7 @@ namespace generate {
 		int stats_freq_ms				= 0;
 		bool two_way					= false;
 		bool add_timestamp				= false;
+		bool rfc4737_metrics			= false;
 		std::string stats_file;
 	};
 

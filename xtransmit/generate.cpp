@@ -44,6 +44,65 @@ void write_timestamp(vector<char> &message_to_send)
 }
 
 
+namespace xtransmit
+{
+namespace rfc4737
+{
+	class generator
+	{
+	public:
+		generator() {}
+
+	public:
+		inline void generate_packet(vector<char>& message_to_send)
+		{
+			iota(message_to_send.begin(), message_to_send.end(), (char)m_seqno);
+			uint64_t* ptr = reinterpret_cast<uint64_t*>(message_to_send.data());
+			*ptr = m_seqno++;
+		}
+
+	private:
+
+
+	private:
+		uint64_t m_seqno = 0;
+	};
+}
+}
+
+
+namespace xtransmit
+{
+class csv_feed
+{
+public:
+	csv_feed(const std::string& filename)
+		: m_srccsv(filename.c_str())
+	{
+		if (!m_srccsv)
+		{
+			spdlog::critical("Failed to open input CSV file. Path: {0}", filename);
+			throw socket::exception("Failed to open input CSV file. Path " + filename);
+		}
+	}
+
+public:
+	steady_clock::time_point next_time()
+	{
+		std::string line;
+		if (!std::getline(m_srccsv, line))
+			return steady_clock::time_point();
+		const double val = stod(line);
+		return m_start + microseconds(long(val * 1000000));
+	}
+
+private:
+	std::ifstream m_srccsv;
+	const steady_clock::time_point m_start = steady_clock::now();
+};
+}
+
+
 void run_pipe(shared_sock dst, const config &cfg, const atomic_bool &force_break)
 {
 	vector<char> message_to_send(cfg.message_size);
@@ -52,7 +111,7 @@ void run_pipe(shared_sock dst, const config &cfg, const atomic_bool &force_break
 	const auto start_time      = steady_clock::now();
 	auto       time_prev       = steady_clock::now();
 	long       time_dev_us     = 0;
-	const long msgs_per_10s      = static_cast<long long>(cfg.sendrate / 8) * 10 / cfg.message_size;
+	const long msgs_per_10s    = static_cast<long long>(cfg.sendrate / 8) * 10 / cfg.message_size;
 	const long msg_interval_us = msgs_per_10s ? 10000000 / msgs_per_10s : 0;
 
 	spdlog::info(LOG_SC_GENERATE "sendrate {} bps ({} msgs/s with interval {} us)",
@@ -66,6 +125,10 @@ void run_pipe(shared_sock dst, const config &cfg, const atomic_bool &force_break
 
 	auto stat_time = steady_clock::now();
 	int prev_i = 0;
+
+	rfc4737::generator rfc4737;
+
+	//csv_feed feed("udp-mcast-60mbps.csv");
 
 	for (int i = 0; (num_messages < 0 || i < num_messages) && !force_break; ++i)
 	{
@@ -86,6 +149,17 @@ void run_pipe(shared_sock dst, const config &cfg, const atomic_bool &force_break
 			time_dev_us += (long)duration_cast<microseconds>(time_now - time_prev).count() - msg_interval_us;
 			time_prev = time_now;
 		}
+		/*else
+		{
+			const steady_clock::time_point next_time = feed.next_time();
+			for (;;)
+			{
+				if (steady_clock::now() >= next_time)
+					break;
+				if (force_break)
+					break;
+			}
+		}*/
 
 		// Check if sending duration is respected
 		if (cfg.duration > 0 && (steady_clock::now() - start_time > seconds(cfg.duration)))
@@ -95,6 +169,8 @@ void run_pipe(shared_sock dst, const config &cfg, const atomic_bool &force_break
 
 		if (cfg.add_timestamp)
 			write_timestamp(message_to_send);
+		if (cfg.rfc4737_metrics)
+			rfc4737.generate_packet(message_to_send);
 
 		target->write(const_buffer(message_to_send.data(), message_to_send.size()));
 
@@ -141,7 +217,8 @@ void xtransmit::generate::run(const string &dst_url, const config &cfg, const at
 			connection = accept ? s->accept() : s->connect();
 		}
 
-		stats->add_socket(connection);
+		if (stats)
+			stats->add_socket(connection);
 		run_pipe(connection, cfg, force_break);
 	}
 	catch (const socket::exception &e)
@@ -170,6 +247,7 @@ CLI::App* xtransmit::generate::add_subcommand(CLI::App &app, config &cfg, string
 		->transform(CLI::AsNumberWithUnit(to_ms, CLI::AsNumberWithUnit::CASE_SENSITIVE));
 	sc_generate->add_flag("--twoway", cfg.two_way, "Both send and receive data");
 	sc_generate->add_flag("--timestamp", cfg.add_timestamp, "Place a timestamp in the message payload");
+	sc_generate->add_flag("--rfc4737", cfg.rfc4737_metrics, "Add seqno in the message payload to ckeck reordering");
 
 	return sc_generate;
 }

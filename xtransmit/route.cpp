@@ -97,7 +97,7 @@ void xtransmit::route::run(const string& src_url, const string& dst_url,
 		shared_sock dst = create_connection(dst_url);
 		shared_sock src = create_connection(src_url);
 
-		if (write_stats)
+		if (stats)
 		{
 			stats->add_socket(src);
 			stats->add_socket(dst);
