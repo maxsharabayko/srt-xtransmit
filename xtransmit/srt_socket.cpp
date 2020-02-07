@@ -198,8 +198,10 @@ shared_srt socket::srt::connect()
 		const int res = srt_connect(m_bind_socket, psa, sizeof sa);
 		if (res == SRT_ERROR)
 		{
+			// srt_getrejectreason() added in v1.3.4
+			const SRT_REJECT_REASON reason = srt_getrejectreason(m_bind_socket);
 			srt_close(m_bind_socket);
-			raise_exception("connect");
+			raise_exception("connect failed", srt_rejectreason_str(reason));
 		}
 	}
 
@@ -213,7 +215,11 @@ shared_srt socket::srt::connect()
 		{
 			const SRT_SOCKSTATUS state = srt_getsockstate(m_bind_socket);
 			if (state != SRTS_CONNECTED)
-				raise_exception("connect", "connection failed, socket state " + to_string(state));
+			{
+				const SRT_REJECT_REASON reason = srt_getrejectreason(m_bind_socket);
+				raise_exception("connect failed", srt_rejectreason_str(reason));
+				//raise_exception("connect", "connection failed, socket state " + to_string(state));
+			}
 		}
 		else
 		{
