@@ -20,6 +20,7 @@ namespace generate {
 		bool add_timestamp				= false;
 		bool rfc4737_metrics			= false;
 		std::string stats_file;
+		std::string playback_csv;
 	};
 
 

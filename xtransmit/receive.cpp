@@ -123,6 +123,7 @@ namespace xtransmit
 					const uint32_t lost = pkt_seqno - m_seqno;
 					m_pkts_lost += lost;
 					spdlog::warn(LOG_SC_RECEIVE "Detected loss of {} packets", lost);
+					m_seqno += lost;
 				}
 				else // pkt_seqno < m_seqno
 				{
