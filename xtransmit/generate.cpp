@@ -128,7 +128,9 @@ void run_pipe(shared_sock dst, const config &cfg, const atomic_bool &force_break
 
 	rfc4737::generator rfc4737;
 
-	//csv_feed feed("udp-mcast-60mbps.csv");
+	unique_ptr <csv_feed> feed = !cfg.playback_csv.empty()
+		? unique_ptr<csv_feed>(new csv_feed(cfg.playback_csv))
+		: nullptr;
 
 	for (int i = 0; (num_messages < 0 || i < num_messages) && !force_break; ++i)
 	{
@@ -149,9 +151,9 @@ void run_pipe(shared_sock dst, const config &cfg, const atomic_bool &force_break
 			time_dev_us += (long)duration_cast<microseconds>(time_now - time_prev).count() - msg_interval_us;
 			time_prev = time_now;
 		}
-		/*else
+		else if (feed)
 		{
-			const steady_clock::time_point next_time = feed.next_time();
+			const steady_clock::time_point next_time = feed->next_time();
 			for (;;)
 			{
 				if (steady_clock::now() >= next_time)
@@ -159,7 +161,7 @@ void run_pipe(shared_sock dst, const config &cfg, const atomic_bool &force_break
 				if (force_break)
 					break;
 			}
-		}*/
+		}
 
 		// Check if sending duration is respected
 		if (cfg.duration > 0 && (steady_clock::now() - start_time > seconds(cfg.duration)))
@@ -248,6 +250,7 @@ CLI::App* xtransmit::generate::add_subcommand(CLI::App &app, config &cfg, string
 	sc_generate->add_flag("--twoway", cfg.two_way, "Both send and receive data");
 	sc_generate->add_flag("--timestamp", cfg.add_timestamp, "Place a timestamp in the message payload");
 	sc_generate->add_flag("--rfc4737", cfg.rfc4737_metrics, "Add seqno in the message payload to ckeck reordering");
+	sc_generate->add_option("--playback-csv", cfg.playback_csv, "Input CSV file with timestamp of every packet");
 
 	return sc_generate;
 }
