@@ -1,7 +1,9 @@
 #include "udp_socket.hpp"
 #include "apputil.hpp"
 #include "socketoptions.hpp"
-#include "verbose.hpp"
+
+// submodules
+#include "spdlog/spdlog.h"
 
 using namespace std;
 using namespace xtransmit;
@@ -96,9 +98,21 @@ size_t socket::udp::read(const mutable_buffer &buffer, int timeout_ms)
 	}
 
 	const int res =
-		::recvfrom(m_bind_socket, static_cast<char *>(buffer.data()), (int)buffer.size(), 0, nullptr, nullptr);
+		::recv(m_bind_socket, static_cast<char *>(buffer.data()), (int)buffer.size(), 0);
 	if (res == -1)
-		throw socket::exception("udp::read::recv");
+	{
+#ifndef _WIN32
+#define NET_ERROR errno
+#else
+#define NET_ERROR WSAGetLastError()
+#endif
+		const int err = NET_ERROR;
+		if (err != EAGAIN && err != EINTR && err != ECONNREFUSED)
+			throw socket::exception("udp::read::recv");
+
+		spdlog::info("UDP reading failed: error {0}. Again.", err);
+		return 0;
+	}
 
 	return static_cast<size_t>(res);
 }
