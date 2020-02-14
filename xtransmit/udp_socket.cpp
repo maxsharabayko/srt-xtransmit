@@ -28,17 +28,19 @@ socket::udp::udp(const UriParser &src_uri)
 	int yes = 1;
 	::setsockopt(m_bind_socket, SOL_SOCKET, SO_REUSEADDR, (const char *)&yes, sizeof yes);
 
-	if (m_blocking_mode)
+	if (!m_blocking_mode)
 	{ // set non-blocking mode
+		unsigned long nonblocking = 1;
 #if defined(_WIN32)
-		unsigned long ulyes = 1;
-		if (ioctlsocket(m_bind_socket, FIONBIO, &ulyes) == SOCKET_ERROR)
+		if (ioctlsocket(m_bind_socket, FIONBIO, &nonblocking) == SOCKET_ERROR)
 #else
-		if (ioctl(m_bind_socket, FIONBIO, (const char *)&yes) < 0)
+		if (ioctl(m_bind_socket, FIONBIO, (const char *)&nonblocking) < 0)
 #endif
 		{
-			throw socket::exception("UdpCommon::Setup: ioctl FIONBIO");
+			throw socket::exception("Failed to set blocking mode for UDP");
 		}
+
+		//epoll_create(256);
 	}
 
 	// Use the following convention:
@@ -77,17 +79,20 @@ size_t socket::udp::read(const mutable_buffer &buffer, int timeout_ms)
 {
 	if (!m_blocking_mode)
 	{
-		//	int ready[2] = {SRT_INVALID_SOCK, SRT_INVALID_SOCK};
-		//	int len      = 2;
-		//
-		//	const int epoll_res = srt_epoll_wait(m_epoll_io, ready, &len, nullptr, nullptr, timeout_ms, 0, 0, 0, 0);
-		//	if (epoll_res == SRT_ERROR)
-		//	{
-		//		if (srt_getlasterror(nullptr) == SRT_ETIMEOUT)
-		//			return 0;
-		//
-		//		raise_exception("socket::read::epoll", UDT::getlasterror());
-		//	}
+#if defined(UNIX) || defined(_WIN32)
+		fd_set set;
+		timeval tv;
+		FD_ZERO(&set);
+		FD_SET(m_bind_socket, &set);
+		tv.tv_sec = 0;
+		tv.tv_usec = 10000;
+		const int select_ret = ::select((int)m_bind_socket + 1, &set, NULL, &set, &tv);
+#else
+		const int select_ret = 1;   // the socket is expected to be in the blocking mode itself
+#endif
+
+		if (select_ret == 0)   // timeout
+			return 0;
 	}
 
 	const int res =
