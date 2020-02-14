@@ -12,6 +12,7 @@ using shared_udp = shared_ptr<socket::udp>;
 socket::udp::udp(const UriParser &src_uri)
 	: m_host(src_uri.host())
 	, m_port(src_uri.portno())
+	, m_options(src_uri.parameters())
 {
 	sockaddr_in sa     = sockaddr_in();
 	sa.sin_family      = AF_INET;
@@ -81,7 +82,6 @@ size_t socket::udp::read(const mutable_buffer &buffer, int timeout_ms)
 {
 	if (!m_blocking_mode)
 	{
-#if defined(UNIX) || defined(_WIN32)
 		fd_set set;
 		timeval tv;
 		FD_ZERO(&set);
@@ -89,9 +89,6 @@ size_t socket::udp::read(const mutable_buffer &buffer, int timeout_ms)
 		tv.tv_sec = 0;
 		tv.tv_usec = 10000;
 		const int select_ret = ::select((int)m_bind_socket + 1, &set, NULL, &set, &tv);
-#else
-		const int select_ret = 1;   // the socket is expected to be in the blocking mode itself
-#endif
 
 		if (select_ret == 0)   // timeout
 			return 0;
