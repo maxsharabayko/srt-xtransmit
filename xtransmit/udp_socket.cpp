@@ -2,6 +2,10 @@
 #include "apputil.hpp"
 #include "socketoptions.hpp"
 
+#ifndef _WIN32
+#include <sys/epoll.h>
+#endif
+
 // submodules
 #include "spdlog/spdlog.h"
 
@@ -43,7 +47,13 @@ socket::udp::udp(const UriParser &src_uri)
 			throw socket::exception("Failed to set blocking mode for UDP");
 		}
 
-		//epoll_create(256);
+#ifndef _WIN32
+		epoll_event ev;
+		m_epoll_io = epoll_create(256);
+		ev.data.fd = m_bind_socket;
+		ev.events = EPOLLIN | EPOLLET;
+		epoll_ctl(m_epoll_io, EPOLL_CTL_ADD, m_bind_socket, &ev);
+#endif
 	}
 
 	// Use the following convention:
@@ -80,6 +90,7 @@ socket::udp::~udp() { closesocket(m_bind_socket); }
 
 size_t socket::udp::read(const mutable_buffer &buffer, int timeout_ms)
 {
+#if defined(_WIN32)
 	while (!m_blocking_mode)
 	{
 		fd_set set;
@@ -96,6 +107,10 @@ size_t socket::udp::read(const mutable_buffer &buffer, int timeout_ms)
 		if (timeout_ms >= 0)   // timeout
 			return 0;
 	}
+#else
+	struct epoll_event events[20];
+	const int nfds = epoll_wait(m_epoll_io, events, 20, timeout_ms);
+#endif
 
 	const int res =
 		::recv(m_bind_socket, static_cast<char *>(buffer.data()), (int)buffer.size(), 0);
