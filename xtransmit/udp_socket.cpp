@@ -80,7 +80,7 @@ socket::udp::~udp() { closesocket(m_bind_socket); }
 
 size_t socket::udp::read(const mutable_buffer &buffer, int timeout_ms)
 {
-	if (!m_blocking_mode)
+	while (!m_blocking_mode)
 	{
 		fd_set set;
 		timeval tv;
@@ -90,7 +90,10 @@ size_t socket::udp::read(const mutable_buffer &buffer, int timeout_ms)
 		tv.tv_usec = 10000;
 		const int select_ret = ::select((int)m_bind_socket + 1, &set, NULL, &set, &tv);
 
-		if (select_ret == 0)   // timeout
+		if (select_ret != 0)    // ready
+			break;
+
+		if (timeout_ms >= 0)   // timeout
 			return 0;
 	}
 
