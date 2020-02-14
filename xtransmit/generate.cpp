@@ -16,6 +16,7 @@
 #include "srt_socket.hpp"
 #include "udp_socket.hpp"
 #include "generate.hpp"
+#include "rfc4737.hpp"
 
 // OpenSRT
 #include "apputil.hpp"
@@ -43,32 +44,6 @@ void write_timestamp(vector<char> &message_to_send)
 	*(reinterpret_cast<long long*>(message_to_send.data() + 8)) = duration_cast<microseconds>(frac).count();
 }
 
-
-namespace xtransmit
-{
-namespace rfc4737
-{
-	class generator
-	{
-	public:
-		generator() {}
-
-	public:
-		inline void generate_packet(vector<char>& message_to_send)
-		{
-			iota(message_to_send.begin(), message_to_send.end(), (char)m_seqno);
-			uint64_t* ptr = reinterpret_cast<uint64_t*>(message_to_send.data());
-			*ptr = m_seqno++;
-		}
-
-	private:
-
-
-	private:
-		uint64_t m_seqno = 0;
-	};
-}
-}
 
 
 namespace xtransmit

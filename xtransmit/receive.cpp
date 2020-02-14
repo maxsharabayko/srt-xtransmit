@@ -15,6 +15,7 @@
 #include "srt_socket.hpp"
 #include "udp_socket.hpp"
 #include "receive.hpp"
+#include "rfc4737.hpp"
 
 // OpenSRT
 #include "apputil.hpp"
@@ -91,60 +92,6 @@ void trace_message(const size_t bytes, const vector<char> &buffer, int conn_id)
 	//::cout << "SRT HS: " << hs.show() << endl;
 }
 
-namespace xtransmit
-{
-	namespace rfc4737
-	{
-		class validator
-		{
-		public:
-			validator() {}
-
-		public:
-			inline void validate_packet(const vector<char>& message_received)
-			{
-				++m_pkts_rcvd;
-				const uint64_t pkt_seqno = *(reinterpret_cast<const uint64_t*>(message_received.data()));
-
-				if (m_next_time <= steady_clock::now())
-				{
-					spdlog::info(LOG_SC_RECEIVE "Overal pkts received: {}, lost: {}", m_pkts_rcvd, m_pkts_lost);
-					m_next_time += 1s;
-				}
-
-				if (pkt_seqno == m_seqno)
-				{
-					++m_seqno;
-					return;
-				}
-
-				if (pkt_seqno > m_seqno)
-				{
-					const uint32_t lost = pkt_seqno - m_seqno;
-					m_pkts_lost += lost;
-					spdlog::warn(LOG_SC_RECEIVE "Detected loss of {} packets", lost);
-					m_seqno += lost;
-				}
-				else // pkt_seqno < m_seqno
-				{
-					const uint32_t reorder_dist = pkt_seqno - m_seqno;
-					spdlog::warn(LOG_SC_RECEIVE "Detected reordered packet, dist {}", reorder_dist);
-				}
-
-				++m_seqno;
-			}
-
-		private:
-
-
-		private:
-			steady_clock::time_point m_next_time = steady_clock::now() + 1s;
-			uint64_t m_seqno = 0;
-			uint64_t m_pkts_lost = 0;
-			uint64_t m_pkts_rcvd = 0;
-		};
-	}
-}
 
 void run_pipe(shared_sock src, const config &cfg, const atomic_bool &force_break)
 {
