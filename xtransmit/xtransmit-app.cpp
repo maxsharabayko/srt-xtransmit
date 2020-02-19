@@ -88,6 +88,31 @@ int main(int argc, char **argv)
 	app.add_option("--loglevel", [](CLI::results_t val) {
 		srt_logging::LogLevel::type lev = SrtParseLogLevel(val[0]);
 		UDT::setloglevel(lev);
+
+		// Uncovered spdlog levels:
+		// debug = SPDLOG_LEVEL_DEBUG
+		// off   = SPDLOG_LEVEL_OFF
+		switch (lev)
+		{
+		case srt_logging::LogLevel::fatal:
+			spdlog::set_level(spdlog::level::critical);
+			break;
+		case srt_logging::LogLevel::error:
+			spdlog::set_level(spdlog::level::err);
+			break;
+		case srt_logging::LogLevel::warning:
+			spdlog::set_level(spdlog::level::warn);
+			break;
+		case srt_logging::LogLevel::note:
+			spdlog::set_level(spdlog::level::info);
+			break;
+		case srt_logging::LogLevel::debug:
+			spdlog::set_level(spdlog::level::trace);
+			break;
+		default:
+			break;
+		}
+
 		Verb() << "Log level set to " << val[0];
 		return true;
 	}, "log level [debug, error, note, info, fatal]");
