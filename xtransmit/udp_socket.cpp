@@ -49,7 +49,7 @@ socket::udp::udp(const UriParser &src_uri)
 
 #ifndef _WIN32
 		epoll_event ev;
-		m_epoll_io = epoll_create(256);
+		m_epoll_io = epoll_create(2);
 		ev.data.fd = m_bind_socket;
 		ev.events = EPOLLIN | EPOLLET;
 		epoll_ctl(m_epoll_io, EPOLL_CTL_ADD, m_bind_socket, &ev);
@@ -108,8 +108,8 @@ size_t socket::udp::read(const mutable_buffer &buffer, int timeout_ms)
 			return 0;
 	}
 #else
-	struct epoll_event events[20];
-	const int nfds = epoll_wait(m_epoll_io, events, 20, timeout_ms);
+	struct epoll_event events[2];
+	const int nfds = epoll_wait(m_epoll_io, events, 2, timeout_ms);
 #endif
 
 	const int res =
