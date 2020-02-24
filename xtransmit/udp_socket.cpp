@@ -50,7 +50,7 @@ socket::udp::udp(const UriParser &src_uri)
 		int rcvbuf_size = 65536;
 		socklen_t rcvbuf_len  = sizeof(int);
 		::getsockopt(m_bind_socket, SOL_SOCKET, SO_RCVBUF, (char*)&rcvbuf_size, &rcvbuf_len);
-		spdlog::info("UDP SO_RCVBUF: {0}.", rcvbuf_size);
+		spdlog::info("UDP old SO_RCVBUF: {0}.", rcvbuf_size);
 #ifndef _WIN32
 
 		rcvbuf_size = 64 * 1024 * 1024; //212992;
