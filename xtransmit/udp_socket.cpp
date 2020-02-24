@@ -47,7 +47,15 @@ socket::udp::udp(const UriParser &src_uri)
 			throw socket::exception("Failed to set blocking mode for UDP");
 		}
 
+		int rcvbuf_size = 65536;
+		socklen_t rcvbuf_len  = sizeof(int);
+		::getsockopt(m_bind_socket, SOL_SOCKET, SO_RCVBUF, (char*)&rcvbuf_size, &rcvbuf_len);
+		spdlog::info("UDP SO_RCVBUF: {0}.", rcvbuf_size);
 #ifndef _WIN32
+
+		rcvbuf_size = 65536;
+		::setsockopt(m_bind_socket, SOL_SOCKET, SO_RCVBUF, (char*)&rcvbuf_size, sizeof(int));
+
 		epoll_event ev;
 		m_epoll_io = epoll_create(2);
 		ev.data.fd = m_bind_socket;
