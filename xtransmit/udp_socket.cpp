@@ -53,8 +53,11 @@ socket::udp::udp(const UriParser &src_uri)
 		spdlog::info("UDP SO_RCVBUF: {0}.", rcvbuf_size);
 #ifndef _WIN32
 
-		rcvbuf_size = 65536;
+		rcvbuf_size = 4 * 212992;
 		::setsockopt(m_bind_socket, SOL_SOCKET, SO_RCVBUF, (char*)&rcvbuf_size, sizeof(int));
+
+		::getsockopt(m_bind_socket, SOL_SOCKET, SO_RCVBUF, (char*)&rcvbuf_size, &rcvbuf_len);
+		spdlog::info("UDP new SO_RCVBUF: {0}.", rcvbuf_size);
 
 		epoll_event ev;
 		m_epoll_io = epoll_create(2);
