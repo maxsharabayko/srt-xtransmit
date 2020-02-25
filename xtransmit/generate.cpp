@@ -64,6 +64,13 @@ public:
 public:
 	steady_clock::time_point next_time()
 	{
+		if (m_srccsv.eof())
+		{
+			m_srccsv.clear(); // Need to clear the eof flag
+			m_srccsv.seekg(0, m_srccsv.beg);
+			m_start = steady_clock::now();
+		}
+
 		std::string line;
 		if (!std::getline(m_srccsv, line))
 			return steady_clock::time_point();
@@ -73,7 +80,7 @@ public:
 
 private:
 	std::ifstream m_srccsv;
-	const steady_clock::time_point m_start = steady_clock::now();
+	steady_clock::time_point m_start = steady_clock::now();
 };
 }
 
