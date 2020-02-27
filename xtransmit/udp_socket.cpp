@@ -63,18 +63,42 @@ socket::udp::udp(const UriParser &src_uri)
 		throw socket::exception("create_addr_inet failed");
 	}
 
-	if (m_is_caller)
+	const auto bind_me = [&](const sockaddr* sa) {
+		const int       bind_res = ::bind(m_bind_socket, sa, sizeof *sa);
+		if (bind_res < 0)
+		{
+			throw socket::exception("UDP binding has failed");
+		}
+	};
+
+	bool ip_bonded = false;
+	if (m_options.count("bindip"))
+	{
+		sockaddr_in sa_bind;
+		const string bindip = m_options.at("bindip");
+		m_options.erase("bindip");
+		const int bindport = m_options.count("bindport") ? std::stoi(m_options.at("bindport")) : m_port;
+		m_options.erase("bindport");
+
+		try
+		{
+			sa_bind = CreateAddrInet(bindip, bindport);
+		}
+		catch (const std::invalid_argument&)
+		{
+			throw socket::exception("create_addr_inet failed");
+		}
+
+		bind_me(reinterpret_cast<const sockaddr*>(&sa_bind));
+	}
+
+	if (m_host != "" || ip_bonded)
 	{
 		m_dst_addr = sa_requested;
 	}
 	else
 	{
-		const sockaddr *psa      = reinterpret_cast<const sockaddr *>(&sa_requested);
-		const int       bind_res = ::bind(m_bind_socket, psa, sizeof sa_requested);
-		if (bind_res < 0)
-		{
-			throw socket::exception("UDP binding has failed");
-		}
+		bind_me(reinterpret_cast<const sockaddr*>(&sa_requested));
 	}
 }
 
