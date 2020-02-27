@@ -1,7 +1,13 @@
 #include "udp_socket.hpp"
 #include "apputil.hpp"
 #include "socketoptions.hpp"
-#include "verbose.hpp"
+
+#ifndef _WIN32
+#include <sys/epoll.h>
+#endif
+
+// submodules
+#include "spdlog/spdlog.h"
 
 using namespace std;
 using namespace xtransmit;
@@ -10,6 +16,7 @@ using shared_udp = shared_ptr<socket::udp>;
 socket::udp::udp(const UriParser &src_uri)
 	: m_host(src_uri.host())
 	, m_port(src_uri.portno())
+	, m_options(src_uri.parameters())
 {
 	sockaddr_in sa     = sockaddr_in();
 	sa.sin_family      = AF_INET;
@@ -28,16 +35,16 @@ socket::udp::udp(const UriParser &src_uri)
 	int yes = 1;
 	::setsockopt(m_bind_socket, SOL_SOCKET, SO_REUSEADDR, (const char *)&yes, sizeof yes);
 
-	if (m_blocking_mode)
+	if (!m_blocking_mode)
 	{ // set non-blocking mode
+		unsigned long nonblocking = 1;
 #if defined(_WIN32)
-		unsigned long ulyes = 1;
-		if (ioctlsocket(m_bind_socket, FIONBIO, &ulyes) == SOCKET_ERROR)
+		if (ioctlsocket(m_bind_socket, FIONBIO, &nonblocking) == SOCKET_ERROR)
 #else
-		if (ioctl(m_bind_socket, FIONBIO, (const char *)&yes) < 0)
+		if (ioctl(m_bind_socket, FIONBIO, (const char *)&nonblocking) < 0)
 #endif
 		{
-			throw socket::exception("UdpCommon::Setup: ioctl FIONBIO");
+			throw socket::exception("Failed to set blocking mode for UDP");
 		}
 	}
 
@@ -75,31 +82,62 @@ socket::udp::~udp() { closesocket(m_bind_socket); }
 
 size_t socket::udp::read(const mutable_buffer &buffer, int timeout_ms)
 {
-	if (!m_blocking_mode)
+	while (!m_blocking_mode)
 	{
-		//	int ready[2] = {SRT_INVALID_SOCK, SRT_INVALID_SOCK};
-		//	int len      = 2;
-		//
-		//	const int epoll_res = srt_epoll_wait(m_epoll_io, ready, &len, nullptr, nullptr, timeout_ms, 0, 0, 0, 0);
-		//	if (epoll_res == SRT_ERROR)
-		//	{
-		//		if (srt_getlasterror(nullptr) == SRT_ETIMEOUT)
-		//			return 0;
-		//
-		//		raise_exception("socket::read::epoll", UDT::getlasterror());
-		//	}
+		fd_set set;
+		timeval tv;
+		FD_ZERO(&set);
+		FD_SET(m_bind_socket, &set);
+		tv.tv_sec = 0;
+		tv.tv_usec = 10000;
+		const int select_ret = ::select((int)m_bind_socket + 1, &set, NULL, &set, &tv);
+
+		if (select_ret != 0)    // ready
+			break;
+
+		if (timeout_ms >= 0)   // timeout
+			return 0;
 	}
 
 	const int res =
-		::recvfrom(m_bind_socket, static_cast<char *>(buffer.data()), (int)buffer.size(), 0, nullptr, nullptr);
+		::recv(m_bind_socket, static_cast<char *>(buffer.data()), (int)buffer.size(), 0);
 	if (res == -1)
-		throw socket::exception("udp::read::recv");
+	{
+#ifndef _WIN32
+#define NET_ERROR errno
+#else
+#define NET_ERROR WSAGetLastError()
+#endif
+		const int err = NET_ERROR;
+		if (err != EAGAIN && err != EINTR && err != ECONNREFUSED)
+			throw socket::exception("udp::read::recv");
+
+		spdlog::info("UDP reading failed: error {0}. Again.", err);
+		return 0;
+	}
 
 	return static_cast<size_t>(res);
 }
 
 int socket::udp::write(const const_buffer &buffer, int timeout_ms)
 {
+	while (!m_blocking_mode)
+	{
+		fd_set set;
+		timeval tv;
+		FD_ZERO(&set);
+		FD_SET(m_bind_socket, &set);
+		tv.tv_sec = 0;
+		tv.tv_usec = 10000;
+		const int select_ret = ::select((int)m_bind_socket + 1, nullptr, &set, &set, &tv);
+
+		if (select_ret != 0)    // ready
+			break;
+
+		if (timeout_ms >= 0)   // timeout
+			return 0;
+	}
+
 	const int res = ::sendto(m_bind_socket,
 							 static_cast<const char *>(buffer.data()),
 							 (int)buffer.size(),

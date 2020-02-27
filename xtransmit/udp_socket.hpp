@@ -45,7 +45,6 @@ public:
 
 private:
 	SOCKET m_bind_socket = -1; // INVALID_SOCK;
-	int    m_epoll_io    = -1;
 	bool   m_is_caller     = false;
 
 	sockaddr_in m_dst_addr = {};
