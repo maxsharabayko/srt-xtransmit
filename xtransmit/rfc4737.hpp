@@ -52,7 +52,7 @@ namespace rfc4737
 			if (m_next_time <= steady_clock::now())
 			{
 				spdlog::info(LOG_SC_RFC4737 "Overal pkts received: {}, lost: {}", m_pkts_rcvd, m_pkts_lost);
-				m_next_time += 1s;
+				m_next_time += seconds(1);
 			}
 
 			if (pkt_seqno == m_seqno)
@@ -78,7 +78,7 @@ namespace rfc4737
 		}
 
 	private:
-		steady_clock::time_point m_next_time = steady_clock::now() + 1s;
+		steady_clock::time_point m_next_time = steady_clock::now() + seconds(1);
 		uint64_t m_seqno = 0;
 		uint64_t m_pkts_lost = 0;
 		uint64_t m_pkts_rcvd = 0;
