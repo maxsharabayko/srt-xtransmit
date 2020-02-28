@@ -2,10 +2,6 @@
 #include "apputil.hpp"
 #include "socketoptions.hpp"
 
-#ifndef _WIN32
-#include <sys/epoll.h>
-#endif
-
 // submodules
 #include "spdlog/spdlog.h"
 
