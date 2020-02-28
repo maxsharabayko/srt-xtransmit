@@ -30,7 +30,7 @@ public:
 	void listen();
 
 public:
-	bool is_caller() const final { return m_is_caller; }
+	bool is_caller() const final { return m_host != ""; }
 
 	int id() const final { return m_bind_socket; }
 
@@ -45,8 +45,6 @@ public:
 
 private:
 	SOCKET m_bind_socket = -1; // INVALID_SOCK;
-	bool   m_is_caller     = false;
-
 	sockaddr_in m_dst_addr = {};
 
 	bool                     m_blocking_mode = false;

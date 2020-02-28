@@ -44,11 +44,6 @@ socket::udp::udp(const UriParser &src_uri)
 		}
 	}
 
-	// Use the following convention:
-	// 1. Server for source, Client for target
-	// 2. If host is empty, then always server.
-	m_is_caller = (m_host != "");
-
 	sockaddr_in sa_requested;
 	try
 	{
@@ -86,6 +81,7 @@ socket::udp::udp(const UriParser &src_uri)
 		}
 
 		bind_me(reinterpret_cast<const sockaddr*>(&sa_bind));
+		ip_bonded = true;
 	}
 
 	if (m_host != "" || ip_bonded)

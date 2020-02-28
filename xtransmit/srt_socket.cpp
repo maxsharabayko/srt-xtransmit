@@ -54,6 +54,8 @@ socket::srt::srt(const UriParser &src_uri)
 
 	check_options_exist();
 
+	handle_hosts();
+
 	if (SRT_SUCCESS != configure_pre(m_bind_socket))
 		throw socket::exception(srt_getlasterror_str());
 }
@@ -87,27 +89,7 @@ socket::srt::~srt()
 void socket::srt::listen()
 {
 	int         num_clients = 2;
-	sockaddr_in sa;
-
-	try
-	{
-		sa = CreateAddrInet(m_host, m_port);
-	}
-	catch (const std::invalid_argument &e)
-	{
-		raise_exception("listen::create_addr", e.what());
-	}
-
-	sockaddr *psa = (sockaddr *)&sa;
-
-	int res = srt_bind(m_bind_socket, psa, sizeof sa);
-	if (res == SRT_ERROR)
-	{
-		srt_close(m_bind_socket);
-		raise_exception("bind");
-	}
-
-	res = srt_listen(m_bind_socket, num_clients);
+	int res = srt_listen(m_bind_socket, num_clients);
 	if (res == SRT_ERROR)
 	{
 		srt_close(m_bind_socket);
@@ -349,6 +331,54 @@ int socket::srt::configure_post(SRTSOCKET sock)
 	}
 
 	return 0;
+}
+
+void socket::srt::handle_hosts()
+{
+	const auto bind_me = [&](const sockaddr* sa) {
+		const int       bind_res = srt_bind(m_bind_socket, sa, sizeof * sa);
+		if (bind_res < 0)
+		{
+			srt_close(m_bind_socket);
+			throw socket::exception("SRT binding has failed");
+		}
+	};
+
+	bool ip_bonded = false;
+	if (m_options.count("bindip"))
+	{
+		sockaddr_in sa_bind;
+		const string bindip = m_options.at("bindip");
+		m_options.erase("bindip");
+		const int bindport = m_options.count("bindport") ? std::stoi(m_options.at("bindport")) : m_port;
+		m_options.erase("bindport");
+
+		try
+		{
+			sa_bind = CreateAddrInet(bindip, bindport);
+		}
+		catch (const std::invalid_argument&)
+		{
+			throw socket::exception("create_addr_inet failed");
+		}
+
+		bind_me(reinterpret_cast<const sockaddr*>(&sa_bind));
+		ip_bonded = true;
+	}
+
+	if (m_host != "" && !ip_bonded)
+	{
+		sockaddr_in sa;
+		try
+		{
+			sa = CreateAddrInet(m_host, m_port);
+		}
+		catch (const std::invalid_argument & e)
+		{
+			raise_exception("listen::create_addr", e.what());
+		}
+		bind_me(reinterpret_cast<const sockaddr*>(&sa));
+	}
 }
 
 size_t socket::srt::read(const mutable_buffer &buffer, int timeout_ms)
