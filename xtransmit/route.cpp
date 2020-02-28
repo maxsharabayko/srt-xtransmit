@@ -7,6 +7,10 @@
 #include <thread>
 #include <vector>
 
+// submodules
+#include "spdlog/spdlog.h"
+
+// xtransmit
 #include "srt_socket.hpp"
 #include "udp_socket.hpp"
 #include "route.hpp"
@@ -24,6 +28,7 @@ using namespace std::chrono;
 using shared_srt = std::shared_ptr<socket::srt>;
 using shared_sock = std::shared_ptr<socket::isocket>;
 
+#define LOG_SC_ROUTE "ROUTE "
 
 namespace xtransmit
 {
@@ -37,6 +42,8 @@ namespace route
 
 		socket::isocket& sock_src = *src.get();
 		socket::isocket& sock_dst = *dst.get();
+
+		spdlog::info(LOG_SC_ROUTE "{0} Started", desc);
 
 		while (!force_break)
 		{
@@ -103,7 +110,13 @@ void xtransmit::route::run(const string& src_url, const string& dst_url,
 			stats->add_socket(dst);
 		}
 
+		future<void> route_bkwd = cfg.bidir
+			? ::async(::launch::async, route, dst, src, cfg, "[DST->SRC]", ref(force_break))
+			: future<void>();	
+
 		route(src, dst, cfg, "[SRC->DST]", force_break);
+
+		route_bkwd.wait();
 	}
 	catch (const socket::exception & e)
 	{
@@ -119,6 +132,7 @@ CLI::App* xtransmit::route::add_subcommand(CLI::App& app, config& cfg, string& s
 	sc_route->add_option("src", src_url, "Source URI");
 	sc_route->add_option("dst", dst_url, "Destination URI");
 	sc_route->add_option("--msgsize", cfg.message_size, "Size of a buffer to receive message payload");
+	sc_route->add_flag("--bidir", cfg.bidir, "Enable bidirectional transmission");
 	sc_route->add_option("--statsfile", cfg.stats_file, "output stats report filename");
 	sc_route->add_option("--statsfreq", cfg.stats_freq_ms, "output stats report frequency (ms)")
 		->transform(CLI::AsNumberWithUnit(to_ms, CLI::AsNumberWithUnit::CASE_SENSITIVE));

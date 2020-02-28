@@ -12,7 +12,7 @@ namespace xtransmit {
 		struct config
 		{
 			int message_size = 1456;
-			bool one_way = false;
+			bool bidir = false;
 			int stats_freq_ms = 0;
 			std::string stats_file;
 		};
