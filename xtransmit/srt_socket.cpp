@@ -366,7 +366,7 @@ void socket::srt::handle_hosts()
 		ip_bonded = true;
 	}
 
-	if (m_host != "" && !ip_bonded)
+	if (m_host == "" && !ip_bonded)
 	{
 		sockaddr_in sa;
 		try
