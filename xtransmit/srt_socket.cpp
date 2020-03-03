@@ -345,14 +345,18 @@ void socket::srt::handle_hosts()
 	};
 
 	bool ip_bonded = false;
-	if (m_options.count("bindip"))
+	if (m_options.count("bind"))
 	{
-		sockaddr_in sa_bind;
-		const string bindip = m_options.at("bindip");
-		m_options.erase("bindip");
-		const int bindport = m_options.count("bindport") ? std::stoi(m_options.at("bindport")) : m_port;
-		m_options.erase("bindport");
+		string bindipport = m_options.at("bind");
+		transform(bindipport.begin(), bindipport.end(), bindipport.begin(), [](char c) { return tolower(c); });
+		const size_t idx = bindipport.find(":");
+		const string bindip = bindipport.substr(0, idx);
+		const int bindport = idx != string::npos
+			? stoi(bindipport.substr(idx + 1, bindipport.size() - (idx + 1)))
+			: m_port;
+		m_options.erase("bind");
 
+		sockaddr_in sa_bind;
 		try
 		{
 			sa_bind = CreateAddrInet(bindip, bindport);
