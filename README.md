@@ -9,6 +9,7 @@ TODO: Brief description
 
 * **generate** -  dummy content streaming over SRT for performance tests
 * **receive** - receiving SRT streaming to null for performance tests
+* **route** - route packets between two sockets (UDP/SRT) uni- or bidirectionally
 * **forward** - forward packets bidirectionally between two SRT connections
 * **file send** - segment-based file/folder sender (C++17)
 * **file receive** - segment-based file/folder receiver (C++17)
