@@ -108,7 +108,9 @@ void run_pipe(shared_sock dst, const config &cfg, const atomic_bool &force_break
 	auto stat_time = steady_clock::now();
 	int prev_i = 0;
 
+#if ENABLE_RFC4737
 	rfc4737::generator rfc4737;
+#endif
 
 	unique_ptr <csv_feed> feed = !cfg.playback_csv.empty()
 		? unique_ptr<csv_feed>(new csv_feed(cfg.playback_csv))
@@ -153,8 +155,10 @@ void run_pipe(shared_sock dst, const config &cfg, const atomic_bool &force_break
 
 		if (cfg.add_timestamp)
 			write_timestamp(message_to_send);
+#if ENABLE_RFC4737
 		if (cfg.rfc4737_metrics)
 			rfc4737.generate_packet(message_to_send);
+#endif
 
 		target->write(const_buffer(message_to_send.data(), message_to_send.size()));
 
@@ -231,7 +235,9 @@ CLI::App* xtransmit::generate::add_subcommand(CLI::App &app, config &cfg, string
 		->transform(CLI::AsNumberWithUnit(to_ms, CLI::AsNumberWithUnit::CASE_SENSITIVE));
 	sc_generate->add_flag("--twoway", cfg.two_way, "Both send and receive data");
 	sc_generate->add_flag("--timestamp", cfg.add_timestamp, "Place a timestamp in the message payload");
+#if ENABLE_RFC4737
 	sc_generate->add_flag("--rfc4737", cfg.rfc4737_metrics, "Add seqno in the message payload to ckeck reordering");
+#endif
 	sc_generate->add_option("--playback-csv", cfg.playback_csv, "Input CSV file with timestamp of every packet");
 
 	return sc_generate;

@@ -98,7 +98,9 @@ void run_pipe(shared_sock src, const config &cfg, const atomic_bool &force_break
 	socket::isocket &sock = *src.get();
 
 	vector<char> buffer(cfg.message_size);
+#if ENABLE_RFC4737
 	rfc4737::validator rfc4737;
+#endif
 	try
 	{
 		while (!force_break)
@@ -115,8 +117,10 @@ void run_pipe(shared_sock src, const config &cfg, const atomic_bool &force_break
 				trace_message(bytes, buffer, sock.id());
 			if (cfg.check_timestamp)
 				read_timestamp(buffer);
+#if ENABLE_RFC4737
 			if (cfg.rfc4737_metrics)
 				rfc4737.validate_packet(buffer);
+#endif
 
 			if (cfg.send_reply)
 			{
@@ -191,7 +195,9 @@ CLI::App* xtransmit::receive::add_subcommand(CLI::App& app, config& cfg, string&
 		->transform(CLI::AsNumberWithUnit(to_ms, CLI::AsNumberWithUnit::CASE_SENSITIVE));
 	sc_receive->add_flag("--printmsg", cfg.print_notifications, "print message into to stdout");
 	sc_receive->add_flag("--timestamp", cfg.check_timestamp, "Check a timestamp in the message payload");
+#if ENABLE_RFC4737
 	sc_receive->add_flag("--rfc4737", cfg.rfc4737_metrics, "Check packet reordering based on the message payload");
+#endif
 	sc_receive->add_flag("--twoway", cfg.send_reply, "Both send and receive data");
 
 	return sc_receive;
