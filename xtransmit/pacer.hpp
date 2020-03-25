@@ -76,4 +76,57 @@ private:
 	long m_timedev_us = 0; ///< Pacing time deviation (microseconds) is used to adjust the pace
 };
 
+
+class csv_pacer
+	: public ipacer
+{
+public:
+	csv_pacer(const std::string& filename)
+		: m_srccsv(filename.c_str())
+	{
+		if (!m_srccsv)
+		{
+			spdlog::critical("Failed to open input CSV file. Path: {0}", filename);
+			throw socket::exception("Failed to open input CSV file. Path " + filename);
+		}
+	}
+
+	~csv_pacer() final
+	{}
+
+public:
+	inline void wait(const atomic_bool &force_break) final
+	{
+		const steady_clock::time_point next_time_ = next_time();
+		for (;;)
+		{
+			if (steady_clock::now() >= next_time_)
+				break;
+			if (force_break)
+				break;
+		}
+	}
+
+private:
+	steady_clock::time_point next_time()
+	{
+		if (m_srccsv.eof())
+		{
+			m_srccsv.clear(); // Need to clear the eof flag
+			m_srccsv.seekg(0, m_srccsv.beg);
+			m_start = steady_clock::now();
+		}
+
+		std::string line;
+		if (!std::getline(m_srccsv, line))
+			return steady_clock::time_point();
+		const double val = stod(line);
+		return m_start + microseconds(long(val * 1000000));
+	}
+
+private:
+	std::ifstream m_srccsv;
+	steady_clock::time_point m_start = steady_clock::now();
+};
+
 } // namespace xtransmit

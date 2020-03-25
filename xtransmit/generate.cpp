@@ -46,46 +46,6 @@ void write_timestamp(vector<char> &message_to_send)
 }
 
 
-
-namespace xtransmit
-{
-class csv_feed
-{
-public:
-	csv_feed(const std::string& filename)
-		: m_srccsv(filename.c_str())
-	{
-		if (!m_srccsv)
-		{
-			spdlog::critical("Failed to open input CSV file. Path: {0}", filename);
-			throw socket::exception("Failed to open input CSV file. Path " + filename);
-		}
-	}
-
-public:
-	steady_clock::time_point next_time()
-	{
-		if (m_srccsv.eof())
-		{
-			m_srccsv.clear(); // Need to clear the eof flag
-			m_srccsv.seekg(0, m_srccsv.beg);
-			m_start = steady_clock::now();
-		}
-
-		std::string line;
-		if (!std::getline(m_srccsv, line))
-			return steady_clock::time_point();
-		const double val = stod(line);
-		return m_start + microseconds(long(val * 1000000));
-	}
-
-private:
-	std::ifstream m_srccsv;
-	steady_clock::time_point m_start = steady_clock::now();
-};
-}
-
-
 void run_pipe(shared_sock dst, const config &cfg, const atomic_bool &force_break)
 {
 	vector<char> message_to_send(cfg.message_size);
@@ -103,30 +63,17 @@ void run_pipe(shared_sock dst, const config &cfg, const atomic_bool &force_break
 	rfc4737::generator rfc4737;
 #endif
 
-	unique_ptr <csv_feed> feed = !cfg.playback_csv.empty()
-		? unique_ptr<csv_feed>(new csv_feed(cfg.playback_csv))
-		: nullptr;
-
 	unique_ptr<ipacer> ratepacer = cfg.sendrate
 		? unique_ptr<ipacer>(new pacer(cfg.sendrate, cfg.message_size))
-		: nullptr;
+		: (!cfg.playback_csv.empty()
+		? unique_ptr<ipacer>(new csv_pacer(cfg.playback_csv))
+		: nullptr);
 
 	for (int i = 0; (num_messages < 0 || i < num_messages) && !force_break; ++i)
 	{
 		if (ratepacer)
 		{
 			ratepacer->wait(force_break);
-		}
-		else if (feed)
-		{
-			const steady_clock::time_point next_time = feed->next_time();
-			for (;;)
-			{
-				if (steady_clock::now() >= next_time)
-					break;
-				if (force_break)
-					break;
-			}
 		}
 
 		// Check if sending duration is respected
