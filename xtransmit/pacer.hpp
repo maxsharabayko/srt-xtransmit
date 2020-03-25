@@ -75,7 +75,7 @@ private:
 class csv_pacer : public ipacer
 {
 public:
-	csv_pacer(const std::string& filename)
+	explicit csv_pacer(const std::string& filename)
 		: m_srccsv(filename.c_str())
 	{
 		if (!m_srccsv)
