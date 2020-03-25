@@ -1,0 +1,79 @@
+#pragma once
+#include <chrono>
+#include <limits>
+#include <memory>
+#include <string>
+#include <numeric>
+#include <vector>
+
+// submodules
+#include "spdlog/spdlog.h"
+
+// Log entry prefix
+#define LOG_SC_PACER "PACER "
+
+namespace xtransmit
+{
+using namespace std;
+using namespace std::chrono;
+
+class ipacer
+{
+public:
+	virtual ~ipacer() = 0;
+public:
+	virtual void wait(const atomic_bool &force_break) = 0;
+};
+
+// Definition of Pure Virtual Destructor
+ipacer::~ipacer() {}
+
+
+class pacer
+	: public ipacer
+{
+public:
+	pacer(int sendrate_bps, int message_size)
+		: m_msg_interval_us(calc_msg_interval_us(sendrate_bps, message_size))
+	{
+		spdlog::info(LOG_SC_PACER "sendrate {} bps (inter send interval {} us)",
+			sendrate_bps,
+			m_msg_interval_us);
+	}
+
+	~pacer() final
+	{}
+
+public:
+	inline void wait(const atomic_bool &force_break) final
+	{
+		const long inter_send_us = m_timedev_us > m_msg_interval_us ? 0 : (m_msg_interval_us - m_timedev_us);
+		const auto next_time     = m_last_snd_time + microseconds(inter_send_us);
+		std::chrono::steady_clock::time_point time_now;
+		for (;;)
+		{
+			time_now = steady_clock::now();
+			if (time_now >= next_time)
+				break;
+			if (force_break)
+				break;
+		}
+
+		m_timedev_us += (long)duration_cast<microseconds>(time_now - m_last_snd_time).count() - m_msg_interval_us;
+		m_last_snd_time = time_now;
+	}
+
+	static inline long calc_msg_interval_us(int sendrate_bps, int message_size)
+	{
+		const long msgs_per_10s = static_cast<long long>(sendrate_bps / 8) * 10 / message_size;
+		return msgs_per_10s ? 10000000 / msgs_per_10s : 0;
+	}
+
+private:
+	typedef std::chrono::steady_clock::time_point time_point;
+	const long                                    m_msg_interval_us;
+	time_point                                    m_last_snd_time = std::chrono::steady_clock::now();
+	long m_timedev_us = 0; ///< Pacing time deviation (microseconds) is used to adjust the pace
+};
+
+} // namespace xtransmit

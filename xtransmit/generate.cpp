@@ -16,6 +16,7 @@
 #include "srt_socket.hpp"
 #include "udp_socket.hpp"
 #include "generate.hpp"
+#include "pacer.hpp"
 #include "rfc4737.hpp"
 
 // OpenSRT
@@ -91,16 +92,6 @@ void run_pipe(shared_sock dst, const config &cfg, const atomic_bool &force_break
 	iota(message_to_send.begin(), message_to_send.end(), (char)0);
 
 	const auto start_time      = steady_clock::now();
-	auto       time_prev       = steady_clock::now();
-	long       time_dev_us     = 0;
-	const long msgs_per_10s    = static_cast<long long>(cfg.sendrate / 8) * 10 / cfg.message_size;
-	const long msg_interval_us = msgs_per_10s ? 10000000 / msgs_per_10s : 0;
-
-	spdlog::info(LOG_SC_GENERATE "sendrate {} bps ({} msgs/s with interval {} us)",
-		cfg.sendrate,
-		msgs_per_10s / 10.0,
-		msg_interval_us);
-
 	const int num_messages = cfg.duration > 0 ? -1 : cfg.num_messages;
 
 	socket::isocket *target = dst.get();
@@ -116,24 +107,15 @@ void run_pipe(shared_sock dst, const config &cfg, const atomic_bool &force_break
 		? unique_ptr<csv_feed>(new csv_feed(cfg.playback_csv))
 		: nullptr;
 
+	unique_ptr<ipacer> ratepacer = cfg.sendrate
+		? unique_ptr<ipacer>(new pacer(cfg.sendrate, cfg.message_size))
+		: nullptr;
+
 	for (int i = 0; (num_messages < 0 || i < num_messages) && !force_break; ++i)
 	{
-		if (cfg.sendrate)
+		if (ratepacer)
 		{
-			const long               duration_us = time_dev_us > msg_interval_us ? 0 : (msg_interval_us - time_dev_us);
-			const auto               next_time   = time_prev + microseconds(duration_us);
-			steady_clock::time_point time_now;
-			for (;;)
-			{
-				time_now = steady_clock::now();
-				if (time_now >= next_time)
-					break;
-				if (force_break)
-					break;
-			}
-
-			time_dev_us += (long)duration_cast<microseconds>(time_now - time_prev).count() - msg_interval_us;
-			time_prev = time_now;
+			ratepacer->wait(force_break);
 		}
 		else if (feed)
 		{
