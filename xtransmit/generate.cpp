@@ -33,10 +33,10 @@ using shared_sock = std::shared_ptr<socket::isocket>;
 
 #define LOG_SC_GENERATE "GENERATE "
 
-void write_timestamp(vector<char> &message_to_send)
+void write_timestamp(vector<char>& message_to_send)
 {
-	const auto   systime_now = system_clock::now();
-	const time_t now_c = system_clock::to_time_t(systime_now);
+	const auto   systime_now                             = system_clock::now();
+	const time_t now_c                                   = system_clock::to_time_t(systime_now);
 	*(reinterpret_cast<time_t*>(message_to_send.data())) = now_c;
 
 	system_clock::duration frac =
@@ -45,29 +45,26 @@ void write_timestamp(vector<char> &message_to_send)
 	*(reinterpret_cast<long long*>(message_to_send.data() + 8)) = duration_cast<microseconds>(frac).count();
 }
 
-
-void run_pipe(shared_sock dst, const config &cfg, const atomic_bool &force_break)
+void run_pipe(shared_sock dst, const config& cfg, const atomic_bool& force_break)
 {
 	vector<char> message_to_send(cfg.message_size);
 	iota(message_to_send.begin(), message_to_send.end(), (char)0);
 
-	const auto start_time      = steady_clock::now();
-	const int num_messages = cfg.duration > 0 ? -1 : cfg.num_messages;
+	const auto start_time   = steady_clock::now();
+	const int  num_messages = cfg.duration > 0 ? -1 : cfg.num_messages;
 
-	socket::isocket *target = dst.get();
+	socket::isocket* target = dst.get();
 
 	auto stat_time = steady_clock::now();
-	int prev_i = 0;
+	int  prev_i    = 0;
 
 #if ENABLE_RFC4737
 	rfc4737::generator rfc4737;
 #endif
 
-	unique_ptr<ipacer> ratepacer = cfg.sendrate
-		? unique_ptr<ipacer>(new pacer(cfg.sendrate, cfg.message_size))
-		: (!cfg.playback_csv.empty()
-		? unique_ptr<ipacer>(new csv_pacer(cfg.playback_csv))
-		: nullptr);
+	unique_ptr<ipacer> ratepacer =
+		cfg.sendrate ? unique_ptr<ipacer>(new pacer(cfg.sendrate, cfg.message_size))
+					 : (!cfg.playback_csv.empty() ? unique_ptr<ipacer>(new csv_pacer(cfg.playback_csv)) : nullptr);
 
 	for (int i = 0; (num_messages < 0 || i < num_messages) && !force_break; ++i)
 	{
@@ -94,18 +91,17 @@ void run_pipe(shared_sock dst, const config &cfg, const atomic_bool &force_break
 		const auto tnow = steady_clock::now();
 		if (tnow > (stat_time + chrono::seconds(1)))
 		{
-			const int n = i - prev_i;
-			const auto elapsed = tnow - stat_time;
-			const long long bps = (8 * n * cfg.message_size) / duration_cast<milliseconds>(elapsed).count() * 1000;
+			const int       n       = i - prev_i;
+			const auto      elapsed = tnow - stat_time;
+			const long long bps     = (8 * n * cfg.message_size) / duration_cast<milliseconds>(elapsed).count() * 1000;
 			spdlog::info(LOG_SC_GENERATE "Sending at {} kbps", bps / 1000);
 			stat_time = tnow;
-			prev_i = i;
+			prev_i    = i;
 		}
 	}
 }
 
-
-void xtransmit::generate::run(const string &dst_url, const config &cfg, const atomic_bool &force_break)
+void xtransmit::generate::run(const string& dst_url, const config& cfg, const atomic_bool& force_break)
 {
 	const UriParser uri(dst_url);
 
@@ -116,9 +112,10 @@ void xtransmit::generate::run(const string &dst_url, const config &cfg, const at
 	{
 		const bool write_stats = cfg.stats_file != "" && cfg.stats_freq_ms > 0;
 		// make_unique is not supported by GCC 4.8, only starting from GCC 4.9 :(
-		unique_ptr<socket::stats_writer> stats = write_stats
-			? unique_ptr<socket::stats_writer>(new socket::stats_writer(cfg.stats_file, milliseconds(cfg.stats_freq_ms)))
-			: nullptr;
+		unique_ptr<socket::stats_writer> stats =
+			write_stats ? unique_ptr<socket::stats_writer>(
+							  new socket::stats_writer(cfg.stats_file, milliseconds(cfg.stats_freq_ms)))
+						: nullptr;
 
 		if (uri.proto() == "udp")
 		{
@@ -126,9 +123,9 @@ void xtransmit::generate::run(const string &dst_url, const config &cfg, const at
 		}
 		else
 		{
-			socket = make_shared<socket::srt>(uri);
-			socket::srt* s = static_cast<socket::srt *>(socket.get());
-			const bool  accept = s->mode() == socket::srt::LISTENER;
+			socket              = make_shared<socket::srt>(uri);
+			socket::srt* s      = static_cast<socket::srt*>(socket.get());
+			const bool   accept = s->mode() == socket::srt::LISTENER;
 			if (accept)
 				s->listen();
 			connection = accept ? s->accept() : s->connect();
@@ -138,18 +135,18 @@ void xtransmit::generate::run(const string &dst_url, const config &cfg, const at
 			stats->add_socket(connection);
 		run_pipe(connection, cfg, force_break);
 	}
-	catch (const socket::exception &e)
+	catch (const socket::exception& e)
 	{
 		spdlog::warn(LOG_SC_GENERATE "{}", e.what());
 		return;
 	}
 }
 
-CLI::App* xtransmit::generate::add_subcommand(CLI::App &app, config &cfg, string &dst_url)
+CLI::App* xtransmit::generate::add_subcommand(CLI::App& app, config& cfg, string& dst_url)
 {
-	const map<string, int> to_bps{ {"kbps", 1000}, {"Mbps", 1000000}, {"Gbps", 1000000000} };
-	const map<string, int> to_ms{ {"s", 1000}, {"ms", 1} };
-	const map<string, int> to_sec{ {"s", 1}, {"min", 60}, {"mins", 60} };
+	const map<string, int> to_bps{{"kbps", 1000}, {"Mbps", 1000000}, {"Gbps", 1000000000}};
+	const map<string, int> to_ms{{"s", 1000}, {"ms", 1}};
+	const map<string, int> to_sec{{"s", 1}, {"min", 60}, {"mins", 60}};
 
 	CLI::App* sc_generate = app.add_subcommand("generate", "Send generated data (SRT, UDP)")->fallthrough();
 	sc_generate->add_option("dst", dst_url, "Destination URI");
@@ -171,7 +168,3 @@ CLI::App* xtransmit::generate::add_subcommand(CLI::App &app, config &cfg, string
 
 	return sc_generate;
 }
-
-
-
-

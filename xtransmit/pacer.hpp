@@ -21,31 +21,27 @@ class ipacer
 {
 public:
 	virtual ~ipacer() = 0;
+
 public:
-	virtual void wait(const atomic_bool &force_break) = 0;
+	virtual void wait(const atomic_bool& force_break) = 0;
 };
 
 // Definition of Pure Virtual Destructor
 ipacer::~ipacer() {}
 
-
-class pacer
-	: public ipacer
+class pacer : public ipacer
 {
 public:
 	pacer(int sendrate_bps, int message_size)
 		: m_msg_interval_us(calc_msg_interval_us(sendrate_bps, message_size))
 	{
-		spdlog::info(LOG_SC_PACER "sendrate {} bps (inter send interval {} us)",
-			sendrate_bps,
-			m_msg_interval_us);
+		spdlog::info(LOG_SC_PACER "sendrate {} bps (inter send interval {} us)", sendrate_bps, m_msg_interval_us);
 	}
 
-	~pacer() final
-	{}
+	~pacer() final {}
 
 public:
-	inline void wait(const atomic_bool &force_break) final
+	inline void wait(const atomic_bool& force_break) final
 	{
 		const long inter_send_us = m_timedev_us > m_msg_interval_us ? 0 : (m_msg_interval_us - m_timedev_us);
 		const auto next_time     = m_last_snd_time + microseconds(inter_send_us);
@@ -76,9 +72,7 @@ private:
 	long m_timedev_us = 0; ///< Pacing time deviation (microseconds) is used to adjust the pace
 };
 
-
-class csv_pacer
-	: public ipacer
+class csv_pacer : public ipacer
 {
 public:
 	csv_pacer(const std::string& filename)
@@ -91,11 +85,10 @@ public:
 		}
 	}
 
-	~csv_pacer() final
-	{}
+	~csv_pacer() final {}
 
 public:
-	inline void wait(const atomic_bool &force_break) final
+	inline void wait(const atomic_bool& force_break) final
 	{
 		const steady_clock::time_point next_time_ = next_time();
 		for (;;)
@@ -125,7 +118,7 @@ private:
 	}
 
 private:
-	std::ifstream m_srccsv;
+	std::ifstream            m_srccsv;
 	steady_clock::time_point m_start = steady_clock::now();
 };
 
