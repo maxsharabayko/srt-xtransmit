@@ -166,7 +166,20 @@ int socket::udp::write(const const_buffer &buffer, int timeout_ms)
 							 sizeof m_dst_addr);
 	if (res == -1)
 	{
-		throw socket::exception("udp::write::send");
+#ifndef _WIN32
+#define NET_ERROR errno
+#else
+#define NET_ERROR WSAGetLastError()
+#endif
+		const int err = NET_ERROR;
+		if (err != EAGAIN && err != EINTR && err != ECONNREFUSED)
+		{
+			spdlog::info("udp::write::sendto: error {0}.", err);
+			throw socket::exception("udp::write::sendto error");
+		}
+
+		spdlog::info("udp::sendto failed: error {0}. Again.", err);
+		return 0;
 	}
 
 	return static_cast<size_t>(res);
