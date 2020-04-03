@@ -41,6 +41,13 @@ void xtransmit::socket::stats_writer::add_socket(shared_sock sock)
 	m_stat_future = launch();
 }
 
+void xtransmit::socket::stats_writer::clear()
+{
+	m_lock.lock();
+	m_sock.clear();
+	m_lock.unlock();
+}
+
 void xtransmit::socket::stats_writer::stop()
 {
 	m_stop = true;

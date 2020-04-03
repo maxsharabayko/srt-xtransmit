@@ -159,23 +159,27 @@ void xtransmit::receive::run(const string &src_url, const config &cfg, const ato
 			? unique_ptr<socket::stats_writer>(new socket::stats_writer(cfg.stats_file, milliseconds(cfg.stats_freq_ms)))
 			: nullptr;
 
-		if (uri.proto() == "udp")
-		{
-			connection = make_shared<socket::udp>(uri);
-		}
-		else
-		{
-			socket = make_shared<socket::srt>(uri);
-			socket::srt* s = static_cast<socket::srt*>(socket.get());
-			const bool  accept = s->mode() == socket::srt::LISTENER;
-			if (accept)
-				s->listen();
-			connection = accept ? s->accept() : s->connect();
-		}
+		do {
+			if (uri.proto() == "udp")
+			{
+				connection = make_shared<socket::udp>(uri);
+			}
+			else
+			{
+				socket = make_shared<socket::srt>(uri);
+				socket::srt* s = static_cast<socket::srt*>(socket.get());
+				const bool  accept = s->mode() == socket::srt::LISTENER;
+				if (accept)
+					s->listen();
+				connection = accept ? s->accept() : s->connect();
+			}
 
-		if (stats)
-			stats->add_socket(connection);
-		run_pipe(connection, cfg, force_break);
+			if (stats)
+				stats->add_socket(connection);
+			run_pipe(connection, cfg, force_break);
+			if (stats && cfg.reconnect)
+				stats->clear();
+		} while (cfg.reconnect);
 	}
 	catch (const socket::exception & e)
 	{
@@ -194,6 +198,7 @@ CLI::App* xtransmit::receive::add_subcommand(CLI::App& app, config& cfg, string&
 	sc_receive->add_option("--statsfreq", cfg.stats_freq_ms, "output stats report frequency (ms)")
 		->transform(CLI::AsNumberWithUnit(to_ms, CLI::AsNumberWithUnit::CASE_SENSITIVE));
 	sc_receive->add_flag("--printmsg", cfg.print_notifications, "print message into to stdout");
+	sc_receive->add_flag("--reconnect", cfg.reconnect, "Reconnect automatically");
 	sc_receive->add_flag("--timestamp", cfg.check_timestamp, "Check a timestamp in the message payload");
 #if ENABLE_RFC4737
 	sc_receive->add_flag("--rfc4737", cfg.rfc4737_metrics, "Check packet reordering based on the message payload");

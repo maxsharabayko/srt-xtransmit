@@ -24,7 +24,7 @@ public:
 
 public:
 	void add_socket(std::shared_ptr<socket::isocket> sock);
-
+	void clear();
 	void stop();
 
 private:
