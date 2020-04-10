@@ -11,8 +11,8 @@ TODO: Brief description
 * **receive** - receiving SRT streaming to null for performance tests
 * **route** - route packets between two sockets (UDP/SRT) uni- or bidirectionally
 * **forward** - forward packets bidirectionally between two SRT connections
-* **file send** - segment-based file/folder sender (C++17)
-* **file receive** - segment-based file/folder receiver (C++17)
+* **file send** - segment-based file/folder sender (requires C++17: `-DENABLE_CXX17=ON`)
+* **file receive** - segment-based file/folder receiver (requires C++17: `-DENABLE_CXX17=ON`)
 
 ## Common
 
