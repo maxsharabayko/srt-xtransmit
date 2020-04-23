@@ -109,7 +109,7 @@ void run_pipe(shared_sock src, const config &cfg, const atomic_bool &force_break
 
 			if (bytes == 0)
 			{
-				::cerr << "src->read returned 0\n";
+				spdlog::debug(LOG_SC_RECEIVE "sock::read() returned 0 bytes");
 				continue;
 			}
 

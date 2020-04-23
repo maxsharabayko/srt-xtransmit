@@ -404,7 +404,13 @@ size_t socket::srt::read(const mutable_buffer &buffer, int timeout_ms)
 
 	const int res = srt_recvmsg2(m_bind_socket, static_cast<char *>(buffer.data()), (int)buffer.size(), nullptr);
 	if (SRT_ERROR == res)
-		raise_exception("read::recv");
+	{
+		if (srt_getlasterror(nullptr) != SRT_EASYNCRCV)
+			raise_exception("read::recv");
+
+		spdlog::warn(LOG_SOCK_SRT "recvmsg returned error 6002: read error, try again");
+		return 0;
+	}
 
 	return static_cast<size_t>(res);
 }
