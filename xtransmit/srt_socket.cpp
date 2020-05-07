@@ -54,10 +54,11 @@ socket::srt::srt(const UriParser &src_uri)
 
 	check_options_exist();
 
-	handle_hosts();
-
 	if (SRT_SUCCESS != configure_pre(m_bind_socket))
 		throw socket::exception(srt_getlasterror_str());
+	
+	// Do binding after PRE options are configured in the above call.
+	handle_hosts();
 }
 
 socket::srt::srt(const int sock, bool blocking)
@@ -372,6 +373,7 @@ void socket::srt::handle_hosts()
 
 	if (m_host == "" && !ip_bonded)
 	{
+		// bind listener
 		sockaddr_in sa;
 		try
 		{
@@ -456,7 +458,7 @@ socket::srt::connection_mode socket::srt::mode() const
 	return m_mode;
 }
 
-int socket::srt::statistics(SRT_TRACEBSTATS &stats)
+int socket::srt::statistics(SRT_TRACEBSTATS& stats)
 {
 	return srt_bstats(m_bind_socket, &stats, true);
 }
