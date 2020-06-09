@@ -483,9 +483,9 @@ const string socket::srt::stats_to_csv(int socketid, const SRT_TRACEBSTATS& stat
 #endif
 		output << "Time,SocketID,pktFlowWindow,pktCongestionWindow,pktFlightSize,";
 		output << "msRTT,mbpsBandwidth,mbpsMaxBW,pktSent,pktSndLoss,pktSndDrop,";
-		output << "pktRetrans,byteSent,byteAvailSndBuf,byteSndDrop,mbpsSendRate,usPktSndPeriod,";
+		output << "pktRetrans,byteSent,byteAvailSndBuf,byteSndDrop,mbpsSendRate,usPktSndPeriod,msSndBuf,";
 		output << "pktRecv,pktRcvLoss,pktRcvDrop,pktRcvRetrans,pktRcvBelated,";
-		output << "byteRecv,byteAvailRcvBuf,byteRcvLoss,byteRcvDrop,mbpsRecvRate,msRcvTsbPdDelay";
+		output << "byteRecv,byteAvailRcvBuf,byteRcvLoss,byteRcvDrop,mbpsRecvRate,msRcvBuf,msRcvTsbPdDelay";
 #if HAS_PKT_REORDER_TOL
 		output << ",msRcvTsbPdDelay";
 #endif
@@ -537,6 +537,7 @@ const string socket::srt::stats_to_csv(int socketid, const SRT_TRACEBSTATS& stat
 	output << stats.byteSndDrop << ",";
 	output << stats.mbpsSendRate << ",";
 	output << stats.usPktSndPeriod << ",";
+	output << stats.msSndBuf << ",";
 
 	output << stats.pktRecv << ",";
 	output << stats.pktRcvLoss << ",";
@@ -549,6 +550,7 @@ const string socket::srt::stats_to_csv(int socketid, const SRT_TRACEBSTATS& stat
 	output << stats.byteRcvLoss << ",";
 	output << stats.byteRcvDrop << ",";
 	output << stats.mbpsRecvRate << ",";
+	output << stats.msRcvBuf << ",";
 	output << stats.msRcvTsbPdDelay;
 
 #if	HAS_PKT_REORDER_TOL
