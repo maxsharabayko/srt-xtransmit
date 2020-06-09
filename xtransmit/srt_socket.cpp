@@ -438,6 +438,9 @@ int socket::srt::write(const const_buffer &buffer, int timeout_ms)
 	const int res = srt_sendmsg2(m_bind_socket, static_cast<const char*>(buffer.data()), static_cast<int>(buffer.size()), nullptr);
 	if (res == SRT_ERROR)
 	{
+		if (srt_getlasterror(nullptr) != SRT_EASYNCSND)
+			return 0;
+
 		size_t blocks, bytes;
 		srt_getsndbuffer(m_bind_socket, &blocks, &bytes);
 		int sndbuf = 0;
@@ -447,7 +450,6 @@ int socket::srt::write(const const_buffer &buffer, int timeout_ms)
 		ss << " (" << sndbuf - bytes << " bytes remaining)";
 		ss << "trying to write " << buffer.size() << "bytes";
 		raise_exception("socket::write::send", srt_getlasterror_str() + ss.str());
-		//	raise_exception("socket::write::send", UDT::getlasterror());
 	}
 
 	return res;
