@@ -460,21 +460,16 @@ socket::srt::connection_mode socket::srt::mode() const
 	return m_mode;
 }
 
-int socket::srt::statistics(SRT_TRACEBSTATS& stats)
+int socket::srt::statistics(SRT_TRACEBSTATS& stats, bool instant)
 {
-	return srt_bstats(m_bind_socket, &stats, true);
+	return srt_bstats(m_bind_socket, &stats, instant);
 }
 
-const string socket::srt::statistics_csv(bool print_header)
+const string socket::srt::stats_to_csv(int socketid, const SRT_TRACEBSTATS& stats, bool print_header)
 {
-	SRT_TRACEBSTATS stats;
-	if (SRT_ERROR == srt_bstats(m_bind_socket, &stats, true))
-		raise_exception("statistics");
-
 	std::ostringstream output;
 
 	// Note: std::put_time is supported only in GCC 5 and higher
-
 #if !defined(__GNUC__) || defined(__clang__) || (__GNUC__ >= 5)
 #define HAS_PUT_TIME
 #endif
@@ -495,6 +490,7 @@ const string socket::srt::statistics_csv(bool print_header)
 		output << ",msRcvTsbPdDelay";
 #endif
 		output << endl;
+		return output.str();
 	}
 
 #ifdef HAS_PUT_TIME
@@ -523,7 +519,7 @@ const string socket::srt::statistics_csv(bool print_header)
 #endif // HAS_PUT_TIME
 
 	output << stats.msTimeStamp << ",";
-	output << m_bind_socket << ",";
+	output << socketid << ",";
 	output << stats.pktFlowWindow << ",";
 	output << stats.pktCongestionWindow << ",";
 	output << stats.pktFlightSize << ",";
@@ -564,4 +560,13 @@ const string socket::srt::statistics_csv(bool print_header)
 	return output.str();
 
 #undef HAS_PUT_TIME
+}
+
+const string socket::srt::statistics_csv(bool print_header)
+{
+	SRT_TRACEBSTATS stats;
+	if (SRT_ERROR == srt_bstats(m_bind_socket, &stats, true))
+		raise_exception("statistics");
+
+	return stats_to_csv(m_bind_socket, stats, print_header);
 }
