@@ -38,7 +38,7 @@ bool send_file(const string &filename, const string &upload_name, socket::srt &d
 	const chrono::steady_clock::time_point time_start = chrono::steady_clock::now();
 	size_t file_size = 0;
 
-	cerr << "Transmitting '" << filename << " to " << upload_name;
+	cerr << "Transmitting '" << filename << " to " << upload_name << endl;
 
 	/*   1 byte      string    1 byte
 	 * ------------------------------------------------
@@ -58,9 +58,12 @@ bool send_file(const string &filename, const string &upload_name, socket::srt &d
 		buf[0] = (is_eof ? 2 : 0) | (is_start ? 1 : 0);
 
 		size_t shift = 0;
-		if (n > 0)
+		while (n > 0)
 		{
 			const int st = dst.write(const_buffer(buf.data() + shift, n + hdr_size));
+			if (st == 0)
+				continue;
+
 			file_size += n;
 
 			if (st == SRT_ERROR)
@@ -76,6 +79,7 @@ bool send_file(const string &filename, const string &upload_name, socket::srt &d
 
 			shift += st - hdr_size;
 			hdr_size = 1;
+			break;
 		}
 
 		if (is_eof)
