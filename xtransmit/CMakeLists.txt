@@ -20,7 +20,7 @@ target_include_directories(srt-xtransmit PUBLIC
 
 if (ENABLE_CXX17)
 	set(REQUIRE_CXX_VER 17)
-	if (${CMAKE_CXX_COMPILER_ID} MATCHES "GNU|Intel|Clang|AppleClang")
+	if (${CMAKE_CXX_COMPILER_ID} MATCHES "GNU|Intel")
 		target_compile_options(srt-xtransmit PRIVATE "-lstdc++fs")
 		set(LINKSTDCPP_FS stdc++fs)
 	endif()
