@@ -71,7 +71,9 @@ future<void> xtransmit::socket::stats_writer::launch()
 			lock_guard<mutex> lock(stats_lock);
 #endif
 			for_each(sock.begin(), sock.end(), [&out, &print_header](shared_sock& s) {
-				out << s->statistics_csv(print_header) << flush;
+				if (print_header)
+					out << s->statistics_csv(true);	
+				out << s->statistics_csv(false) << flush;
 				print_header = false;
 				});
 
