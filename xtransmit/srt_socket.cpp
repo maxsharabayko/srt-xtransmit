@@ -262,7 +262,7 @@ void socket::srt::check_options_exist() const
 			break;
 		}
 		
-		if (opt_found)
+		if (opt_found || key == "bind")
 			continue;
 
 		spdlog::warn(LOG_SOCK_SRT "srt://{}:{:d}: Ignoring socket option '{}={}' (not recognized)!",
@@ -369,6 +369,9 @@ void socket::srt::handle_hosts()
 
 		bind_me(reinterpret_cast<const sockaddr*>(&sa_bind));
 		ip_bonded = true;
+
+		spdlog::info(LOG_SOCK_SRT "srt://{}:{:d}: bound to '{}:{}'.",
+			m_host, m_port, bindip, bindport);
 	}
 
 	if (m_host == "" && !ip_bonded)
