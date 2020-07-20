@@ -9,6 +9,8 @@ using namespace std;
 using namespace xtransmit;
 using shared_udp = shared_ptr<socket::udp>;
 
+#define LOG_SOCK_UDP "SOCKET::UDP "
+
 socket::udp::udp(const UriParser &src_uri)
 	: m_host(src_uri.host())
 	, m_port(src_uri.portno())
@@ -86,6 +88,8 @@ socket::udp::udp(const UriParser &src_uri)
 
 		bind_me(reinterpret_cast<const sockaddr*>(&sa_bind));
 		ip_bonded = true;
+		spdlog::info(LOG_SOCK_UDP "udp://{}:{:d}: bound to '{}:{}'.",
+			m_host, m_port, bindip, bindport);
 	}
 
 	if (m_host != "" || ip_bonded)
