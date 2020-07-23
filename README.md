@@ -1,11 +1,12 @@
 # srt-xtransmit
 
-TODO: Brief description
+srt-xtransmit is a testing utility with support for SRT and UDP.
+At the moment the application supports UDP/SRT <-> UDP/SRT packet routing,
+traffic generation to UDP/SRT, file/folder transmission, etc.
 
+## Functionality
 
-# Functionality
-
-## Commands
+### Commands
 
 * **generate** -  dummy content streaming over SRT for performance tests
 * **receive** - receiving SRT streaming to null for performance tests
@@ -14,34 +15,35 @@ TODO: Brief description
 * **file send** - segment-based file/folder sender (requires C++17: `-DENABLE_CXX17=ON`)
 * **file receive** - segment-based file/folder receiver (requires C++17: `-DENABLE_CXX17=ON`)
 
-## Common
+### Common
 
 Collecting SRT statistics in CSV format.
 
-
-# Build Instructions
+## Build Instructions
 
 [![Actions Status](https://github.com/maxsharabayko/srt-xtransmit/workflows/C/C++%20CI/badge.svg)](https://github.com/maxsharabayko/srt-xtransmit/actions)
 [![CodeFactor](https://www.codefactor.io/repository/github/maxsharabayko/srt-xtransmit/badge)](https://www.codefactor.io/repository/github/maxsharabayko/srt-xtransmit)
 
-## Requirements
+### Requirements
 
 * C++14 compliant compiler (GCC 4.8+)
 * cmake (as a build configuration system)
 * OpenSSL (for encryption - required by SRT)
 * Pthreads (use pthreads4w on Windows - required by SRT)
 
-## Building on Linux/Mac
+### Building on Linux/Mac
 
-### 1. Create the directory for the project and clone the source code in here
-```
+#### 1. Create the directory for the project and clone the source code in here
+
+```shell
 mkdir -p projects/srt/srt-xtransmit
 cd projects/srt
 git clone https://github.com/maxsharabayko/srt-xtransmit.git srt-xtransmit
 ```
 
-### 2. Initialize, fetch and checkout submodules
-```
+#### 2. Initialize, fetch and checkout submodules
+
+```shell
 cd srt-xtransmit
 git submodule init
 git submodule update
@@ -53,23 +55,25 @@ git submodule update
 
 **Tip:** If you already cloned the project and forgot `--recurse-submodules`, you can combine the `git submodule init` and `git submodule update` steps by running `git submodule update --init`. To also initialize, fetch and checkout any nested submodules, you can use the foolproof `git submodule update --init --recursive`.
 
-### 3. Install submodules dependencies, in particular, [SRT library](https://github.com/Haivision/srt) dependencies
+#### 3. Install submodules dependencies, in particular, [SRT library](https://github.com/Haivision/srt) dependencies
 
 Install CMake dependencies and set the environment variables for CMake to find openssl:
 
-**Ubuntu 18.04**
-```
+##### Ubuntu 18.04
+
+```shell
 sudo apt-get update
 sudo apt-get upgrade
 sudo apt-get install tclsh pkg-config cmake libssl-dev build-essential
 ```
 
-**CentOS**
+##### CentOS
 
 TODO
 
-**MacOS**
-```
+##### MacOS
+
+```shell
 brew install cmake
 brew install openssl
 export OPENSSL_ROOT_DIR=$(brew --prefix openssl)
@@ -82,89 +86,92 @@ On macOS, you may also need to set
 export PKG_CONFIG_PATH="/usr/local/opt/openssl/lib/pkgconfig"
 for pkg-config to find openssl. Run `brew info openssl` to check the exact path.
 
-### 4. Build srt-xtransmit
+#### 4. Build srt-xtransmit
 
-**Ubuntu 18.04 / CentOS**
-```
+##### Ubuntu 18.04 / CentOS
+
+```shell
 mkdir _build && cd _build
 cmake ../
 cmake --build ./
 ```
 
-**MacOS**
-```
+##### Building on MacOS
+
+```shell
 mkdir _build && cd _build
 cmake ../ -DENABLE_CXX17=OFF
 cmake --build ./
 ```
 
-## Building on Windows
+### Building on Windows
 
 Comprehensive Windows build instructions can be found in the corresponding [wiki page](https://github.com/maxsharabayko/srt-xtransmit/wiki/Build-Instructions).
 
 `vcpkg` package manager is the recommended way to build pthreds and OpenSSL dependencies on Windows.
 
-## Switching SRT version
+### Switching SRT version
 
 Before building the project with cmake, checkout the desired SRT library version.
 
-After 
-```
+After git submodules are initialized:
+
+```shell
 git submodule init
 git submodule update
 ```
+
 go to srt submodule and checkout, e.g. v1.3.4
 
-```
+```shell
 cd submodule/srt
 git checkout v1.3.4
 ```
 
+## Example Use Cases
 
-# Example Use Cases
+### Test Live Transfer Performance
 
-## Test Live Transfer Performance
+#### Sender
 
-### Sender
-
-```
+```shell
 srt-xtransmit generate "srt://127.0.0.1:4200?transtype=live&rcvbuf=1000000000&sndbuf=1000000000" --msgsize 1316 --sendrate 15Mbps --duration 10s --statsfile stats-snd.csv --statsfreq 100ms
 ```
 
-### Receiver
+#### Receiver
 
-```
+```shell
 srt-xtransmit receive "srt://:4200?transtype=live&rcvbuf=1000000000&sndbuf=1000000000" --msgsize 1316 --statsfile stats-rcv.csv --statsfreq 100ms
 ```
 
-## Test File CC Performance
+### Test File CC Performance
 
-### Sender
+#### Sender
 
-```
+```shell
 srt-xtransmit generate "srt://127.0.0.1:4200?transtype=file&messageapi=1&payloadsize=1456&rcvbuf=1000000000&sndbuf=1000000000&fc=800000" --msgsize 1456 --num 1000 --statsfile stats-snd.csv --statsfreq 1s
 ```
 
-### Receiver
+#### Receiver
 
-```
+```shell
 srt-xtransmit receive "srt://:4200?transtype=file&messageapi=1&payloadsize=1456&rcvbuf=1000000000&sndbuf=1000000000&fc=800000" --msgsize 1456  --statsfile stats-rcv.csv --statsfreq 1s
 ```
 
-
-## Transmit File/Folder
+### Transmit File/Folder
 
 Send all files in folder "srcfolder", and  receive into a current folder "./".
 
 Requires C++17 compliant compiler with support for `file_system` (GCC 8 and higher). See [compiler support](https://en.cppreference.com/w/cpp/compiler_support) matrix. \
 Build with `-DENABLE_CXX17=ON` build option to enable (default -DENABLE_CXX17=OFF).
 
-### Sender
-```
+#### Sender
+
+```shell
 srt-xtransmit file send srcfolder/ "srt://127.0.0.1:4200" --statsfile stats-snd.csv --statsfreq 1s
 ```
+#### Receiver
 
-### Receiver
-```
+```shell
 srt-xtransmit file receive "srt://:4200" ./ --statsfile stats-rcv.csv --statsfreq 1s
 ```
