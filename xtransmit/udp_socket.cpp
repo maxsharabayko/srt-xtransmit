@@ -46,10 +46,10 @@ socket::udp::udp(const UriParser &src_uri)
 		}
 	}
 
-	sockaddr_in sa_requested;
+	sockaddr_any sa_requested;
 	try
 	{
-		sa_requested = CreateAddrInet(m_host, m_port);
+		sa_requested = CreateAddr(m_host, m_port);
 	}
 	catch (const std::invalid_argument &)
 	{
@@ -76,10 +76,10 @@ socket::udp::udp(const UriParser &src_uri)
 			: m_port;
 		m_options.erase("bind");
 
-		sockaddr_in sa_bind;
+		sockaddr_any sa_bind;
 		try
 		{
-			sa_bind = CreateAddrInet(bindip, bindport);
+			sa_bind = CreateAddr(bindip, bindport);
 		}
 		catch (const std::invalid_argument&)
 		{
@@ -94,7 +94,7 @@ socket::udp::udp(const UriParser &src_uri)
 
 	if (m_host != "" || ip_bonded)
 	{
-		m_dst_addr = sa_requested;
+		m_dst_addr = sa_requested.sin;
 	}
 	else
 	{
