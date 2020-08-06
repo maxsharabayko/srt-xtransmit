@@ -163,10 +163,10 @@ void socket::srt::raise_exception(const string &&place, const string &&reason) c
 
 shared_srt socket::srt::connect()
 {
-	sockaddr_in sa;
+	sockaddr_any sa;
 	try
 	{
-		sa = CreateAddrInet(m_host, m_port);
+		sa = CreateAddr(m_host, m_port);
 	}
 	catch (const std::invalid_argument &e)
 	{
@@ -182,7 +182,7 @@ shared_srt socket::srt::connect()
 		if (res == SRT_ERROR)
 		{
 			// srt_getrejectreason() added in v1.3.4
-			const SRT_REJECT_REASON reason = srt_getrejectreason(m_bind_socket);
+			const int reason = srt_getrejectreason(m_bind_socket);
 			srt_close(m_bind_socket);
 			raise_exception("connect failed", srt_rejectreason_str(reason));
 		}
@@ -199,7 +199,7 @@ shared_srt socket::srt::connect()
 			const SRT_SOCKSTATUS state = srt_getsockstate(m_bind_socket);
 			if (state != SRTS_CONNECTED)
 			{
-				const SRT_REJECT_REASON reason = srt_getrejectreason(m_bind_socket);
+				const int reason = srt_getrejectreason(m_bind_socket);
 				raise_exception("connect failed", srt_rejectreason_str(reason));
 				//raise_exception("connect", "connection failed, socket state " + to_string(state));
 			}
@@ -357,10 +357,10 @@ void socket::srt::handle_hosts()
 			: m_port;
 		m_options.erase("bind");
 
-		sockaddr_in sa_bind;
+		sockaddr_any sa_bind;
 		try
 		{
-			sa_bind = CreateAddrInet(bindip, bindport);
+			sa_bind = CreateAddr(bindip, bindport);
 		}
 		catch (const std::invalid_argument&)
 		{
@@ -377,10 +377,10 @@ void socket::srt::handle_hosts()
 	if (m_host == "" && !ip_bonded)
 	{
 		// bind listener
-		sockaddr_in sa;
+		sockaddr_any sa;
 		try
 		{
-			sa = CreateAddrInet(m_host, m_port);
+			sa = CreateAddr(m_host, m_port);
 		}
 		catch (const std::invalid_argument & e)
 		{

@@ -214,7 +214,7 @@ int SrtNode::EstablishConnection(bool caller, int max_conn)
     const int modes = SRT_EPOLL_IN;
     srt_epoll_add_usock(m_epoll_accept, m_bindsock, &modes);
 
-    sockaddr_in sa = CreateAddrInet(m_host, m_port);
+    sockaddr_any sa = CreateAddr(m_host, m_port);
     sockaddr* psa = (sockaddr*)&sa;
 
     if (caller)
