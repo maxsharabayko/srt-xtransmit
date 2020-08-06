@@ -17,7 +17,7 @@
 #include "udp_socket.hpp"
 #include "generate.hpp"
 #include "pacer.hpp"
-#include "rfc4737.hpp"
+#include "metrics.hpp"
 
 // OpenSRT
 #include "apputil.hpp"
@@ -33,18 +33,6 @@ using shared_sock = std::shared_ptr<socket::isocket>;
 
 #define LOG_SC_GENERATE "GENERATE "
 
-void write_timestamp(vector<char>& message_to_send)
-{
-	const auto   systime_now                             = system_clock::now();
-	const time_t now_c                                   = system_clock::to_time_t(systime_now);
-	*(reinterpret_cast<time_t*>(message_to_send.data())) = now_c;
-
-	system_clock::duration frac =
-		systime_now.time_since_epoch() - duration_cast<seconds>(systime_now.time_since_epoch());
-
-	*(reinterpret_cast<long long*>(message_to_send.data() + 8)) = duration_cast<microseconds>(frac).count();
-}
-
 void run_pipe(shared_sock dst, const config& cfg, const atomic_bool& force_break)
 {
 	vector<char> message_to_send(cfg.message_size);
@@ -55,12 +43,10 @@ void run_pipe(shared_sock dst, const config& cfg, const atomic_bool& force_break
 
 	socket::isocket* target = dst.get();
 
+	metrics::generator pldgen(cfg.enable_metrics);
+
 	auto stat_time = steady_clock::now();
 	int  prev_i    = 0;
-
-#if ENABLE_RFC4737
-	rfc4737::generator rfc4737;
-#endif
 
 	unique_ptr<ipacer> ratepacer =
 		cfg.sendrate ? unique_ptr<ipacer>(new pacer(cfg.sendrate, cfg.message_size))
@@ -79,12 +65,7 @@ void run_pipe(shared_sock dst, const config& cfg, const atomic_bool& force_break
 			break;
 		}
 
-		if (cfg.add_timestamp)
-			write_timestamp(message_to_send);
-#if ENABLE_RFC4737
-		if (cfg.rfc4737_metrics)
-			rfc4737.generate_packet(message_to_send);
-#endif
+		pldgen.generate_payload(message_to_send);
 
 		target->write(const_buffer(message_to_send.data(), message_to_send.size()));
 
@@ -160,10 +141,7 @@ CLI::App* xtransmit::generate::add_subcommand(CLI::App& app, config& cfg, string
 	sc_generate->add_option("--statsfreq", cfg.stats_freq_ms, "output stats report frequency (ms)")
 		->transform(CLI::AsNumberWithUnit(to_ms, CLI::AsNumberWithUnit::CASE_SENSITIVE));
 	sc_generate->add_flag("--twoway", cfg.two_way, "Both send and receive data");
-	sc_generate->add_flag("--timestamp", cfg.add_timestamp, "Place a timestamp in the message payload");
-#if ENABLE_RFC4737
-	sc_generate->add_flag("--rfc4737", cfg.rfc4737_metrics, "Add seqno in the message payload to ckeck reordering");
-#endif
+	sc_generate->add_flag("--enable-metrics", cfg.enable_metrics, "Enable all metrics: latency, loss, reordering, jitter, etc.");
 	sc_generate->add_option("--playback-csv", cfg.playback_csv, "Input CSV file with timestamp of every packet");
 
 	return sc_generate;

@@ -15,7 +15,7 @@
 #include "srt_socket.hpp"
 #include "udp_socket.hpp"
 #include "receive.hpp"
-#include "rfc4737.hpp"
+#include "metrics.hpp"
 
 // OpenSRT
 #include "apputil.hpp"
@@ -31,38 +31,7 @@ using shared_sock = std::shared_ptr<socket::isocket>;
 
 #define LOG_SC_RECEIVE "RECEIVE "
 
-void read_timestamp(const vector<char>& buffer)
-{
-	// Note: std::put_time is supported only in GCC 5 and higher
-#if !defined(__GNUC__) || defined(__clang__) || (__GNUC__ >= 5)
-	const time_t    send_time    = *(reinterpret_cast<const time_t*>   (buffer.data()));
-	const long long send_time_us = *(reinterpret_cast<const long long*>(buffer.data() + 8));
-	const std::tm* tm_send = std::localtime(&send_time);
-	if (!tm_send)
-	{
-		spdlog::error(LOG_SC_RECEIVE "Failed to extract send time");
-		return;
-	}
 
-	const auto systime_now = system_clock::now();
-	const auto delay = systime_now - (system_clock::from_time_t(send_time) + microseconds(send_time_us));
-
-	::stringstream send_time_str; 
-	send_time_str << std::put_time(tm_send, "%T.") << std::setfill('0') << std::setw(6) << send_time_us;;
-
-	spdlog::info(LOG_SC_RECEIVE "packet send time {} delay {} ms",
-		send_time_str.str(),
-		duration_cast<milliseconds>(delay).count());
-
-#else
-	static bool printwarn = true;
-	if (!printwarn)
-		return;
-
-	spdlog::error(LOG_SC_RECEIVE "The --timestamp feature requires GCC 5.0 abd higher, sorry.");
-	printwarn = false;
-#endif
-}
 
 
 void trace_message(const size_t bytes, const vector<char> &buffer, int conn_id)
@@ -96,9 +65,10 @@ void run_pipe(shared_sock src, const config &cfg, const atomic_bool &force_break
 	socket::isocket &sock = *src.get();
 
 	vector<char> buffer(cfg.message_size);
-#if ENABLE_RFC4737
-	rfc4737::validator rfc4737;
-#endif
+	metrics::validator validator;
+
+	auto stat_time = steady_clock::now();
+
 	try
 	{
 		while (!force_break)
@@ -113,12 +83,8 @@ void run_pipe(shared_sock src, const config &cfg, const atomic_bool &force_break
 
 			if (cfg.print_notifications)
 				trace_message(bytes, buffer, sock.id());
-			if (cfg.check_timestamp)
-				read_timestamp(buffer);
-#if ENABLE_RFC4737
-			if (cfg.rfc4737_metrics)
-				rfc4737.validate_packet(buffer);
-#endif
+			if (cfg.enable_metrics)
+				validator.validate_packet(buffer);
 
 			if (cfg.send_reply)
 			{
@@ -126,7 +92,15 @@ void run_pipe(shared_sock src, const config &cfg, const atomic_bool &force_break
 				sock.write(const_buffer(out_message.data(), out_message.size()));
 
 				if (cfg.print_notifications)
-					::cerr << "Reply sent on conn ID " << sock.id() << "\n";
+					spdlog::error(LOG_SC_RECEIVE "Reply sent on conn ID {}", sock.id());
+			}
+
+			const auto tnow = steady_clock::now();
+			if (cfg.enable_metrics && tnow > (stat_time + chrono::seconds(1)))
+			{
+				const auto stats_str = validator.stats();
+				spdlog::info(LOG_SC_RECEIVE "{}", stats_str);
+				stat_time = tnow;
 			}
 		}
 	}
@@ -139,7 +113,6 @@ void run_pipe(shared_sock src, const config &cfg, const atomic_bool &force_break
 	{
 		spdlog::info(LOG_SC_RECEIVE "interrupted by request!");
 	}
-;
 }
 
 void xtransmit::receive::run(const string &src_url, const config &cfg, const atomic_bool &force_break)
@@ -197,10 +170,7 @@ CLI::App* xtransmit::receive::add_subcommand(CLI::App& app, config& cfg, string&
 		->transform(CLI::AsNumberWithUnit(to_ms, CLI::AsNumberWithUnit::CASE_SENSITIVE));
 	sc_receive->add_flag("--printmsg", cfg.print_notifications, "print message into to stdout");
 	sc_receive->add_flag("--reconnect", cfg.reconnect, "Reconnect automatically");
-	sc_receive->add_flag("--timestamp", cfg.check_timestamp, "Check a timestamp in the message payload");
-#if ENABLE_RFC4737
-	sc_receive->add_flag("--rfc4737", cfg.rfc4737_metrics, "Check packet reordering based on the message payload");
-#endif
+	sc_receive->add_flag("--enable-metrics", cfg.enable_metrics, "Enable checking metrics: jitter, latency, etc.");
 	sc_receive->add_flag("--twoway", cfg.send_reply, "Both send and receive data");
 
 	return sc_receive;
