@@ -29,7 +29,6 @@ traffic generation to UDP/SRT, file/folder transmission, etc.
 * C++14 compliant compiler (GCC 4.8+)
 * cmake (as a build configuration system)
 * OpenSSL (for encryption - required by SRT)
-* Pthreads (use pthreads4w on Windows - required by SRT)
 
 ### Building on Linux/Mac
 
@@ -108,7 +107,13 @@ cmake --build ./
 
 Comprehensive Windows build instructions can be found in the corresponding [wiki page](https://github.com/maxsharabayko/srt-xtransmit/wiki/Build-Instructions).
 
-`vcpkg` package manager is the recommended way to build pthreds and OpenSSL dependencies on Windows.
+`vcpkg` package manager is the easiest way to build the OpenSSL dependency.
+
+```shell
+md _build && cd _build
+cmake ../ -DENABLE_STDCXX_SYNC=ON
+cmake --build ./
+```
 
 ### Switching SRT version
 
