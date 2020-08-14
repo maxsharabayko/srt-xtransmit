@@ -131,9 +131,6 @@ int main(int argc, char **argv)
 
 	string src, dst;
 
-	xtransmit::forward::config cfg_forward;
-	CLI::App* sc_forward = xtransmit::forward::add_subcommand(app, cfg_forward, src, dst);
-
 	generate::config cfg_generate;
 	CLI::App* sc_generate = generate::add_subcommand(app, cfg_generate, dst);
 
@@ -149,6 +146,8 @@ int main(int argc, char **argv)
 	CLI::App* sc_file_send = file::send::add_subcommand(*sc_file, cfg_file_send, dst);
 	xtransmit::file::receive::config cfg_file_recv;
 	CLI::App* sc_file_recv = file::receive::add_subcommand(*sc_file, cfg_file_recv, src);
+	xtransmit::forward::config cfg_forward;
+	CLI::App* sc_forward = xtransmit::forward::add_subcommand(*sc_file, cfg_forward, src, dst);
 #endif
 
 	app.require_subcommand(1);
@@ -159,11 +158,7 @@ int main(int argc, char **argv)
 
 	// TODO: Callback for subcommands
 	// https://cliutils.gitlab.io/CLI11Tutorial/chapters/an-advanced-example.html
-	if (sc_forward->parsed())
-	{
-		forward::run(src, dst, cfg_forward, force_break);
-	}
-	else if (sc_generate->parsed())
+	if (sc_generate->parsed())
 	{
 		generate::run(dst, cfg_generate, force_break);
 		return 0;
@@ -188,6 +183,10 @@ int main(int argc, char **argv)
 	{
 		file::receive::run(src, cfg_file_recv, force_break);
 		return 0;
+	}
+	else if (sc_forward->parsed())
+	{
+		forward::run(src, dst, cfg_forward, force_break);
 	}
 #endif
 	else

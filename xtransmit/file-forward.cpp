@@ -178,7 +178,7 @@ void xtransmit::forward::run(const string& src, const string& dst, const config&
 
 CLI::App* xtransmit::forward::add_subcommand(CLI::App& app, config& cfg, string& src_url, string& dst_url)
 {
-	CLI::App* sc_forward = app.add_subcommand("forward", "Bidirectional data forwarding. srt-forwarder srt://:<src_port> srt://<dst_ip>:<dst:port>");
+	CLI::App* sc_forward = app.add_subcommand("forward", "Bidirectional file forwarding. srt://:<src_port> srt://<dst_ip>:<dst_port>");
 	sc_forward->add_option("src", src_url, "Source URI");
 	sc_forward->add_option("dst", dst_url, "Destination URI");
 	sc_forward->add_flag("--oneway", cfg.one_way, "Forward only from SRT to DST");
