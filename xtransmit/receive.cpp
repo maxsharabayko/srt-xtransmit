@@ -21,8 +21,6 @@
 #include "apputil.hpp"
 #include "uriparser.hpp"
 
-#include "handshake.h"
-
 using namespace std;
 using namespace xtransmit;
 using namespace xtransmit::receive;

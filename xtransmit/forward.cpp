@@ -1,19 +1,14 @@
 #include "forward.h"
 #include "srt_node.hpp"
 
-// SRT logging
-#include "udt.h"	// srt_logger_config
-#include "logging.h"
-#include "logsupport.hpp"
+// submodules
+#include "spdlog/spdlog.h"
 
 
 using namespace std;
 using namespace xtransmit::forward;
 
-
-const srt_logging::LogFA SRT_LOGFA_FORWARDER = 10;
-srt_logging::Logger g_fwdlog(SRT_LOGFA_FORWARDER, srt_logger_config, "SRT.fwd");
-
+#define LOG_SC_FORWARD "FORWARD "
 
 shared_ptr<SrtNode> create_node(const config& cfg, const char* uri, bool is_caller)
 {
@@ -50,49 +45,47 @@ void fwd_route(shared_ptr<SrtNode> src, shared_ptr<SrtNode> dst, SRTSOCKET dst_s
 			if (recv_res == 0 && connection_id == 0)
 				break;
 
-			g_fwdlog.Error() << description << "ERROR: Receiving message resulted with " << recv_res
-				<< " on conn ID " << connection_id << "\n";
-			g_fwdlog.Error() << srt_getlasterror_str();
+			spdlog::error(LOG_SC_FORWARD "{} ERROR: Receiving message resulted with {} on conn ID {}. {}",
+				description, recv_res, connection_id, srt_getlasterror_str());
 
 			break;
 		}
 
 		if (recv_res > (int)message_rcvd.size())
 		{
-			g_fwdlog.Error() << description << "ERROR: Size of the received message " << recv_res
-				<< " exeeds the buffer size " << message_rcvd.size();
-			g_fwdlog.Error() << " on connection: " << connection_id << "\n";
+			spdlog::error(LOG_SC_FORWARD "{} ERROR: Size of the received message {} exeeds the buffer size {} on conn ID {}",
+				description, recv_res, message_rcvd.size(), connection_id);
 			break;
 		}
 
 		if (recv_res < 50)
 		{
-			g_fwdlog.Debug() << description << "RECEIVED MESSAGE on conn ID " << connection_id << ": "
-				<< string(message_rcvd.data(), recv_res).c_str();
+			spdlog::debug(LOG_SC_FORWARD "{} RECEIVED MESSAGE on conn ID {}: {}",
+				description, connection_id, string(message_rcvd.data(), recv_res).c_str());
 		}
 		else if (message_rcvd[0] >= '0' && message_rcvd[0] <= 'z')
 		{
-			g_fwdlog.Debug() << description << "RECEIVED MESSAGE length " << recv_res << " on conn ID " << connection_id << " (first character): "
-				<< message_rcvd[0];
+			spdlog::debug(LOG_SC_FORWARD "{} RECEIVED MESSAGE length on conn ID {} (first character): {}",
+				description, dst->GetBindSocket());
 		}
 
-
-		g_fwdlog.Debug() << description << "Forwarding message to: " << dst->GetBindSocket();
+		spdlog::debug(LOG_SC_FORWARD "{} Forwarding message to {} (first character): {}",
+			description, recv_res, connection_id, message_rcvd[0]);
+		
 		const int send_res = dst->Send(message_rcvd.data(), recv_res, dst_sock);
 		if (send_res <= 0)
 		{
-			g_fwdlog.Error() << description << "ERROR: Sending message resulted with " << send_res
-				<< " on conn ID " << dst->GetBindSocket() << ". Error message: "
-				<< srt_getlasterror_str();
+			spdlog::error(LOG_SC_FORWARD "{} ERROR: Sending message resulted with {} on conn ID {}. Error message: {}",
+				description, send_res, dst->GetBindSocket(), srt_getlasterror_str());
 
 			break;
 		}
 	}
 
 	if (force_break)
-		g_fwdlog.Debug() << description << "Breaking on request";
+		spdlog::debug(LOG_SC_FORWARD "{} Breaking on request.", description);
 	else
-		g_fwdlog.Debug() << description << "Force reconnection";
+		spdlog::debug(LOG_SC_FORWARD "{} Force reconnection.", description);
 
 	src->Close();
 	dst->Close();
@@ -106,14 +99,14 @@ int start_forwarding(const config& cfg, const char* src_uri, const char* dst_uri
 	shared_ptr<SrtNode> dst = create_node(cfg, dst_uri, true);
 	if (!dst)
 	{
-		g_fwdlog.Error() << "ERROR! Failed to create destination node.";
+		spdlog::error(LOG_SC_FORWARD "ERROR! Failed to create destination node.");
 		return 1;
 	}
 
 	shared_ptr<SrtNode> src = create_node(cfg, src_uri, false);
 	if (!src)
 	{
-		g_fwdlog.Error() << "ERROR! Failed to create source node.";
+		spdlog::error(LOG_SC_FORWARD "ERROR! Failed to create source node.");
 		return 1;
 	}
 
@@ -122,14 +115,14 @@ int start_forwarding(const config& cfg, const char* src_uri, const char* dst_uri
 	const int sock_dst = dst->Connect();
 	if (sock_dst == SRT_INVALID_SOCK)
 	{
-		g_fwdlog.Error() << "ERROR! While setting up a caller.";
+		spdlog::error(LOG_SC_FORWARD "ERROR! While setting up a caller.");
 		return 1;
 	}
 
 
 	if (0 != src->Listen(1))
 	{
-		g_fwdlog.Error() << "ERROR! While setting up a listener: " << srt_getlasterror_str();
+		spdlog::error(LOG_SC_FORWARD "ERROR! While setting up a listener: {}.", srt_getlasterror_str());
 		return 1;
 	}
 
@@ -137,7 +130,7 @@ int start_forwarding(const config& cfg, const char* src_uri, const char* dst_uri
 	const SRTSOCKET sock_src = future_src_socket.get();
 	if (sock_src == SRT_ERROR)
 	{
-		g_fwdlog.Error() << "Wait for source connection canceled";
+		spdlog::error(LOG_SC_FORWARD "Wait for source connection canceled");
 		return 0;
 	}
 
@@ -153,11 +146,11 @@ int start_forwarding(const config& cfg, const char* src_uri, const char* dst_uri
 		const int undelivered = node->WaitUndelivered(wait_ms);
 		if (undelivered == -1)
 		{
-			g_fwdlog.Error() << desc.c_str() << "ERROR: waiting undelivered data resulted with " << srt_getlasterror_str();
+			spdlog::error(LOG_SC_FORWARD "{} ERROR: waiting undelivered data resulted with {}", desc, srt_getlasterror_str());
 		}
 		if (undelivered)
 		{
-			g_fwdlog.Error() << desc.c_str() << "ERROR: still has " << undelivered << " bytes undelivered";
+			spdlog::error(LOG_SC_FORWARD "{} ERROR: still has {} bytes undelivered", desc, srt_getlasterror_str(), undelivered);
 		}
 
 		node.reset();
