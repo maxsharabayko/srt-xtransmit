@@ -24,8 +24,8 @@ void latency::submit_sample(const time_point& sample_time, const time_point& cur
 
 void latency::reset()
 {
-	m_latency_min_us = LLONG_MAX;
-	m_latency_max_us = LLONG_MIN;
+	m_latency_min_us = std::numeric_limits<long long>::max();
+	m_latency_max_us = std::numeric_limits<long long>::min();
 	m_latency_avg_us = 0;
 }
 

@@ -25,14 +25,14 @@ public:
 	void reset();
 
 	/// Get curent jitter value.
-	int64_t get_latency_min() const { return m_latency_min_us; }
-	int64_t get_latency_max() const { return m_latency_max_us; }
-	int64_t get_latency_avg() const { return m_latency_avg_us; }
+	long long get_latency_min() const { return m_latency_min_us; }
+	long long get_latency_max() const { return m_latency_max_us; }
+	long long get_latency_avg() const { return m_latency_avg_us; }
 
 private:
-	int64_t m_latency_min_us = LLONG_MAX;
-	int64_t m_latency_max_us = LLONG_MIN;
-	int64_t m_latency_avg_us = 0;
+	long long m_latency_min_us = std::numeric_limits<long long>::max();
+	long long m_latency_max_us = std::numeric_limits<long long>::min();
+	long long m_latency_avg_us = 0;
 };
 
 
