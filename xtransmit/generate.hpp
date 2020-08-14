@@ -17,7 +17,7 @@ namespace generate {
 		int message_size				= 1316; ////8 * 1024 * 1024;
 		int stats_freq_ms				= 0;
 		bool two_way					= false;
-		bool add_timestamp				= false;
+		bool enable_metrics				= false;
 		bool rfc4737_metrics			= false;
 		std::string stats_file;
 		std::string playback_csv;
