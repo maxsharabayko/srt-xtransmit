@@ -11,11 +11,9 @@
 #include "spdlog/spdlog.h"
 
 // SRT libraries
-#include "udt.h"	// srt_logger_config
 #include "apputil.hpp"
 #include "uriparser.hpp"
 #include "srt_node.hpp"
-#include "logging.h"
 #include "logsupport.hpp"
 #include "verbose.hpp"
 
