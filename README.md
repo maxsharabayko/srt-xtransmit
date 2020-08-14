@@ -1,28 +1,28 @@
 # srt-xtransmit
 
-srt-xtransmit is a testing utility with support for SRT and UDP.
+**srt-xtransmit** is a testing utility with support for SRT and UDP.
 At the moment the application supports UDP/SRT <-> UDP/SRT packet routing,
 traffic generation to UDP/SRT, file/folder transmission, etc.
 
 ## Functionality
 
-### Commands
+### Live Transmission Commands
 
 * **generate** -  dummy content streaming over SRT for performance tests
 * **receive** - receiving SRT streaming to null for performance tests
 * **route** - route packets between two sockets (UDP/SRT) uni- or bidirectionally
-* **forward** - forward packets bidirectionally between two SRT connections
+
+### File Transmission Commands
+
 * **file send** - segment-based file/folder sender (requires C++17: `-DENABLE_CXX17=ON`)
 * **file receive** - segment-based file/folder receiver (requires C++17: `-DENABLE_CXX17=ON`)
-
-### Common
-
-Collecting SRT statistics in CSV format.
+* **file forward** - forward packets bidirectionally between two SRT connections (requires C++17: `-DENABLE_CXX17=ON`)
 
 ## Build Instructions
 
 [![Actions Status](https://github.com/maxsharabayko/srt-xtransmit/workflows/C/C++%20CI/badge.svg)](https://github.com/maxsharabayko/srt-xtransmit/actions)
 [![CodeFactor](https://www.codefactor.io/repository/github/maxsharabayko/srt-xtransmit/badge)](https://www.codefactor.io/repository/github/maxsharabayko/srt-xtransmit)
+[![LGTM alerts](https://img.shields.io/lgtm/alerts/g/maxsharabayko/srt-xtransmit.svg?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/maxsharabayko/srt-xtransmit/alerts/)
 
 ### Requirements
 
@@ -175,3 +175,4 @@ srt-xtransmit file send srcfolder/ "srt://127.0.0.1:4200" --statsfile stats-snd.
 ```shell
 srt-xtransmit file receive "srt://:4200" ./ --statsfile stats-rcv.csv --statsfreq 1s
 ```
+
