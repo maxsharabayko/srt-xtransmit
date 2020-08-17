@@ -14,6 +14,7 @@
 // xtransmit
 #include "socket_stats.hpp"
 #include "srt_socket.hpp"
+#include "srt_socket_group.hpp"
 #include "udp_socket.hpp"
 #include "generate.hpp"
 #include "pacer.hpp"
@@ -33,10 +34,29 @@ using shared_sock = std::shared_ptr<socket::isocket>;
 
 #define LOG_SC_GENERATE "GENERATE "
 
+int srt_gen_listen_callback(void* opaq, SRTSOCKET sock, int hsversion,
+    const struct sockaddr* peeraddr, const char* streamid)
+{
+	spdlog::trace(LOG_SC_GENERATE "Accepted member socket 0x{:X}.", sock);
+	return 0;
+}
+
+void srt_gen_connect_callback(void* opaq, SRTSOCKET sock, int error, const sockaddr* /*peer*/, int token)
+{
+	if (error != SRT_SUCCESS)
+	{
+		spdlog::warn(LOG_SC_GENERATE "Member socket 0x{:X} (token {}) connection failed: ({}) {}.", sock, token, error,
+			srt_strerror(error, 0));
+		return;
+	}
+
+	// After SRT v1.4.2 connection callback is no longer called on connection success.
+	spdlog::trace(LOG_SC_GENERATE "Member socket connected 0x{:X} (token {}).", sock, token);
+}
+
 void run_pipe(shared_sock dst, const config& cfg, const atomic_bool& force_break)
 {
 	vector<char> message_to_send(cfg.message_size);
-	iota(message_to_send.begin(), message_to_send.end(), (char)0);
 
 	const auto start_time   = steady_clock::now();
 	const int  num_messages = cfg.duration > 0 ? -1 : cfg.num_messages;
@@ -94,9 +114,19 @@ void run_pipe(shared_sock dst, const config& cfg, const atomic_bool& force_break
 	}
 }
 
-void xtransmit::generate::run(const string& dst_url, const config& cfg, const atomic_bool& force_break)
+void xtransmit::generate::run(const vector<string>& dst_urls, const config& cfg, const atomic_bool& force_break)
 {
-	const UriParser uri(dst_url);
+	if (dst_urls.empty())
+	{
+		spdlog::error(LOG_SC_GENERATE "No destination URI was provided");
+		return;
+	}
+
+	vector<UriParser> urls;
+	for (const string& url : dst_urls)
+	{
+		urls.emplace_back(UriParser(url));
+	}
 
 	shared_sock sock;
 	shared_sock connection;
@@ -121,17 +151,36 @@ void xtransmit::generate::run(const string& dst_url, const config& cfg, const at
 	do {
 		try
 		{
-			if (uri.proto() == "udp")
+			if (urls.size() == 1)
 			{
-				connection = make_shared<socket::udp>(uri);
+				if (urls[0].proto() == "udp")
+				{
+					connection = make_shared<socket::udp>(urls[0]);
+				}
+				else
+				{
+					sock = make_shared<socket::srt>(urls[0]);
+					socket::srt* s = static_cast<socket::srt*>(sock.get());
+					const bool   accept = s->mode() == socket::srt::LISTENER;
+					if (accept)
+						s->listen();
+					connection = accept ? s->accept() : s->connect();
+				}
 			}
 			else
 			{
-				sock = make_shared<socket::srt>(uri);
-				socket::srt* s = static_cast<socket::srt*>(sock.get());
-				const bool   accept = s->mode() == socket::srt::LISTENER;
+				sock = make_shared<socket::srt_group>(urls);
+				socket::srt_group* s = static_cast<socket::srt_group*>(sock.get());
+				const bool   accept = s->mode() == socket::srt_group::LISTENER;
 				if (accept)
+				{
+					s->set_listen_callback(srt_gen_listen_callback, nullptr);
 					s->listen();
+				}
+				else
+				{
+					s->set_connect_callback(srt_gen_connect_callback, nullptr);
+				}
 				connection = accept ? s->accept() : s->connect();
 			}
 
@@ -146,14 +195,14 @@ void xtransmit::generate::run(const string& dst_url, const config& cfg, const at
 	} while (cfg.reconnect && !force_break);
 }
 
-CLI::App* xtransmit::generate::add_subcommand(CLI::App& app, config& cfg, string& dst_url)
+CLI::App* xtransmit::generate::add_subcommand(CLI::App& app, config& cfg, vector<string>& dst_urls)
 {
 	const map<string, int> to_bps{{"kbps", 1000}, {"Mbps", 1000000}, {"Gbps", 1000000000}};
 	const map<string, int> to_ms{{"s", 1000}, {"ms", 1}};
 	const map<string, int> to_sec{{"s", 1}, {"min", 60}, {"mins", 60}};
 
 	CLI::App* sc_generate = app.add_subcommand("generate", "Send generated data (SRT, UDP)")->fallthrough();
-	sc_generate->add_option("dst", dst_url, "Destination URI");
+	sc_generate->add_option("dst", dst_urls, "Destination URI")->expected(1, 10);
 	sc_generate->add_option("--msgsize", cfg.message_size, "Size of a message to send");
 	sc_generate->add_option("--sendrate", cfg.sendrate, "Bitrate to generate")
 		->transform(CLI::AsNumberWithUnit(to_bps, CLI::AsNumberWithUnit::CASE_SENSITIVE));

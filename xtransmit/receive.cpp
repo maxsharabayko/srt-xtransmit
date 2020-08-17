@@ -13,6 +13,7 @@
 // xtransmit
 #include "socket_stats.hpp"
 #include "srt_socket.hpp"
+#include "srt_socket_group.hpp"
 #include "udp_socket.hpp"
 #include "receive.hpp"
 #include "metrics.hpp"
@@ -137,9 +138,39 @@ void run_pipe(shared_sock src, const config &cfg, const atomic_bool &force_break
 	}
 }
 
-void xtransmit::receive::run(const string &src_url, const config &cfg, const atomic_bool &force_break)
+int srt_listen_callback(void* opaq, SRTSOCKET sock, int hsversion,
+    const struct sockaddr* peeraddr, const char* streamid)
 {
-	const UriParser uri(src_url);
+	spdlog::trace(LOG_SC_RECEIVE "Accepted member socket 0x{:X}.", sock);
+	return 0;
+}
+
+void srt_connect_callback(void* opaq, SRTSOCKET sock, int error, const sockaddr* /*peer*/, int token)
+{
+	if (error != SRT_SUCCESS)
+	{
+		spdlog::warn(LOG_SC_RECEIVE "Member socket 0x{:X} (token {}) connection failed: ({}) {}.", sock, token, error,
+			srt_strerror(error, 0));
+		return;
+	}
+
+	// After SRT v1.4.2 connection callback is no longer called on connection success.
+	spdlog::trace(LOG_SC_RECEIVE "Member socket connected 0x{:X} (token {}).", sock, token);
+}
+
+void xtransmit::receive::run(const vector<string> &src_urls, const config &cfg, const atomic_bool &force_break)
+{
+	if (src_urls.empty())
+	{
+		spdlog::error(LOG_SC_RECEIVE "No destination URI was provided");
+		return;
+	}
+
+	vector<UriParser> urls;
+	for (const string& url : src_urls)
+	{
+		urls.emplace_back(url);
+	}
 
 	shared_sock sock;
 	shared_sock conn;
@@ -164,17 +195,34 @@ void xtransmit::receive::run(const string &src_url, const config &cfg, const ato
 	do {
 		try
 		{
-			if (uri.proto() == "udp")
+			if (urls.size() == 1)
 			{
-				conn = make_shared<socket::udp>(uri);
+				if (urls[0].proto() == "udp")
+				{
+					conn = make_shared<socket::udp>(urls[0]);
+				}
+				else
+				{
+					sock = make_shared<socket::srt>(urls[0]);
+					socket::srt* s = static_cast<socket::srt*>(sock.get());
+					const bool   accept = s->mode() == socket::srt::LISTENER;
+					if (accept)
+						s->listen();
+					conn = accept ? s->accept() : s->connect();
+				}
 			}
 			else
 			{
-				sock = make_shared<socket::srt>(uri);
-				socket::srt* s = static_cast<socket::srt*>(sock.get());
-				const bool  accept = s->mode() == socket::srt::LISTENER;
-				if (accept)
+				sock = make_shared<socket::srt_group>(urls);
+				socket::srt_group* s = static_cast<socket::srt_group*>(sock.get());
+				const bool   accept = s->mode() == socket::srt_group::LISTENER;
+				if (accept) {
+					s->set_listen_callback(&srt_listen_callback, nullptr);
 					s->listen();
+				}
+				else {
+					s->set_connect_callback(&srt_connect_callback, nullptr);
+				}
 				conn = accept ? s->accept() : s->connect();
 			}
 
@@ -191,12 +239,12 @@ void xtransmit::receive::run(const string &src_url, const config &cfg, const ato
 	} while (cfg.reconnect && !force_break);
 }
 
-CLI::App* xtransmit::receive::add_subcommand(CLI::App& app, config& cfg, string& src_url)
+CLI::App* xtransmit::receive::add_subcommand(CLI::App& app, config& cfg, vector<string>& src_urls)
 {
 	const map<string, int> to_ms{ {"s", 1000}, {"ms", 1} };
 
 	CLI::App* sc_receive = app.add_subcommand("receive", "Receive data (SRT, UDP)")->fallthrough();
-	sc_receive->add_option("src", src_url, "Source URI");
+	sc_receive->add_option("--input,-i,src", src_urls, "Source URI");
 	sc_receive->add_option("--msgsize", cfg.message_size, "Size of a buffer to receive message payload");
 	sc_receive->add_option("--statsfile", cfg.stats_file, "output stats report filename");
 	sc_receive->add_option("--statsfreq", cfg.stats_freq_ms, "output stats report frequency (ms)")
@@ -208,6 +256,7 @@ CLI::App* xtransmit::receive::add_subcommand(CLI::App& app, config& cfg, string&
 	sc_receive->add_option("--metricsfreq", cfg.metrics_freq_ms, "Metrics report frequency")
 		->transform(CLI::AsNumberWithUnit(to_ms, CLI::AsNumberWithUnit::CASE_SENSITIVE));
 	sc_receive->add_flag("--twoway", cfg.send_reply, "Both send and receive data");
+	sc_receive->add_option("--input-group", cfg.inputs, "More input group URLs for SRT bonding");
 
 	return sc_receive;
 }

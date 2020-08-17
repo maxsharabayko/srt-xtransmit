@@ -79,12 +79,12 @@ socket::srt::~srt()
 {
 	if (!m_blocking_mode)
 	{
-		spdlog::debug(LOG_SOCK_SRT "0x{:X} Closing. Releasing epolls", m_bind_socket);
+		spdlog::debug(LOG_SOCK_SRT "@{} srt::~srt. releasing epolls", m_bind_socket);
 		if (m_epoll_connect != -1)
 			srt_epoll_release(m_epoll_connect);
 		srt_epoll_release(m_epoll_io);
 	}
-	spdlog::debug(LOG_SOCK_SRT "0x{:X} Closing", m_bind_socket);
+	spdlog::debug(LOG_SOCK_SRT "0x{:X} srt::~srt: closing", m_bind_socket);
 	srt_close(m_bind_socket);
 }
 

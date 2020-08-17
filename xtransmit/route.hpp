@@ -22,7 +22,7 @@ namespace xtransmit {
 			const config& cfg, const std::atomic_bool& force_break);
 
 		CLI::App* add_subcommand(CLI::App& app, config& cfg,
-			std::string& src_url, std::string& dst_url);
+			std::vector<std::string>& src_urls, std::vector<std::string>& dst_urls);
 
 
 	}	// namespace forward
