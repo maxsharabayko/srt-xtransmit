@@ -15,7 +15,8 @@ namespace xtransmit {
 			bool send_reply				= false;
 			bool reconnect				= false;
 			bool enable_metrics			= false;
-			bool rfc4737_metrics		= false;
+			unsigned metrics_freq_ms	= 1000;
+			std::string metrics_file;
 			int max_connections			= 1;		// Maximum number of connections on a socket
 			int message_size			= 1316;
 			int stats_freq_ms			= 0;

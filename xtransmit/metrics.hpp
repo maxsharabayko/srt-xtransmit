@@ -76,6 +76,7 @@ namespace metrics
 		}
 
 		std:: string stats();
+		std::string stats_csv(bool only_header = false);
 
 	private:
 		steady_clock::time_point m_next_time = steady_clock::now() + seconds(1);
