@@ -18,7 +18,6 @@ namespace generate {
 		int stats_freq_ms				= 0;
 		bool two_way					= false;
 		bool enable_metrics				= false;
-		bool rfc4737_metrics			= false;
 		std::string stats_file;
 		std::string playback_csv;
 	};

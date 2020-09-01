@@ -32,7 +32,7 @@ public:
 private:
 	long long m_latency_min_us = std::numeric_limits<long long>::max();
 	long long m_latency_max_us = std::numeric_limits<long long>::min();
-	long long m_latency_avg_us = 0;
+	long long m_latency_avg_us = -1;
 };
 
 

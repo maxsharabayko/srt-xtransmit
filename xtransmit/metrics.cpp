@@ -2,8 +2,10 @@
 #include <iomanip> // put_time
 #include <iostream> //cerr
 #include "metrics.hpp"
+#include "misc.hpp"
 
 using namespace xtransmit::metrics;
+using namespace std;
 using namespace std::chrono;
 
 
@@ -95,6 +97,47 @@ std:: string validator::stats()
 	ss << "), lost " << stats.pkts_lost;
 
 	m_latency.reset();
+	return ss.str();
+}
+
+string validator::stats_csv(bool only_header)
+{
+	stringstream ss;
+
+	if (only_header)
+	{
+#ifdef HAS_PUT_TIME
+		ss << "Timepoint,";
+#endif
+		ss << "usLatencyMin,";
+		ss << "usLatencyMax,";
+		ss << "usLatencyAvg,";
+		ss << "usJitter,";
+		ss << "pktReceived,";
+		ss << "pktLost,";
+		ss << "pktReordered,";
+		ss << "pktReorderDist";
+		ss << '\n';
+	}
+	else
+	{
+#ifdef HAS_PUT_TIME
+		ss << print_timestamp_now() << ',';
+#endif
+		ss << m_latency.get_latency_min() << ',';
+		ss << m_latency.get_latency_max() << ',';
+		ss << m_latency.get_latency_avg() << ',';
+		ss << m_jitter.jitter() << ',';
+		const auto stats = m_reorder.get_stats();
+		ss << stats.pkts_processed << ',';
+		ss << stats.pkts_lost << ',';
+		ss << stats.pkts_reordered << ',';
+		ss << stats.reorder_dist;
+		ss << '\n';
+
+		m_latency.reset();
+	}
+
 	return ss.str();
 }
 

@@ -68,6 +68,18 @@ void run_pipe(shared_sock src, const config &cfg, const atomic_bool &force_break
 	metrics::validator validator;
 
 	auto stat_time = steady_clock::now();
+	ofstream metrics_file;
+	if (cfg.enable_metrics && !cfg.metrics_file.empty() && cfg.metrics_freq_ms > 0)
+	{
+		metrics_file.open(cfg.metrics_file, std::ofstream::out);
+		if (!metrics_file)
+		{
+			spdlog::error(LOG_SC_RECEIVE "Failed to open metrics file {} for output", cfg.metrics_file);
+			return;
+		}
+
+		metrics_file << validator.stats_csv(true);
+	}
 
 	try
 	{
@@ -95,11 +107,21 @@ void run_pipe(shared_sock src, const config &cfg, const atomic_bool &force_break
 					spdlog::error(LOG_SC_RECEIVE "Reply sent on conn ID {}", sock.id());
 			}
 
+			if (!cfg.enable_metrics)
+				continue;
+
 			const auto tnow = steady_clock::now();
-			if (cfg.enable_metrics && tnow > (stat_time + chrono::seconds(1)))
+			if (tnow > (stat_time + chrono::milliseconds(cfg.metrics_freq_ms)))
 			{
-				const auto stats_str = validator.stats();
-				spdlog::info(LOG_SC_RECEIVE "{}", stats_str);
+				if (metrics_file)
+				{
+					metrics_file << validator.stats_csv(false);
+				}
+				else
+				{
+					const auto stats_str = validator.stats();
+					spdlog::info(LOG_SC_RECEIVE "{}", stats_str);
+				}
 				stat_time = tnow;
 			}
 		}
@@ -171,6 +193,9 @@ CLI::App* xtransmit::receive::add_subcommand(CLI::App& app, config& cfg, string&
 	sc_receive->add_flag("--printmsg", cfg.print_notifications, "print message into to stdout");
 	sc_receive->add_flag("--reconnect", cfg.reconnect, "Reconnect automatically");
 	sc_receive->add_flag("--enable-metrics", cfg.enable_metrics, "Enable checking metrics: jitter, latency, etc.");
+	sc_receive->add_option("--metricsfile", cfg.metrics_file, "Metrics output filename (stdout if not set)");
+	sc_receive->add_option("--metricsfreq", cfg.metrics_freq_ms, "Metrics report frequency")
+		->transform(CLI::AsNumberWithUnit(to_ms, CLI::AsNumberWithUnit::CASE_SENSITIVE));
 	sc_receive->add_flag("--twoway", cfg.send_reply, "Both send and receive data");
 
 	return sc_receive;

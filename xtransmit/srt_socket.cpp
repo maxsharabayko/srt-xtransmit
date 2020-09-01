@@ -7,6 +7,7 @@
 
 // xtransmit
 #include "srt_socket.hpp"
+#include "misc.hpp"
 
 // srt utils
 #include "verbose.hpp"
@@ -472,11 +473,6 @@ const string socket::srt::stats_to_csv(int socketid, const SRT_TRACEBSTATS& stat
 {
 	std::ostringstream output;
 
-	// Note: std::put_time is supported only in GCC 5 and higher
-#if !defined(__GNUC__) || defined(__clang__) || (__GNUC__ >= 5)
-#define HAS_PUT_TIME
-#endif
-
 #define HAS_PKT_REORDER_TOL (SRT_VERSION_MAJOR >= 1) && (SRT_VERSION_MINOR >= 4) && (SRT_VERSION_PATCH > 0)
 
 	if (print_header)
@@ -497,63 +493,42 @@ const string socket::srt::stats_to_csv(int socketid, const SRT_TRACEBSTATS& stat
 	}
 
 #ifdef HAS_PUT_TIME
-	auto print_timestamp = [&output]() {
-		using namespace std;
-		using namespace std::chrono;
-
-		const auto systime_now = system_clock::now();
-		const time_t time_now = system_clock::to_time_t(systime_now);
-		std::tm*     tm_now   = std::localtime(&time_now);
-		if (!tm_now)
-		{
-			spdlog::warn(LOG_SOCK_SRT "Failed to get current time for stats");
-			return;
-		}
-
-		output << std::put_time(tm_now, "%d.%m.%Y %T.") << std::setfill('0') << std::setw(6);
-		const auto since_epoch = systime_now.time_since_epoch();
-		const seconds s = duration_cast<seconds>(since_epoch);
-		output << duration_cast<microseconds>(since_epoch - s).count();
-		output << std::put_time(tm_now, " %z");
-		output << ",";
-	};
-
-	print_timestamp();
+	output << print_timestamp_now() << ',';
 #endif // HAS_PUT_TIME
 
-	output << stats.msTimeStamp << ",";
-	output << socketid << ",";
-	output << stats.pktFlowWindow << ",";
-	output << stats.pktCongestionWindow << ",";
-	output << stats.pktFlightSize << ",";
+	output << stats.msTimeStamp << ',';
+	output << socketid << ',';
+	output << stats.pktFlowWindow << ',';
+	output << stats.pktCongestionWindow << ',';
+	output << stats.pktFlightSize << ',';
 
-	output << stats.msRTT << ",";
-	output << stats.mbpsBandwidth << ",";
-	output << stats.mbpsMaxBW << ",";
-	output << stats.pktSent << ",";
-	output << stats.pktSndLoss << ",";
-	output << stats.pktSndDrop << ",";
+	output << stats.msRTT << ',';
+	output << stats.mbpsBandwidth << ',';
+	output << stats.mbpsMaxBW << ',';
+	output << stats.pktSent << ',';
+	output << stats.pktSndLoss << ',';
+	output << stats.pktSndDrop << ',';
 
-	output << stats.pktRetrans << ",";
-	output << stats.byteSent << ",";
-	output << stats.byteAvailSndBuf << ",";
-	output << stats.byteSndDrop << ",";
-	output << stats.mbpsSendRate << ",";
-	output << stats.usPktSndPeriod << ",";
-	output << stats.msSndBuf << ",";
+	output << stats.pktRetrans << ',';
+	output << stats.byteSent << ',';
+	output << stats.byteAvailSndBuf << ',';
+	output << stats.byteSndDrop << ',';
+	output << stats.mbpsSendRate << ',';
+	output << stats.usPktSndPeriod << ',';
+	output << stats.msSndBuf << ',';
 
-	output << stats.pktRecv << ",";
-	output << stats.pktRcvLoss << ",";
-	output << stats.pktRcvDrop << ",";
-	output << stats.pktRcvRetrans << ",";
-	output << stats.pktRcvBelated << ",";
+	output << stats.pktRecv << ',';
+	output << stats.pktRcvLoss << ',';
+	output << stats.pktRcvDrop << ',';
+	output << stats.pktRcvRetrans << ',';
+	output << stats.pktRcvBelated << ',';
 
-	output << stats.byteRecv << ",";
-	output << stats.byteAvailRcvBuf << ",";
-	output << stats.byteRcvLoss << ",";
-	output << stats.byteRcvDrop << ",";
-	output << stats.mbpsRecvRate << ",";
-	output << stats.msRcvBuf << ",";
+	output << stats.byteRecv << ',';
+	output << stats.byteAvailRcvBuf << ',';
+	output << stats.byteRcvLoss << ',';
+	output << stats.byteRcvDrop << ',';
+	output << stats.mbpsRecvRate << ',';
+	output << stats.msRcvBuf << ',';
 	output << stats.msRcvTsbPdDelay;
 
 #if	HAS_PKT_REORDER_TOL
