@@ -263,7 +263,7 @@ void socket::srt::check_options_exist() const
 			break;
 		}
 		
-		if (opt_found || key == "bind")
+		if (opt_found || key == "bind" || key == "mode")
 			continue;
 
 		spdlog::warn(LOG_SOCK_SRT "srt://{}:{:d}: Ignoring socket option '{}={}' (not recognized)!",
@@ -301,6 +301,14 @@ int socket::srt::configure_pre(SRTSOCKET sock)
 	}
 
 	m_mode = static_cast<connection_mode>(conmode);
+
+	if (m_mode == connection_mode::RENDEZVOUS)
+	{
+		int yes = 1;
+		const int r = srt_setsockopt(sock, 0, SRTO_RENDEZVOUS, &yes, sizeof yes);
+		if (result == -1)
+			return result;
+	}
 
 	return SRT_SUCCESS;
 }
