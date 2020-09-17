@@ -485,6 +485,7 @@ const string socket::srt::stats_to_csv(int socketid, const SRT_TRACEBSTATS& stat
 		output << "pktRetrans,byteSent,byteAvailSndBuf,byteSndDrop,mbpsSendRate,usPktSndPeriod,msSndBuf,";
 		output << "pktRecv,pktRcvLoss,pktRcvDrop,pktRcvRetrans,pktRcvBelated,";
 		output << "byteRecv,byteAvailRcvBuf,byteRcvLoss,byteRcvDrop,mbpsRecvRate,msRcvBuf,msRcvTsbPdDelay";
+		output << ",byteEstInputBW";
 #if HAS_PKT_REORDER_TOL
 		output << ",msRcvTsbPdDelay";
 #endif
@@ -529,6 +530,12 @@ const string socket::srt::stats_to_csv(int socketid, const SRT_TRACEBSTATS& stat
 	output << stats.byteRcvDrop << ',';
 	output << stats.mbpsRecvRate << ',';
 	output << stats.msRcvBuf << ',';
+
+	int64_t est_inputbw = 0;
+	int optlen = sizeof est_inputbw;
+	srt_getsockflag(socketid, SRTO_ESTINPUTBW, &est_inputbw, &optlen);
+	output << est_inputbw << ',';
+
 	output << stats.msRcvTsbPdDelay;
 
 #if	HAS_PKT_REORDER_TOL
