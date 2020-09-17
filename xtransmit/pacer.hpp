@@ -34,6 +34,7 @@ class pacer : public ipacer
 public:
 	pacer(int sendrate_bps, int message_size)
 		: m_msg_interval_us(calc_msg_interval_us(sendrate_bps, message_size))
+		, m_message_size(message_size)
 	{
 		spdlog::info(LOG_SC_PACER "sendrate {} bps (inter send interval {} us)", sendrate_bps, m_msg_interval_us);
 	}
@@ -43,7 +44,11 @@ public:
 public:
 	inline void wait(const atomic_bool& force_break) final
 	{
-		const long inter_send_us = m_timedev_us > m_msg_interval_us ? 0 : (m_msg_interval_us - m_timedev_us);
+		const long message_int_us = (steady_clock::now() > (m_start_time + std::chrono::seconds(5)))
+			? m_msg_interval_us
+			: calc_msg_interval_us(1000000, m_message_size);
+
+		const long inter_send_us = m_timedev_us > message_int_us ? 0 : (message_int_us - m_timedev_us);
 		const auto next_time     = m_last_snd_time + microseconds(inter_send_us);
 		std::chrono::steady_clock::time_point time_now;
 		for (;;)
@@ -55,7 +60,7 @@ public:
 				break;
 		}
 
-		m_timedev_us += (long)duration_cast<microseconds>(time_now - m_last_snd_time).count() - m_msg_interval_us;
+		m_timedev_us += (long)duration_cast<microseconds>(time_now - m_last_snd_time).count() - message_int_us;
 		m_last_snd_time = time_now;
 	}
 
@@ -69,7 +74,9 @@ private:
 	typedef std::chrono::steady_clock::time_point time_point;
 	const long                                    m_msg_interval_us;
 	time_point                                    m_last_snd_time = std::chrono::steady_clock::now();
+	time_point m_start_time = std::chrono::steady_clock::now();
 	long m_timedev_us = 0; ///< Pacing time deviation (microseconds) is used to adjust the pace
+	int m_message_size;
 };
 
 class csv_pacer : public ipacer
