@@ -116,7 +116,19 @@ string validator::stats_csv(bool only_header)
 		ss << "pktReceived,";
 		ss << "pktLost,";
 		ss << "pktReordered,";
-		ss << "pktReorderDist";
+		ss << "pktReorderDist,";
+		ss << "usStdDriftMin,";
+		ss << "usStdDriftMax,";
+		ss << "usStdDriftAvg,";
+		ss << "usSysDriftMin,";
+		ss << "usSysDriftMax,";
+		ss << "usSysDriftAvg,";
+		ss << "usLocalDriftMin,";
+		ss << "usLocalDriftMax,";
+		ss << "usLocalDriftAvg,";
+		ss << "usRemoteDriftMin,";
+		ss << "usRemoteDriftMax,";
+		ss << "usRemoteDriftAvg";
 		ss << '\n';
 	}
 	else
@@ -132,10 +144,31 @@ string validator::stats_csv(bool only_header)
 		ss << stats.pkts_processed << ',';
 		ss << stats.pkts_lost << ',';
 		ss << stats.pkts_reordered << ',';
-		ss << stats.reorder_dist;
+		ss << stats.reorder_dist << ",";
+		ss << m_drift.m_stddiff_us_min << ",";
+		ss << m_drift.m_stddiff_us_max << ",";
+		ss << m_drift.m_stddiff_us_avg << ",";
+		ss << m_drift.m_sysdiff_us_min << ",";
+		ss << m_drift.m_sysdiff_us_max << ",";
+		ss << m_drift.m_sysdiff_us_avg << ",";
+		ss << m_drift.m_localdiff_us_min << ",";
+		ss << m_drift.m_localdiff_us_max << ",";
+		ss << m_drift.m_localdiff_us_avg << ",";
+		ss << m_drift.m_remotediff_us_min << ",";
+		ss << m_drift.m_remotediff_us_max << ",";
+		ss << m_drift.m_remotediff_us_avg;
 		ss << '\n';
 
 		m_latency.reset();
+
+		m_drift.m_stddiff_us_min = std::numeric_limits<long long>::max();
+		m_drift.m_stddiff_us_max = std::numeric_limits<long long>::min();
+		m_drift.m_sysdiff_us_min = std::numeric_limits<long long>::max();
+		m_drift.m_sysdiff_us_max = std::numeric_limits<long long>::min();
+		m_drift.m_localdiff_us_min = std::numeric_limits<long long>::max();
+		m_drift.m_localdiff_us_max = std::numeric_limits<long long>::min();
+		m_drift.m_remotediff_us_min = std::numeric_limits<long long>::max();
+		m_drift.m_remotediff_us_max = std::numeric_limits<long long>::min();
 	}
 
 	return ss.str();
