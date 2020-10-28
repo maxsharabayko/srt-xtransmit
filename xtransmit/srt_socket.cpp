@@ -496,7 +496,8 @@ const string socket::srt::stats_to_csv(int socketid, const SRT_TRACEBSTATS& stat
 #if HAS_PKT_REORDER_TOL
 		output << ",msRcvTsbPdDelay";
 #endif
-		output << ",usRcvIATJitter,usRcvTsbpdJitter,usSndJitter,usDrift";
+		output << ",msAvgResponseTime,msMaxResponseTime,";
+		output << "usRcvIATJitter,usRcvTsbpdJitter,usSndJitter,usDrift";
 		output << endl;
 		return output.str();
 	}
@@ -544,7 +545,9 @@ const string socket::srt::stats_to_csv(int socketid, const SRT_TRACEBSTATS& stat
 	output << "," << stats.pktReorderTolerance;
 #endif
 
-	output << "," << stats.usInterArrivalJitter << ",";
+	output << "," << stats.msAvgResponseTime << ",";
+	output << stats.msMaxResponseTime << ",";
+	output << stats.usInterArrivalJitter << ",";
 	output << stats.usDeliveryJitter << ",";
 	output << stats.usSendingJitter << ",";
 	output << stats.usDrift;
