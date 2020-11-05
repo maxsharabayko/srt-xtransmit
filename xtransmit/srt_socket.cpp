@@ -53,7 +53,7 @@ socket::srt::srt(const UriParser &src_uri)
 			throw socket::exception(srt_getlasterror_str());
 	}
 
-	check_options_exist();
+	assert_options_valid();
 
 	if (SRT_SUCCESS != configure_pre(m_bind_socket))
 		throw socket::exception(srt_getlasterror_str());
@@ -242,13 +242,13 @@ std::future<shared_srt> socket::srt::async_read(std::vector<char> &buffer)
 	return std::future<shared_srt>();
 }
 
-void socket::srt::check_options_exist() const
+void socket::srt::assert_options_valid(const std::map<string, string>& options)
 {
 #ifdef ENABLE_CXX17
-	for (const auto& [key, val] : myMap)
+	for (const auto& [key, val] : options)
 	{
 #else
-	for (const auto el : m_options)
+	for (const auto el : options)
 	{
 		const string& key = el.first;
 		const string& val = el.second;
@@ -266,9 +266,16 @@ void socket::srt::check_options_exist() const
 		if (opt_found || key == "bind" || key == "mode")
 			continue;
 
-		spdlog::warn(LOG_SOCK_SRT "srt://{}:{:d}: Ignoring socket option '{}={}' (not recognized)!",
-			m_host, m_port, key, val);
+		stringstream ss;
+		ss << "Invalid URI query option '";
+		ss << key << "=" << val << " (not recognized)!";
+		throw socket::exception(ss.str());
 	}
+}
+
+void socket::srt::assert_options_valid() const
+{
+	assert_options_valid(m_options);
 }
 
 
