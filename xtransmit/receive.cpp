@@ -176,7 +176,7 @@ void xtransmit::receive::run(const string &src_url, const config &cfg, const ato
 	}
 	catch (const socket::exception & e)
 	{
-		cerr << e.what() << endl;
+		spdlog::error(LOG_SC_RECEIVE "{}", e.what());
 	}
 }
 

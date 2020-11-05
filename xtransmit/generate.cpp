@@ -118,7 +118,7 @@ void xtransmit::generate::run(const string& dst_url, const config& cfg, const at
 	}
 	catch (const socket::exception& e)
 	{
-		spdlog::warn(LOG_SC_GENERATE "{}", e.what());
+		spdlog::error(LOG_SC_GENERATE "{}", e.what());
 		return;
 	}
 }

@@ -120,7 +120,7 @@ void xtransmit::route::run(const string& src_url, const string& dst_url,
 	}
 	catch (const socket::exception & e)
 	{
-		cerr << e.what() << endl;
+		spdlog::error(LOG_SC_ROUTE "{}", e.what());
 	}
 }
 
