@@ -13,6 +13,7 @@
 
 
 #ifdef HAS_PUT_TIME
+// Follows ISO 8601
 inline std::string print_timestamp_now()
 {
 	using namespace std;
@@ -29,12 +30,12 @@ inline std::string print_timestamp_now()
 #endif
 
 	stringstream ss;
-	ss << std::put_time(&tm_now, "%d.%m.%Y %T.") << std::setfill('0') << std::setw(6);
+	ss << std::put_time(&tm_now, "%FT%T.") << std::setfill('0') << std::setw(6);
 
 	const auto since_epoch = systime_now.time_since_epoch();
 	const seconds s = duration_cast<seconds>(since_epoch);
 	ss << duration_cast<microseconds>(since_epoch - s).count();
-	ss << std::put_time(&tm_now, " %z");
+	ss << std::put_time(&tm_now, "%z");
 
 	return ss.str();
 };
