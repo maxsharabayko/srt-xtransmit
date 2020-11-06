@@ -494,7 +494,7 @@ const string socket::srt::stats_to_csv(int socketid, const SRT_TRACEBSTATS& stat
 		output << "pktRecv,pktRcvLoss,pktRcvDrop,pktRcvRetrans,pktRcvBelated,";
 		output << "byteRecv,byteAvailRcvBuf,byteRcvLoss,byteRcvDrop,mbpsRecvRate,msRcvBuf,msRcvTsbPdDelay";
 #if HAS_PKT_REORDER_TOL
-		output << ",msRcvTsbPdDelay";
+		output << ",pktReorderTolerance";
 #endif
 		output << ",msAvgResponseTime,msMaxResponseTime,";
 		output << "usRcvIATJitter,usRcvTsbpdJitter,usSndJitter,usDrift";
