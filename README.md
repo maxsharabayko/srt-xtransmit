@@ -1,8 +1,6 @@
 # srt-xtransmit
 
-**srt-xtransmit** is a testing utility with support for SRT and UDP.
-At the moment the application supports UDP/SRT <-> UDP/SRT packet routing,
-traffic generation to UDP/SRT, file/folder transmission, etc.
+`srt-xtransmit` is a testing utility with support for SRT and UDP network protocols.
 
 ## Functionality
 
