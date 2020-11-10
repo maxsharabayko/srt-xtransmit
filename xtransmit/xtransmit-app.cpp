@@ -19,7 +19,6 @@
 
 #include "srt_socket.hpp"
 
-
 #include "forward.h"
 #include "generate.hpp"
 #include "receive.hpp"
@@ -27,12 +26,9 @@
 #include "file-send.hpp"
 #include "file-receive.hpp"
 
-
 using namespace std;
 
-
 atomic_bool force_break(false);
-
 
 void OnINT_ForceExit(int)
 {
@@ -40,7 +36,6 @@ void OnINT_ForceExit(int)
 	force_break = true;
 	srt_cleanup();
 }
-
 
 struct NetworkInit
 {
@@ -62,9 +57,30 @@ struct NetworkInit
 	}
 };
 
+string create_srt_logfa_description()
+{
+	map<int, string> revmap;
+	for (auto entry : SrtLogFAList())
+		revmap[entry.second] = entry.first;
 
+	// Each group on a new line
+	stringstream ss;
+	ss << "SRT log functional areas: [";
+	int en10 = 0;
+	for (auto entry : revmap)
+	{
+		ss << " " << entry.second;
+		if (entry.first / 10 != en10)
+		{
+			ss << endl;
+			en10 = entry.first / 10;
+		}
+	}
+	ss << " ]";
+	return ss.str();
+}
 
-int main(int argc, char **argv)
+int main(int argc, char** argv)
 {
 	using namespace xtransmit;
 
@@ -73,81 +89,94 @@ int main(int argc, char **argv)
 	app.set_help_all_flag("--help-all", "Expand all help");
 
 	spdlog::set_pattern("%H:%M:%S.%f %^[%L]%$ %v");
-	app.add_flag_function("--verbose,-v", [](size_t) {
+	app.add_flag_function(
+		"--verbose,-v",
+		[](size_t) {
 			Verbose::on = true;
 			spdlog::set_level(spdlog::level::trace);
-		}, "enable verbose output");
+		},
+		"enable verbose output");
 
-	app.add_flag_function("--handle-sigint", [](size_t) {
+	app.add_flag_function(
+		"--handle-sigint",
+		[](size_t) {
 			signal(SIGINT, OnINT_ForceExit);
 			signal(SIGTERM, OnINT_ForceExit);
-		}, "Handle Ctrl+C interrupt");
+		},
+		"Handle Ctrl+C interrupt");
 
-	app.add_option("--loglevel", [](CLI::results_t val) {
-		srt_logging::LogLevel::type lev = SrtParseLogLevel(val[0]);
-		UDT::setloglevel(lev);
+	app.add_option(
+		"--loglevel",
+		[](CLI::results_t val) {
+			srt_logging::LogLevel::type lev = SrtParseLogLevel(val[0]);
+			srt_setloglevel(lev);
 
-		// Uncovered spdlog levels:
-		// debug = SPDLOG_LEVEL_DEBUG
-		// off   = SPDLOG_LEVEL_OFF
-		switch (lev)
-		{
-		case srt_logging::LogLevel::fatal:
-			spdlog::set_level(spdlog::level::critical);
-			break;
-		case srt_logging::LogLevel::error:
-			spdlog::set_level(spdlog::level::err);
-			break;
-		case srt_logging::LogLevel::warning:
-			spdlog::set_level(spdlog::level::warn);
-			break;
-		case srt_logging::LogLevel::note:
-			spdlog::set_level(spdlog::level::info);
-			break;
-		case srt_logging::LogLevel::debug:
-			spdlog::set_level(spdlog::level::trace);
-			break;
-		default:
-			break;
-		}
+			// Uncovered spdlog levels:
+			// debug = SPDLOG_LEVEL_DEBUG
+			// off   = SPDLOG_LEVEL_OFF
+			switch (lev)
+			{
+			case srt_logging::LogLevel::fatal:
+				spdlog::set_level(spdlog::level::critical);
+				break;
+			case srt_logging::LogLevel::error:
+				spdlog::set_level(spdlog::level::err);
+				break;
+			case srt_logging::LogLevel::warning:
+				spdlog::set_level(spdlog::level::warn);
+				break;
+			case srt_logging::LogLevel::note:
+				spdlog::set_level(spdlog::level::info);
+				break;
+			case srt_logging::LogLevel::debug:
+				spdlog::set_level(spdlog::level::trace);
+				break;
+			default:
+				break;
+			}
 
-		Verb() << "Log level set to " << val[0];
-		return true;
-	}, "log level [debug, error, note, info, fatal]");
+			spdlog::info("Log level set to {}", val[0]);
+			return true;
+		},
+		"log level [debug, error, note, info, fatal]");
 
-	app.add_option("--logfa",
-				   [](CLI::results_t val) {
-					   set<srt_logging::LogFA>     fas = SrtParseLogFA(val[0]);
-					   srt_resetlogfa(nullptr, 0);
-					   for (set<srt_logging::LogFA>::iterator i = fas.begin(); i != fas.end(); ++i)
-						   srt_addlogfa(*i);
-					   Verb() << "Logfa set to " << val[0];
-					   return true;
-				   },
-				   "log functional area [ all, general, bstats, control, data, tsbpd, rexmit ]");
+	const string logfa_desc = create_srt_logfa_description();
+	app.add_option(
+		"--logfa",
+		[](CLI::results_t val) {
+			set<srt_logging::LogFA> fas = SrtParseLogFA(val[0]);
+			srt_resetlogfa(nullptr, 0);
+			for (set<srt_logging::LogFA>::iterator i = fas.begin(); i != fas.end(); ++i)
+				srt_addlogfa(*i);
 
-	CLI::App* cmd_version = app.add_subcommand("version", "Show version info")
-		->callback([]() { cerr << "SRT library v" << SRT_VERSION_STRING << endl; });
+			spdlog::info("SRT log FAs enabled: {}", val[0]);
+			return true;
+		},
+		logfa_desc);
+
+	CLI::App* cmd_version = app.add_subcommand("version", "Show version info")->callback([]() {
+		cerr << "SRT library v" << SRT_VERSION_STRING << endl;
+	});
 
 	string src, dst;
 
 	generate::config cfg_generate;
-	CLI::App* sc_generate = generate::add_subcommand(app, cfg_generate, dst);
+	CLI::App*        sc_generate = generate::add_subcommand(app, cfg_generate, dst);
 
 	xtransmit::receive::config cfg_receive;
-	CLI::App* sc_receive = receive::add_subcommand(app, cfg_receive, src);
+	CLI::App*                  sc_receive = receive::add_subcommand(app, cfg_receive, src);
 
 	xtransmit::route::config cfg_route;
-	CLI::App* sc_route = route::add_subcommand(app, cfg_route, src, dst);
+	CLI::App*                sc_route = route::add_subcommand(app, cfg_route, src, dst);
 
 #if ENABLE_FILE_TRANSFER
 	CLI::App* sc_file = app.add_subcommand("file", "Send/receive a single file or folder contents")->fallthrough();
-	xtransmit::file::send::config cfg_file_send;
-	CLI::App* sc_file_send = file::send::add_subcommand(*sc_file, cfg_file_send, dst);
+	xtransmit::file::send::config    cfg_file_send;
+	CLI::App*                        sc_file_send = file::send::add_subcommand(*sc_file, cfg_file_send, dst);
 	xtransmit::file::receive::config cfg_file_recv;
-	CLI::App* sc_file_recv = file::receive::add_subcommand(*sc_file, cfg_file_recv, src);
-	xtransmit::forward::config cfg_forward;
-	CLI::App* sc_forward = xtransmit::forward::add_subcommand(*sc_file, cfg_forward, src, dst);
+	CLI::App*                        sc_file_recv = file::receive::add_subcommand(*sc_file, cfg_file_recv, src);
+	xtransmit::forward::config       cfg_forward;
+	CLI::App*                        sc_forward = xtransmit::forward::add_subcommand(*sc_file, cfg_forward, src, dst);
 #endif
 
 	app.require_subcommand(1);
@@ -196,6 +225,3 @@ int main(int argc, char **argv)
 
 	return 0;
 }
-
-
-
