@@ -489,6 +489,8 @@ const string socket::srt::stats_to_csv(int socketid, const SRT_TRACEBSTATS& stat
 	std::ostringstream output;
 
 #define HAS_PKT_REORDER_TOL (SRT_VERSION_MAJOR >= 1) && (SRT_VERSION_MINOR >= 4) && (SRT_VERSION_PATCH > 0)
+// pktSentUnique, pktRecvUnique were added in SRT v1.4.2
+#define HAS_UNIQUE_PKTS (SRT_VERSION_MAJOR == 1) && ((SRT_VERSION_MINOR > 4) || ((SRT_VERSION_MINOR == 4) && (SRT_VERSION_PATCH >= 2)))
 
 	if (print_header)
 	{
@@ -502,6 +504,9 @@ const string socket::srt::stats_to_csv(int socketid, const SRT_TRACEBSTATS& stat
 		output << "byteRecv,byteAvailRcvBuf,byteRcvLoss,byteRcvDrop,mbpsRecvRate,msRcvBuf,msRcvTsbPdDelay";
 #if HAS_PKT_REORDER_TOL
 		output << ",pktReorderTolerance";
+#endif
+#if HAS_UNIQUE_PKTS
+		output << ",pktSentUnique,pktRecvUnique";
 #endif
 		output << endl;
 		return output.str();
@@ -550,11 +555,17 @@ const string socket::srt::stats_to_csv(int socketid, const SRT_TRACEBSTATS& stat
 	output << "," << stats.pktReorderTolerance;
 #endif
 
+#if HAS_UNIQUE_PKTS
+	output << "," << stats.pktSentUnique;
+	output << "," << stats.pktRecvUnique;
+#endif
+
 	output << endl;
 
 	return output.str();
 
 #undef HAS_PUT_TIME
+#undef HAS_UNIQUE_PKTS
 }
 
 const string socket::srt::statistics_csv(bool print_header)
