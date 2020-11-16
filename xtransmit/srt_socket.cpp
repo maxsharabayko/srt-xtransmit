@@ -457,7 +457,7 @@ int socket::srt::write(const const_buffer &buffer, int timeout_ms)
 	const int res = srt_sendmsg2(m_bind_socket, static_cast<const char*>(buffer.data()), static_cast<int>(buffer.size()), nullptr);
 	if (res == SRT_ERROR)
 	{
-		if (srt_getlasterror(nullptr) != SRT_EASYNCSND)
+		if (srt_getlasterror(nullptr) == SRT_EASYNCSND)
 			return 0;
 
 		size_t blocks, bytes;
