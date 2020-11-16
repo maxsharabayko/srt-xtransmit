@@ -51,15 +51,16 @@ namespace route
 
 			if (bytes_read == 0)
 			{
-				::cerr << desc << " read returned 0\n";
+				spdlog::info(LOG_SC_ROUTE "{} read 0 bytes on a socket (spurious read-ready?). Retrying.", desc);
 				continue;
 			}
 
+			// SRT can return 0 on SRT_EASYNCSND. Rare for sending. However might be worth to retry.
 			const int bytes_sent = sock_dst.write(const_buffer(buffer.data(), bytes_read));
 
 			if (bytes_sent != bytes_read)
 			{
-				::cerr << desc << " write returned " << bytes_sent << " while sending " << bytes_read << " bytes" << endl;
+				spdlog::info("{} write returned {} bytes, expected {}", desc, bytes_sent, bytes_read);
 				continue;
 			}
 		}
