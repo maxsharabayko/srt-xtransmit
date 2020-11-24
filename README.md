@@ -24,9 +24,12 @@
 
 ### Requirements
 
-* C++14 compliant compiler (GCC 4.8+)
+* C++14 compliant compiler (GCC 4.8+, CLang, MSVC, etc...)
 * cmake (as a build configuration system)
 * OpenSSL (for encryption - required by SRT)
+
+**Note!** In order to have absolute timepoint in CSV statistics GCC v5.0 (instead of v4.8+) and above is required
+(with support for [std::put_time](https://en.cppreference.com/w/cpp/io/manip/put_time)).
 
 ### Building on Linux/Mac
 
