@@ -357,7 +357,7 @@ void socket::srt::handle_hosts()
 		if (bind_res < 0)
 		{
 			srt_close(m_bind_socket);
-			throw socket::exception("SRT binding has failed");
+			raise_exception("srt::bind");
 		}
 	};
 
