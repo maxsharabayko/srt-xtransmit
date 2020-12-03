@@ -72,7 +72,7 @@ public:
 	 *
 	 * @throws socket::exception Thrown on failure.
 	 */
-	virtual const std::string statistics_csv(bool print_header) { return std::string(); }
+	virtual const std::string statistics_csv(bool print_header) const { return std::string(); }
 
 
 	virtual int id() const = 0;

@@ -438,7 +438,6 @@ size_t socket::srt::read(const mutable_buffer &buffer, int timeout_ms)
 
 int socket::srt::write(const const_buffer &buffer, int timeout_ms)
 {
-	stringstream ss;
 	if (!m_blocking_mode)
 	{
 		int ready[2] = {SRT_INVALID_SOCK, SRT_INVALID_SOCK};
@@ -449,9 +448,6 @@ int socket::srt::write(const const_buffer &buffer, int timeout_ms)
 		const int res = srt_epoll_wait(m_epoll_io, rready, &rlen, ready, &len, timeout_ms, 0, 0, 0, 0);
 		if (res == SRT_ERROR)
 			raise_exception("write::epoll");
-
-		ss << "write::epoll_wait result " << res << " rlen " << rlen << " wlen " << len << " wsocket " << ready[0];
-		//Verb() << "srt::socket::write: srt_epoll_wait set len " << len << " socket " << ready[0];
 	}
 
 	const int res = srt_sendmsg2(m_bind_socket, static_cast<const char*>(buffer.data()), static_cast<int>(buffer.size()), nullptr);
@@ -460,15 +456,7 @@ int socket::srt::write(const const_buffer &buffer, int timeout_ms)
 		if (srt_getlasterror(nullptr) == SRT_EASYNCSND)
 			return 0;
 
-		size_t blocks, bytes;
-		srt_getsndbuffer(m_bind_socket, &blocks, &bytes);
-		int sndbuf = 0;
-		int optlen = sizeof sndbuf;
-		srt_getsockopt(m_bind_socket, 0, SRTO_SNDBUF, &sndbuf, &optlen);
-		ss << " SND Buffer: " << bytes << " / " << sndbuf << " bytes";
-		ss << " (" << sndbuf - bytes << " bytes remaining)";
-		ss << "trying to write " << buffer.size() << "bytes";
-		raise_exception("socket::write::send", srt_getlasterror_str() + ss.str());
+		raise_exception("write::send", srt_getlasterror_str());
 	}
 
 	return res;
@@ -568,7 +556,7 @@ const string socket::srt::stats_to_csv(int socketid, const SRT_TRACEBSTATS& stat
 #undef HAS_UNIQUE_PKTS
 }
 
-const string socket::srt::statistics_csv(bool print_header)
+const string socket::srt::statistics_csv(bool print_header) const
 {
 	SRT_TRACEBSTATS stats;
 	if (SRT_ERROR == srt_bstats(m_bind_socket, &stats, true))

@@ -91,7 +91,7 @@ public:
 	int                      id() const final { return m_bind_socket; }
 	int                      statistics(SRT_TRACEBSTATS& stats, bool instant = true);
 	bool                     supports_statistics() const final { return true; }
-	const std::string        statistics_csv(bool print_header) final;
+	const std::string        statistics_csv(bool print_header) const final;
 	static const std::string stats_to_csv(int socketid, const SRT_TRACEBSTATS& stats, bool print_header);
 
 private:

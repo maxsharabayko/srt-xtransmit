@@ -141,43 +141,54 @@ void xtransmit::receive::run(const string &src_url, const config &cfg, const ato
 {
 	const UriParser uri(src_url);
 
-	shared_sock socket;
-	shared_sock connection;
+	shared_sock sock;
+	shared_sock conn;
 
-	try
+	unique_ptr<socket::stats_writer> stats;
+
+	const bool write_stats = cfg.stats_file != "" && cfg.stats_freq_ms > 0;
+	if (write_stats)
 	{
-		const bool write_stats = cfg.stats_file != "" && cfg.stats_freq_ms > 0;
-		// make_unique is not supported by GCC 4.8, only starting from GCC 4.9 :(
-		unique_ptr<socket::stats_writer> stats = write_stats
-			? unique_ptr<socket::stats_writer>(new socket::stats_writer(cfg.stats_file, milliseconds(cfg.stats_freq_ms)))
-			: nullptr;
+		try {
+			// make_unique is not supported by GCC 4.8, only starting from GCC 4.9 :(
+			stats = unique_ptr<socket::stats_writer>(
+				new socket::stats_writer(cfg.stats_file, milliseconds(cfg.stats_freq_ms)));
+		}
+		catch (const socket::exception& e)
+		{
+			spdlog::error(LOG_SC_RECEIVE "{}", e.what());
+			return;
+		}
+	}
 
-		do {
+	do {
+		try
+		{
 			if (uri.proto() == "udp")
 			{
-				connection = make_shared<socket::udp>(uri);
+				conn = make_shared<socket::udp>(uri);
 			}
 			else
 			{
-				socket = make_shared<socket::srt>(uri);
-				socket::srt* s = static_cast<socket::srt*>(socket.get());
+				sock = make_shared<socket::srt>(uri);
+				socket::srt* s = static_cast<socket::srt*>(sock.get());
 				const bool  accept = s->mode() == socket::srt::LISTENER;
 				if (accept)
 					s->listen();
-				connection = accept ? s->accept() : s->connect();
+				conn = accept ? s->accept() : s->connect();
 			}
 
 			if (stats)
-				stats->add_socket(connection);
-			run_pipe(connection, cfg, force_break);
+				stats->add_socket(conn);
+			run_pipe(conn, cfg, force_break);
 			if (stats && cfg.reconnect)
 				stats->clear();
-		} while (cfg.reconnect);
-	}
-	catch (const socket::exception & e)
-	{
-		spdlog::error(LOG_SC_RECEIVE "{}", e.what());
-	}
+		}
+		catch (const socket::exception & e)
+		{
+			spdlog::warn(LOG_SC_RECEIVE "{}", e.what());
+		}
+	} while (cfg.reconnect && !force_break);
 }
 
 CLI::App* xtransmit::receive::add_subcommand(CLI::App& app, config& cfg, string& src_url)
