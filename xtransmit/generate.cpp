@@ -52,33 +52,45 @@ void run_pipe(shared_sock dst, const config& cfg, const atomic_bool& force_break
 		cfg.sendrate ? unique_ptr<ipacer>(new pacer(cfg.sendrate, cfg.message_size))
 					 : (!cfg.playback_csv.empty() ? unique_ptr<ipacer>(new csv_pacer(cfg.playback_csv)) : nullptr);
 
-	for (int i = 0; (num_messages < 0 || i < num_messages) && !force_break; ++i)
+	try
 	{
-		if (ratepacer)
+		for (int i = 0; (num_messages < 0 || i < num_messages) && !force_break; ++i)
 		{
-			ratepacer->wait(force_break);
+			if (ratepacer)
+			{
+				ratepacer->wait(force_break);
+			}
+
+			// Check if sending duration is respected
+			if (cfg.duration > 0 && (steady_clock::now() - start_time > seconds(cfg.duration)))
+			{
+				break;
+			}
+
+			pldgen.generate_payload(message_to_send);
+
+			target->write(const_buffer(message_to_send.data(), message_to_send.size()));
+
+			const auto tnow = steady_clock::now();
+			if (tnow > (stat_time + chrono::seconds(1)))
+			{
+				const int       n       = i - prev_i;
+				const auto      elapsed = tnow - stat_time;
+				const long long bps     = (8 * n * cfg.message_size) / duration_cast<milliseconds>(elapsed).count() * 1000;
+				spdlog::info(LOG_SC_GENERATE "Sending at {} kbps", bps / 1000);
+				stat_time = tnow;
+				prev_i    = i;
+			}
 		}
+	}
+	catch (const socket::exception& e)
+	{
+		spdlog::warn(LOG_SC_GENERATE "{}", e.what());
+	}
 
-		// Check if sending duration is respected
-		if (cfg.duration > 0 && (steady_clock::now() - start_time > seconds(cfg.duration)))
-		{
-			break;
-		}
-
-		pldgen.generate_payload(message_to_send);
-
-		target->write(const_buffer(message_to_send.data(), message_to_send.size()));
-
-		const auto tnow = steady_clock::now();
-		if (tnow > (stat_time + chrono::seconds(1)))
-		{
-			const int       n       = i - prev_i;
-			const auto      elapsed = tnow - stat_time;
-			const long long bps     = (8 * n * cfg.message_size) / duration_cast<milliseconds>(elapsed).count() * 1000;
-			spdlog::info(LOG_SC_GENERATE "Sending at {} kbps", bps / 1000);
-			stat_time = tnow;
-			prev_i    = i;
-		}
+	if (force_break)
+	{
+		spdlog::info(LOG_SC_GENERATE "interrupted by request!");
 	}
 }
 
@@ -86,41 +98,52 @@ void xtransmit::generate::run(const string& dst_url, const config& cfg, const at
 {
 	const UriParser uri(dst_url);
 
-	shared_sock socket;
+	shared_sock sock;
 	shared_sock connection;
 
-	try
-	{
-		const bool write_stats = cfg.stats_file != "" && cfg.stats_freq_ms > 0;
-		// make_unique is not supported by GCC 4.8, only starting from GCC 4.9 :(
-		unique_ptr<socket::stats_writer> stats =
-			write_stats ? unique_ptr<socket::stats_writer>(
-							  new socket::stats_writer(cfg.stats_file, milliseconds(cfg.stats_freq_ms)))
-						: nullptr;
+	const bool write_stats = cfg.stats_file != "" && cfg.stats_freq_ms > 0;
+	// make_unique is not supported by GCC 4.8, only starting from GCC 4.9 :(
+	unique_ptr<socket::stats_writer> stats;
 
-		if (uri.proto() == "udp")
-		{
-			connection = make_shared<socket::udp>(uri);
-		}
-		else
-		{
-			socket              = make_shared<socket::srt>(uri);
-			socket::srt* s      = static_cast<socket::srt*>(socket.get());
-			const bool   accept = s->mode() == socket::srt::LISTENER;
-			if (accept)
-				s->listen();
-			connection = accept ? s->accept() : s->connect();
-		}
-
-		if (stats)
-			stats->add_socket(connection);
-		run_pipe(connection, cfg, force_break);
-	}
-	catch (const socket::exception& e)
+	if (write_stats)
 	{
-		spdlog::error(LOG_SC_GENERATE "{}", e.what());
-		return;
+		try {
+			stats = unique_ptr<socket::stats_writer>(
+				new socket::stats_writer(cfg.stats_file, milliseconds(cfg.stats_freq_ms)));
+		}
+		catch (const socket::exception& e)
+		{
+			spdlog::error(LOG_SC_GENERATE "{}", e.what());
+			return;
+		}
 	}
+
+	do {
+		try
+		{
+			if (uri.proto() == "udp")
+			{
+				connection = make_shared<socket::udp>(uri);
+			}
+			else
+			{
+				sock = make_shared<socket::srt>(uri);
+				socket::srt* s = static_cast<socket::srt*>(sock.get());
+				const bool   accept = s->mode() == socket::srt::LISTENER;
+				if (accept)
+					s->listen();
+				connection = accept ? s->accept() : s->connect();
+			}
+
+			if (stats)
+				stats->add_socket(connection);
+			run_pipe(connection, cfg, force_break);
+		}
+		catch (const socket::exception& e)
+		{
+			spdlog::warn(LOG_SC_GENERATE "{}", e.what());
+		}
+	} while (cfg.reconnect && !force_break);
 }
 
 CLI::App* xtransmit::generate::add_subcommand(CLI::App& app, config& cfg, string& dst_url)
@@ -141,6 +164,7 @@ CLI::App* xtransmit::generate::add_subcommand(CLI::App& app, config& cfg, string
 	sc_generate->add_option("--statsfreq", cfg.stats_freq_ms, "output stats report frequency (ms)")
 		->transform(CLI::AsNumberWithUnit(to_ms, CLI::AsNumberWithUnit::CASE_SENSITIVE));
 	sc_generate->add_flag("--twoway", cfg.two_way, "Both send and receive data");
+	sc_generate->add_flag("--reconnect", cfg.reconnect, "Reconnect automatically");
 	sc_generate->add_flag("--enable-metrics", cfg.enable_metrics, "Enable all metrics: latency, loss, reordering, jitter, etc.");
 	sc_generate->add_option("--playback-csv", cfg.playback_csv, "Input CSV file with timestamp of every packet");
 
