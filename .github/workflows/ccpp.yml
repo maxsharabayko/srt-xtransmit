@@ -22,13 +22,13 @@ jobs:
       run: |
         sudo apt-get install g++-4.8
         dpkg --list | grep compiler
-        echo ::set-env name=CC::gcc-4.8
-        echo ::set-env name=CXX::g++-4.8
+        echo "{CC}={gcc-4.8}" >> $GITHUB_ENV
+        echo "{CXX}={g++-4.8}" >> $GITHUB_ENV
     - name: Set env clang
       if: matrix.compiler == 'clang'
       run: |
-        echo ::set-env name=CC::clang
-        echo ::set-env name=CXX::clang
+        echo "{CC}={clang}" >> $GITHUB_ENV
+        echo "{CXX}={clang}" >> $GITHUB_ENV
     - name: cmake
       run: mkdir _build && cd _build && cmake ../ -DENABLE_CXX17=OFF
     - name: build
