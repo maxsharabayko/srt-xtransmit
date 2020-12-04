@@ -172,9 +172,6 @@ void xtransmit::receive::run(const vector<string> &src_urls, const config &cfg, 
 		urls.emplace_back(url);
 	}
 
-	shared_sock sock;
-	shared_sock conn;
-
 	unique_ptr<socket::stats_writer> stats;
 
 	const bool write_stats = cfg.stats_file != "" && cfg.stats_freq_ms > 0;
@@ -195,6 +192,9 @@ void xtransmit::receive::run(const vector<string> &src_urls, const config &cfg, 
 	do {
 		try
 		{
+			shared_sock sock;
+			shared_sock conn;
+
 			if (urls.size() == 1)
 			{
 				if (urls[0].proto() == "udp")

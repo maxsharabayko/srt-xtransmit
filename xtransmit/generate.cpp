@@ -35,7 +35,7 @@ using shared_sock = std::shared_ptr<socket::isocket>;
 #define LOG_SC_GENERATE "GENERATE "
 
 int srt_gen_listen_callback(void* opaq, SRTSOCKET sock, int hsversion,
-    const struct sockaddr* peeraddr, const char* streamid)
+	const struct sockaddr* peeraddr, const char* streamid)
 {
 	spdlog::trace(LOG_SC_GENERATE "Accepted member socket 0x{:X}.", sock);
 	return 0;
@@ -128,9 +128,6 @@ void xtransmit::generate::run(const vector<string>& dst_urls, const config& cfg,
 		urls.emplace_back(UriParser(url));
 	}
 
-	shared_sock sock;
-	shared_sock connection;
-
 	const bool write_stats = cfg.stats_file != "" && cfg.stats_freq_ms > 0;
 	// make_unique is not supported by GCC 4.8, only starting from GCC 4.9 :(
 	unique_ptr<socket::stats_writer> stats;
@@ -151,6 +148,9 @@ void xtransmit::generate::run(const vector<string>& dst_urls, const config& cfg,
 	do {
 		try
 		{
+			shared_sock sock;
+			shared_sock connection;
+
 			if (urls.size() == 1)
 			{
 				if (urls[0].proto() == "udp")
