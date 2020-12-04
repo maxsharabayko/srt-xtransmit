@@ -241,7 +241,6 @@ shared_srt_group socket::srt_group::accept()
 	// Wait for REAL connected state if nonblocking mode
 	if (!m_blocking_mode)
 	{
-		std::this_thread::sleep_for(3s);
 		// Socket readiness for connection is checked by polling on READ allowed sockets in case of listeners.
 		// In the group connection mode we wait for the first accepted connection.
 		constexpr int timeout_ms = -1;
