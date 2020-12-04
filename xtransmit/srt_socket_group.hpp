@@ -56,6 +56,7 @@ private:
 	void create_listeners(const std::vector<UriParser>& uris);
 	void create_callers(const std::vector<UriParser>& uris);
 	void release_targets();
+	void release_listeners();
 
 public:
 	/**

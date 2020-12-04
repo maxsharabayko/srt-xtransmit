@@ -139,7 +139,7 @@ void run_pipe(shared_sock src, const config &cfg, const atomic_bool &force_break
 }
 
 int srt_listen_callback(void* opaq, SRTSOCKET sock, int hsversion,
-    const struct sockaddr* peeraddr, const char* streamid)
+	const struct sockaddr* peeraddr, const char* streamid)
 {
 	spdlog::trace(LOG_SC_RECEIVE "Accepted member socket 0x{:X}.", sock);
 	return 0;

@@ -147,6 +147,7 @@ socket::srt_group::~srt_group()
 	}
 	spdlog::debug(LOG_SRT_GROUP "0x{:X} Closing SRT group", m_bind_socket);
 	release_targets();
+	release_listeners();
 	srt_close(m_bind_socket);
 }
 
@@ -182,6 +183,8 @@ void socket::srt_group::create_listeners(const vector<UriParser>& src_uri)
 			if (SRT_ERROR == srt_epoll_add_usock(m_epoll_io, s, &io_modes))
 				throw socket::exception(srt_getlasterror_str());
 		}
+
+		spdlog::trace(LOG_SRT_GROUP "Created listener 0x{:X} on {}:{}", s, url.host(), url.portno());
 
 		m_listeners.push_back(s);
 	}
@@ -307,6 +310,15 @@ void socket::srt_group::release_targets()
 	for (auto& gd : m_targets)
 		srt_delete_config(gd.config);
 	m_targets.clear();
+}
+
+void socket::srt_group::release_listeners()
+{
+	for (auto sock : m_listeners) {
+		spdlog::trace(LOG_SRT_GROUP "Closing listener 0x{:X}", sock);
+		srt_close(sock);
+	}
+	m_listeners.clear();
 }
 
 shared_srt_group socket::srt_group::connect()
