@@ -187,10 +187,14 @@ void xtransmit::generate::run(const vector<string>& dst_urls, const config& cfg,
 			if (stats)
 				stats->add_socket(connection);
 			run_pipe(connection, cfg, force_break);
+			if (stats && cfg.reconnect)
+				stats->clear();
 		}
 		catch (const socket::exception& e)
 		{
 			spdlog::warn(LOG_SC_GENERATE "{}", e.what());
+			if (stats)
+				stats->clear();
 		}
 	} while (cfg.reconnect && !force_break);
 }

@@ -58,6 +58,9 @@ private:
 	void release_targets();
 	void release_listeners();
 
+	void on_connect_callback(SRTSOCKET sock, int error, const sockaddr*, int token);
+	static void connect_callback_fn(void* opaq, SRTSOCKET sock, int error, const sockaddr* peer, int token);
+
 public:
 	/**
 	 * @returns The number of bytes received.

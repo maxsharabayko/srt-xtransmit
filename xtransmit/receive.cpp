@@ -235,6 +235,8 @@ void xtransmit::receive::run(const vector<string> &src_urls, const config &cfg, 
 		catch (const socket::exception & e)
 		{
 			spdlog::warn(LOG_SC_RECEIVE "{}", e.what());
+			if (stats)
+				stats->clear();
 		}
 	} while (cfg.reconnect && !force_break);
 }

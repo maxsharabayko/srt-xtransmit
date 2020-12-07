@@ -284,10 +284,44 @@ void socket::srt_group::set_listen_callback(srt_listen_callback_fn* hook_fn, voi
 			raise_exception("listen failed with {}", srt_getlasterror_str());
 	}
 }
+// for (auto target : m_targets)
+
+void socket::srt_group::connect_callback_fn(void* opaq, SRTSOCKET sock, int error, const sockaddr* peer, int token)
+{
+	if (opaq == nullptr)
+	{
+		spdlog::warn(LOG_SRT_GROUP "connect_callback_fn does not have a pointer to the group");
+		return;
+	}
+
+	// TODO: this group may no longer exist. Use some global array to track valid groups.
+	socket::srt_group* group = reinterpret_cast<socket::srt_group*>(opaq);
+
+	group->on_connect_callback(sock, error, peer, token);
+}
+
+void socket::srt_group::on_connect_callback(SRTSOCKET sock, int error, const sockaddr* /*peer*/, int token)
+{
+	if (error == SRT_SUCCESS)
+	{
+		// After SRT v1.4.2 connection callback is no longer called on connection success.
+		spdlog::trace(LOG_SRT_GROUP "Member socket connected 0x{:X} (token {}).", sock, token);
+		return;
+	}
+
+	spdlog::warn(LOG_SRT_GROUP "Member socket 0x{:X} (token {}) connection failed: ({}) {}.", sock, token, error,
+		srt_strerror(error, 0));
+
+	// TODO: schedule reconnection.
+
+	return;
+
+}
 
 void socket::srt_group::set_connect_callback(srt_connect_callback_fn* hook_fn, void* hook_opaque)
 {
-	srt_connect_callback(m_bind_socket, hook_fn, hook_opaque);
+	//srt_connect_callback(m_bind_socket, hook_fn, hook_opaque);
+	srt_connect_callback(m_bind_socket, connect_callback_fn, (void*) this);
 }
 
 void socket::srt_group::raise_exception(const string&& place, SRTSOCKET sock) const
@@ -324,7 +358,7 @@ void socket::srt_group::release_listeners()
 shared_srt_group socket::srt_group::connect()
 {
 	spdlog::debug(
-		LOG_SRT_GROUP "0x{:X} {} Connecting group to remote srt.", m_bind_socket, m_blocking_mode ? "SYNC" : "ASYNC");
+		LOG_SRT_GROUP "0x{:X} {} Connecting group to remote SRT", m_bind_socket, m_blocking_mode ? "SYNC" : "ASYNC");
 
 	if (!m_blocking_mode)
 	{
