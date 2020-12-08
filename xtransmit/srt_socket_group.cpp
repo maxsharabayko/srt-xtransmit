@@ -312,7 +312,26 @@ void socket::srt_group::on_connect_callback(SRTSOCKET sock, int error, const soc
 	spdlog::warn(LOG_SRT_GROUP "Member socket 0x{:X} (token {}) connection failed: ({}) {}.", sock, token, error,
 		srt_strerror(error, 0));
 
-	// TODO: schedule reconnection.
+	bool reconn_scheduled = false;
+	for (auto target : m_targets)
+	{
+		if (target.token != token)
+			continue;
+
+		auto connfn = [](SRTSOCKET group, SRT_SOCKGROUPCONFIG target) {
+			spdlog::trace(LOG_SRT_GROUP "0x{:X}: Reconnecting member socket (token {})", group, target.token);
+			const int st = srt_connect_group(group, &target, 1);
+			if (st == SRT_ERROR)
+				spdlog::warn(LOG_SRT_GROUP "0x{:X}: Member reconnection failed (token {})", group, target.token);
+		};
+
+		spdlog::trace(LOG_SRT_GROUP "0x{:X}: Scheduling member reconnection (token {})", m_bind_socket, token);
+		reconn_scheduled = true;
+		m_scheduler.schedule_in(1s, connfn, m_bind_socket, target);
+	}
+
+	if (!reconn_scheduled)
+		spdlog::warn(LOG_SRT_GROUP "0x{:X}: Could not schedule member reconnection (token {})", m_bind_socket, token);
 
 	return;
 
@@ -360,8 +379,13 @@ shared_srt_group socket::srt_group::connect()
 	spdlog::debug(
 		LOG_SRT_GROUP "0x{:X} {} Connecting group to remote SRT", m_bind_socket, m_blocking_mode ? "SYNC" : "ASYNC");
 
-	if (!m_blocking_mode)
+	if (!m_blocking_mode && false)
 	{
+		// This branch does not assign a token to the target
+		// therefiore it is not possible to schedule a reconnection.
+		// srt_connect_group is to be used instead in both blocking and non-blocking modes.
+		spdlog::debug(
+			LOG_SRT_GROUP "non blocking");
 		for (auto target : m_targets)
 		{
 			sockaddr_any target_addr(target.peeraddr);
@@ -375,8 +399,7 @@ shared_srt_group socket::srt_group::connect()
 		SRTSOCKET ready[2];
 		if (srt_epoll_wait(m_epoll_connect, 0, 0, ready, &len, -1, 0, 0, 0, 0) != -1)
 		{
-			const SRT_SOCKSTATUS state = srt_getsockstate(m_bind_socket);
-			if (state != SRTS_CONNECTED)
+			if (srt_getsockstate(m_bind_socket) != SRTS_CONNECTED)
 			{
 				const int reason = srt_getrejectreason(m_bind_socket);
 				raise_exception("connect failed", srt_rejectreason_str(reason));
@@ -389,6 +412,8 @@ shared_srt_group socket::srt_group::connect()
 	}
 	else
 	{
+		spdlog::debug(
+			LOG_SRT_GROUP "srt_connect_group");
 		const int st = srt_connect_group(m_bind_socket, m_targets.data(), m_targets.size());
 		if (st == SRT_ERROR)
 			raise_exception("srt_group::connect");
@@ -396,7 +421,7 @@ shared_srt_group socket::srt_group::connect()
 
 	spdlog::debug(
 		LOG_SRT_GROUP "0x{:X} {} Group member connected to remote", m_bind_socket, m_blocking_mode ? "SYNC" : "ASYNC");
-	release_targets();
+
 	return shared_from_this();
 }
 

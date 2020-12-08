@@ -9,6 +9,7 @@
 // xtransmit
 #include "buffer.hpp"
 #include "socket.hpp"
+#include "scheduler.hpp"
 
 // OpenSRT
 #include "srt.h"
@@ -105,6 +106,8 @@ private:
 	string                   m_host;
 	int                      m_port = -1;
 	std::map<string, string> m_options; // All other options, as provided in the URI
+
+	scheduler  m_scheduler;
 };
 
 } // namespace socket
