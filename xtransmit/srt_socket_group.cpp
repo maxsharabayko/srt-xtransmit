@@ -42,6 +42,53 @@ SocketOption::Mode detect_srt_mode(const UriParser& uri)
 	return SrtInterpretMode(modestr, uri.host(), adapter);
 }
 
+static SRT_GROUP_TYPE detect_group_type(const UriParser& uri)
+{
+	const auto& options = uri.parameters();
+	const string key("grouptype");
+
+	if (!options.count(key))
+		return SRT_GTYPE_BROADCAST;
+
+	const string gmode = options.at(key);
+	if (gmode == "broadcast")
+		return SRT_GTYPE_BROADCAST;
+
+	if (gmode == "backup")
+		return SRT_GTYPE_BACKUP;
+
+	throw socket::exception(LOG_SRT_GROUP ": Failed to detect group mode. Value provided: " + gmode);
+}
+
+static int detect_link_weight(UriParser& uri)
+{
+	auto& options = uri.parameters();
+	const string key("weight");
+
+	if (!options.count(key))
+		return 0;
+
+	const string weight_str = options.at(key);
+	int weight = 0;
+	try {
+		weight = std::stoi(weight_str);
+	}
+	catch (std::invalid_argument const &)
+	{
+		throw socket::exception(LOG_SRT_GROUP ": Bad input. weight=" + weight_str);
+	}
+	catch (std::out_of_range const &e)
+	{
+		throw socket::exception(LOG_SRT_GROUP ": Integer overflow. weight=" + weight_str);
+	}
+
+	// the allowed value for weight is between 0 and 32767
+	if (weight < 0 || weight >32767)
+		throw socket::exception(LOG_SRT_GROUP ": Wrong link weight provided. The allowed value is between 0 and 32767.");
+
+	return weight;
+}
+
 SocketOption::Mode validate_srt_group(const vector<UriParser>& urls)
 {
 	SocketOption::Mode prev_mode = SocketOption::FAILURE;
@@ -77,6 +124,9 @@ SocketOption::Mode validate_srt_group(const vector<UriParser>& urls)
 	return prev_mode;
 }
 
+// TODO: m_options per socket:
+// - m_opts_group
+// - m_opts_link[n]
 socket::srt_group::srt_group(const vector<UriParser>& uris)
 {
 	// validate_srt_group(..) also checks for empty 'uris'
@@ -86,6 +136,7 @@ socket::srt_group::srt_group(const vector<UriParser>& uris)
 	if (m_mode == RENDEZVOUS)
 		throw socket::exception("Rendezvous mode is not supported by socket groups!");
 
+	const SRT_GROUP_TYPE gtype = detect_group_type(uris[0]);
 	m_options = uris[0].parameters();
 
 	if (m_options.count("blocking"))
@@ -111,11 +162,14 @@ socket::srt_group::srt_group(const vector<UriParser>& uris)
 	// Create SRT socket group
 	if (m_mode == LISTENER)
 	{
+		spdlog::error(LOG_SRT_GROUP "Creating a group of listeners.");
 		create_listeners(uris);
 	}
 	else
 	{
-		create_callers(uris);
+		const char* gtype_str = (gtype == SRT_GTYPE_BACKUP) ? "main/backup" : "broadcast";
+		spdlog::trace(LOG_SRT_GROUP "Creating a group of callers (type {}).", gtype_str);
+		create_callers(uris, gtype);
 	}
 }
 
@@ -190,9 +244,9 @@ void socket::srt_group::create_listeners(const vector<UriParser>& src_uri)
 	}
 }
 
-void socket::srt_group::create_callers(const vector<UriParser>& uris)
+void socket::srt_group::create_callers(const vector<UriParser>& uris, SRT_GROUP_TYPE gtype)
 {
-	m_bind_socket = srt_create_group(SRT_GTYPE_BROADCAST);
+	m_bind_socket = srt_create_group(gtype);
 	if (m_bind_socket == SRT_INVALID_SOCK)
 		raise_exception("srt_create_group");
 

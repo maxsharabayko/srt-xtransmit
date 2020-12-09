@@ -55,7 +55,7 @@ private:
 	int  configure_pre(SRTSOCKET sock);
 	int  configure_post(SRTSOCKET sock);
 	void create_listeners(const std::vector<UriParser>& uris);
-	void create_callers(const std::vector<UriParser>& uris);
+	void create_callers(const std::vector<UriParser>& uris, SRT_GROUP_TYPE gtype);
 	void release_targets();
 	void release_listeners();
 
