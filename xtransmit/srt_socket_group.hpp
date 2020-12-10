@@ -52,8 +52,12 @@ private:
 	void configure(const std::map<string, string>& options);
 
 	void identify_connection_mode(const std::vector<UriParser>& uris);
-	int  configure_pre(SRTSOCKET sock);
-	int  configure_post(SRTSOCKET sock);
+
+	/// Set SRT socket options with PRE binding.
+	/// @param [in] sock         member socket
+	/// @param [in] link_index   link index in m_opts_link
+	int  configure_pre(SRTSOCKET sock, int link_index);
+	int  configure_post(SRTSOCKET sock, int link_index);
 	void create_listeners(const std::vector<UriParser>& uris);
 	void create_callers(const std::vector<UriParser>& uris, SRT_GROUP_TYPE gtype);
 	void release_targets();
@@ -61,6 +65,9 @@ private:
 
 	void on_connect_callback(SRTSOCKET sock, int error, const sockaddr*, int token);
 	static void connect_callback_fn(void* opaq, SRTSOCKET sock, int error, const sockaddr* peer, int token);
+
+	using options = std::map<string, string>;
+	static SRT_GROUP_TYPE detect_group_type(const options& opts);
 
 public:
 	/**
@@ -105,7 +112,8 @@ private:
 	bool                     m_blocking_mode = true;
 	string                   m_host;
 	int                      m_port = -1;
-	std::map<string, string> m_options; // All other options, as provided in the URI
+	std::vector<options> m_opts_link; // Options per member link. [0] - also defines common options.
+	// Link index to token can be determined from m_targets
 
 	scheduler  m_scheduler;
 };

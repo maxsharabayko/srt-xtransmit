@@ -78,7 +78,7 @@ namespace route
 		if(uri.proto() == "srt")
 		{
 			shared_sock socket = make_shared<socket::srt>(uri);
-			socket::srt* s = static_cast<socket::srt*>(socket.get());
+			socket::srt* s = dynamic_cast<socket::srt*>(socket.get());
 			const bool  accept = s->mode() == socket::srt::LISTENER;
 			if (accept)
 				s->listen();

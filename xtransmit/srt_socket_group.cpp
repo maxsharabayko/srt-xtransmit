@@ -42,15 +42,14 @@ SocketOption::Mode detect_srt_mode(const UriParser& uri)
 	return SrtInterpretMode(modestr, uri.host(), adapter);
 }
 
-static SRT_GROUP_TYPE detect_group_type(const UriParser& uri)
+SRT_GROUP_TYPE socket::srt_group::detect_group_type(const options& opts)
 {
-	const auto& options = uri.parameters();
 	const string key("grouptype");
 
-	if (!options.count(key))
+	if (!opts.count(key))
 		return SRT_GTYPE_BROADCAST;
 
-	const string gmode = options.at(key);
+	const string gmode = opts.at(key);
 	if (gmode == "broadcast")
 		return SRT_GTYPE_BROADCAST;
 
@@ -136,13 +135,19 @@ socket::srt_group::srt_group(const vector<UriParser>& uris)
 	if (m_mode == RENDEZVOUS)
 		throw socket::exception("Rendezvous mode is not supported by socket groups!");
 
-	const SRT_GROUP_TYPE gtype = detect_group_type(uris[0]);
-	m_options = uris[0].parameters();
-
-	if (m_options.count("blocking"))
+	for (auto uri : uris)
 	{
-		m_blocking_mode = !false_names.count(m_options.at("blocking"));
-		m_options.erase("blocking");
+		// Will throw an exception if invalid options were provided.
+		srt::assert_options_valid(uri.parameters(), {"bind", "mode", "weight", "grouptype"});
+		m_opts_link.push_back(uri.parameters());
+	}
+
+	const SRT_GROUP_TYPE gtype = detect_group_type(m_opts_link[0]);
+
+	if (m_opts_link[0].count("blocking"))
+	{
+		m_blocking_mode = !false_names.count(m_opts_link[0].at("blocking"));
+		m_opts_link[0].erase("blocking");
 	}
 
 	if (!m_blocking_mode)
@@ -155,9 +160,6 @@ socket::srt_group::srt_group(const vector<UriParser>& uris)
 		if (m_epoll_io == -1)
 			throw socket::exception(srt_getlasterror_str());
 	}
-
-	// Will throw an exception if invalid options were provided.
-	srt::assert_options_valid(m_options);
 
 	// Create SRT socket group
 	if (m_mode == LISTENER)
@@ -176,6 +178,7 @@ socket::srt_group::srt_group(const vector<UriParser>& uris)
 socket::srt_group::srt_group(srt_group& group, int group_id)
 	: m_bind_socket(group_id)
 	, m_blocking_mode(group.m_blocking_mode)
+	, m_mode(group.m_mode)
 {
 	if (!m_blocking_mode)
 	{
@@ -224,7 +227,7 @@ void socket::srt_group::create_listeners(const vector<UriParser>& src_uri)
 		if (SRT_SUCCESS != srt_bind(s, sa.get(), sa.size()))
 			throw socket::exception(srt_getlasterror_str());
 
-		if (SRT_SUCCESS != configure_pre(s))
+		if (SRT_SUCCESS != configure_pre(s, i))
 			throw socket::exception(srt_getlasterror_str());
 
 		if (!m_blocking_mode)
@@ -323,7 +326,7 @@ shared_srt_group socket::srt_group::accept()
 	}
 
 	spdlog::info(LOG_SRT_GROUP "Accepted connection sock 0x{:X}", accepted_sock);
-	const int res = configure_post(accepted_sock);
+	const int res = configure_post(accepted_sock, 0); // TODO: are there POST options per link?
 	if (res == SRT_ERROR)
 		raise_exception("accept::configure_post");
 
@@ -479,41 +482,48 @@ shared_srt_group socket::srt_group::connect()
 	return shared_from_this();
 }
 
-int socket::srt_group::configure_pre(SRTSOCKET sock)
+int socket::srt_group::configure_pre(SRTSOCKET sock, int link_index)
 {
+	SRT_ASSERT(link_index < m_opts_link.size());
 	int       maybe  = m_blocking_mode ? 1 : 0;
 	const int result = srt_setsockopt(sock, 0, SRTO_RCVSYN, &maybe, sizeof maybe);
 	if (result == -1)
 		return result;
 
-	// host is only checked for emptiness and depending on that the connection mode is selected.
-	// Here we are not exactly interested with that information.
-	std::vector<string> failures;
+	const auto configure = [&](int li) -> int {
+		// host is only checked for emptiness and depending on that the connection mode is selected.
+		// Here we are not exactly interested with that information.
+		std::vector<string> failures;
 
-	// NOTE: here host = "", so the 'connmode' will be returned as LISTENER always,
-	// but it doesn't matter here. We don't use 'connmode' for anything else than
-	// checking for failures.
-	SocketOption::Mode conmode = SrtConfigurePre(sock, m_host, m_options, &failures);
+		// NOTE: here host = "", so the 'connmode' will be returned as LISTENER always,
+		// but it doesn't matter here. We don't use 'connmode' for anything else than
+		// checking for failures.
+		// TODO: use per-link options too
+		SocketOption::Mode conmode = SrtConfigurePre(sock, m_host, m_opts_link[li], &failures);
 
-	if (conmode == SocketOption::FAILURE)
-	{
-		if (Verbose::on)
+		if (conmode == SocketOption::FAILURE)
 		{
-			Verb() << "WARNING: failed to set options: ";
-			copy(failures.begin(), failures.end(), ostream_iterator<string>(*Verbose::cverb, ", "));
-			Verb();
+			stringstream ss;
+			for (const auto v : failures) ss << v << ", ";
+			spdlog::error(LOG_SRT_GROUP "WARNING: failed to set options: {}", ss.str());
+			return SRT_ERROR;
 		}
 
-		return SRT_ERROR;
-	}
+		return SRT_SUCCESS;
+	};
 
-	m_mode = static_cast<connection_mode>(conmode);
+	if (configure(0) != SRT_SUCCESS)
+		return SRT_ERROR;
+
+	if (link_index != 0)
+		return configure(link_index);
 
 	return SRT_SUCCESS;
 }
 
-int socket::srt_group::configure_post(SRTSOCKET sock)
+int socket::srt_group::configure_post(SRTSOCKET sock, int link_index)
 {
+	SRT_ASSERT(link_index < m_opts_link.size());
 	int is_blocking = m_blocking_mode ? 1 : 0;
 
 	int result = srt_setsockopt(sock, 0, SRTO_SNDSYN, &is_blocking, sizeof is_blocking);
@@ -527,15 +537,15 @@ int socket::srt_group::configure_post(SRTSOCKET sock)
 	// Here we are not exactly interested with that information.
 	vector<string> failures;
 
-	SrtConfigurePost(sock, m_options, &failures);
+	SrtConfigurePost(sock, m_opts_link[link_index], &failures);
 
 	if (!failures.empty())
 	{
 		if (Verbose::on)
 		{
-			Verb() << "WARNING: failed to set options: ";
-			copy(failures.begin(), failures.end(), ostream_iterator<string>(*Verbose::cverb, ", "));
-			Verb();
+			stringstream ss;
+			for (const auto v : failures) ss << v << ", ";
+			spdlog::error(LOG_SRT_GROUP "WARNING: failed to set options: {}", ss.str());
 		}
 	}
 
@@ -599,7 +609,7 @@ int socket::srt_group::write(const const_buffer& buffer, int timeout_ms)
 	return res;
 }
 
-socket::srt_group::connection_mode socket::srt_group::mode() const { return m_mode; }
+socket::srt_group::connection_mode socket::srt_group::mode() const { cout << "mode = " << m_mode << endl;  return m_mode; }
 
 int socket::srt_group::statistics(SRT_TRACEBSTATS& stats, bool instant)
 {

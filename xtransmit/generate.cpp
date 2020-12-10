@@ -160,7 +160,7 @@ void xtransmit::generate::run(const vector<string>& dst_urls, const config& cfg,
 				else
 				{
 					sock = make_shared<socket::srt>(urls[0]);
-					socket::srt* s = static_cast<socket::srt*>(sock.get());
+					socket::srt* s = dynamic_cast<socket::srt*>(sock.get());
 					const bool   accept = s->mode() == socket::srt::LISTENER;
 					if (accept)
 						s->listen();
@@ -170,7 +170,7 @@ void xtransmit::generate::run(const vector<string>& dst_urls, const config& cfg,
 			else
 			{
 				sock = make_shared<socket::srt_group>(urls);
-				socket::srt_group* s = static_cast<socket::srt_group*>(sock.get());
+				socket::srt_group* s = dynamic_cast<socket::srt_group*>(sock.get());
 				const bool   accept = s->mode() == socket::srt_group::LISTENER;
 				if (accept)
 				{
