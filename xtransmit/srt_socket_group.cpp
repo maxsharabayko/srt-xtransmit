@@ -59,7 +59,7 @@ SRT_GROUP_TYPE socket::srt_group::detect_group_type(const options& opts)
 	throw socket::exception(LOG_SRT_GROUP ": Failed to detect group mode. Value provided: " + gmode);
 }
 
-static int detect_link_weight(UriParser& uri)
+static int detect_link_weight(const UriParser& uri)
 {
 	auto& options = uri.parameters();
 	const string key("weight");
@@ -129,7 +129,7 @@ SocketOption::Mode validate_srt_group(const vector<UriParser>& urls)
 socket::srt_group::srt_group(const vector<UriParser>& uris)
 {
 	// validate_srt_group(..) also checks for empty 'uris'
-	const connection_mode m_mode = (connection_mode)validate_srt_group(uris);
+	m_mode = (connection_mode)validate_srt_group(uris);
 	if (m_mode == FAILURE)
 		throw socket::exception("Group mode validation failed!");
 	if (m_mode == RENDEZVOUS)
@@ -164,7 +164,7 @@ socket::srt_group::srt_group(const vector<UriParser>& uris)
 	// Create SRT socket group
 	if (m_mode == LISTENER)
 	{
-		spdlog::error(LOG_SRT_GROUP "Creating a group of listeners.");
+		spdlog::trace(LOG_SRT_GROUP "Creating a group of listeners.");
 		create_listeners(uris);
 	}
 	else
@@ -267,7 +267,9 @@ void socket::srt_group::create_callers(const vector<UriParser>& uris, SRT_GROUP_
 
 		const sockaddr* bindsa = nullptr;
 
-		const SRT_SOCKGROUPCONFIG gd = srt_prepare_endpoint(bindsa, sa.get(), sa.size());
+		SRT_SOCKGROUPCONFIG gd = srt_prepare_endpoint(bindsa, sa.get(), sa.size());
+
+		gd.weight = detect_link_weight(uri);
 		m_targets.push_back(gd);
 	}
 
@@ -490,7 +492,7 @@ int socket::srt_group::configure_pre(SRTSOCKET sock, int link_index)
 	if (result == -1)
 		return result;
 
-	const auto configure = [&](int li) -> int {
+	const auto configure_link = [&](int li) -> int {
 		// host is only checked for emptiness and depending on that the connection mode is selected.
 		// Here we are not exactly interested with that information.
 		std::vector<string> failures;
@@ -512,11 +514,11 @@ int socket::srt_group::configure_pre(SRTSOCKET sock, int link_index)
 		return SRT_SUCCESS;
 	};
 
-	if (configure(0) != SRT_SUCCESS)
+	if (configure_link(0) != SRT_SUCCESS)
 		return SRT_ERROR;
 
 	if (link_index != 0)
-		return configure(link_index);
+		return configure_link(link_index);
 
 	return SRT_SUCCESS;
 }
@@ -609,7 +611,7 @@ int socket::srt_group::write(const const_buffer& buffer, int timeout_ms)
 	return res;
 }
 
-socket::srt_group::connection_mode socket::srt_group::mode() const { cout << "mode = " << m_mode << endl;  return m_mode; }
+socket::srt_group::connection_mode socket::srt_group::mode() const { return m_mode; }
 
 int socket::srt_group::statistics(SRT_TRACEBSTATS& stats, bool instant)
 {
