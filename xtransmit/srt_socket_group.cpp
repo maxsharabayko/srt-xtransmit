@@ -253,6 +253,9 @@ void socket::srt_group::create_callers(const vector<UriParser>& uris, SRT_GROUP_
 	if (m_bind_socket == SRT_INVALID_SOCK)
 		raise_exception("srt_create_group");
 
+	if (SRT_SUCCESS != configure_pre(m_bind_socket, 0))
+		throw socket::exception(srt_getlasterror_str());
+
 	for (const auto& uri : uris)
 	{
 		sockaddr_any sa;
