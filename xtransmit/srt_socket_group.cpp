@@ -224,10 +224,10 @@ void socket::srt_group::create_listeners(const vector<UriParser>& src_uri)
 		if (SRT_SUCCESS != srt_setsockflag(s, SRTO_GROUPCONNECT, &gcon, sizeof gcon))
 			throw socket::exception(srt_getlasterror_str());
 
-		if (SRT_SUCCESS != srt_bind(s, sa.get(), sa.size()))
+		if (SRT_SUCCESS != configure_pre(s, i))
 			throw socket::exception(srt_getlasterror_str());
 
-		if (SRT_SUCCESS != configure_pre(s, i))
+		if (SRT_SUCCESS != srt_bind(s, sa.get(), sa.size()))
 			throw socket::exception(srt_getlasterror_str());
 
 		if (!m_blocking_mode)
