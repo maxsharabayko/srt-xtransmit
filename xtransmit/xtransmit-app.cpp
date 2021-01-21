@@ -191,6 +191,10 @@ int main(int argc, char** argv)
 	// https://cliutils.gitlab.io/CLI11Tutorial/chapters/an-advanced-example.html
 	if (sc_generate->parsed())
 	{
+		for (const auto url : dst_urls)
+		{
+			spdlog::info("DST URL: {}", url);
+		}
 		generate::run(dst_urls, cfg_generate, force_break);
 		return 0;
 	}
@@ -198,7 +202,7 @@ int main(int argc, char** argv)
 	{
 		for (const auto url : src_urls)
 		{
-			cout << "URL: " << url << "\n";
+			spdlog::info("SRC URL: {}", url);
 		}
 		xtransmit::receive::run(src_urls, cfg_receive, force_break);
 		return 0;
@@ -207,11 +211,11 @@ int main(int argc, char** argv)
 	{
 		for (const auto url : src_urls)
 		{
-			cout << "SRC URL: " << url << "\n";
+			spdlog::info("SRC URL: {}", url);
 		}
 		for (const auto url : dst_urls)
 		{
-			cout << "DST URL: " << url << "\n";
+			spdlog::info("DST URL: {}", url);
 		}
 
 		xtransmit::route::run(src, dst, cfg_route, force_break);
