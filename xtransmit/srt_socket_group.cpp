@@ -344,10 +344,6 @@ shared_srt_group socket::srt_group::accept()
 
 void socket::srt_group::print_member_socket(SRTSOCKET sock)
 {
-	sockaddr_any sa;
-	int sa_len = sa.storage_size();
-	srt_getpeername(sock, sa.get(), &sa_len);
-
 	int weight = -1; // unknown
 	int gtype = -1;
 	int gtype_len = sizeof gtype;
@@ -356,7 +352,6 @@ void socket::srt_group::print_member_socket(SRTSOCKET sock)
 		&& gtype == SRT_GTYPE_BACKUP)
 	{
 		const SRTSOCKET group_id = srt_groupof(sock);
-		spdlog::trace(LOG_SRT_GROUP "group ID {}.", group_id);
 		SRT_SOCKGROUPDATA gdata[3] = {};
 		size_t gdata_len = 3;
 		const int gsize = srt_group_data(group_id, gdata, &gdata_len);
@@ -373,8 +368,8 @@ void socket::srt_group::print_member_socket(SRTSOCKET sock)
 	gtype += 1;
 	gtype = gtype < 0 ? 0 : (gtype > 3 ? 0 : gtype);
 	const char* gtype_str[] = { "NO GROUP", "BROADCAST", "BACKUP", "BALANCING"};
-	spdlog::trace(LOG_SRT_GROUP "Member socket 0x{:X}, {} weight = {} remote IP {}", sock,
-		gtype_str[gtype], weight, sa.str());
+	spdlog::trace(LOG_SRT_GROUP "Member socket 0x{:X}, {} weight = {}", sock,
+		gtype_str[gtype], weight);
 }
 
 int socket::srt_group::on_listen_callback(SRTSOCKET sock)
@@ -392,7 +387,8 @@ int socket::srt_group::listen_callback_fn(void* opaq, SRTSOCKET sock, int hsvers
 		return 0;
 	}
 
-	spdlog::trace(LOG_SRT_GROUP "Accepted member socket 0x{:X}", sock);
+	sockaddr_any sa(peeraddr);
+	spdlog::trace(LOG_SRT_GROUP "Accepted member socket 0x{:X}, remote IP {}", sock, sa.str());
 
 	// TODO: this group may no longer exist. Use some global array to track valid groups.
 	socket::srt_group* group = reinterpret_cast<socket::srt_group*>(opaq);
