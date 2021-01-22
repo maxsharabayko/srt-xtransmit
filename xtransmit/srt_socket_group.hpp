@@ -45,14 +45,14 @@ public:
 	 */
 	void listen() noexcept(false);
 
-	void set_listen_callback(srt_listen_callback_fn* hook_fn, void* hook_opaque);
-	void set_connect_callback(srt_connect_callback_fn* hook_fn, void* hook_opaque);
 
 private:
 	void configure(const std::map<string, string>& options);
 
 	void identify_connection_mode(const std::vector<UriParser>& uris);
 
+	void set_listen_callback();
+	void set_connect_callback();
 	/// Set SRT socket options with PRE binding.
 	/// @param [in] sock         member socket
 	/// @param [in] link_index   link index in m_opts_link
@@ -65,9 +65,14 @@ private:
 
 	void on_connect_callback(SRTSOCKET sock, int error, const sockaddr*, int token);
 	static void connect_callback_fn(void* opaq, SRTSOCKET sock, int error, const sockaddr* peer, int token);
+	int on_listen_callback(SRTSOCKET sock);
+	static int listen_callback_fn(void* opaq, SRTSOCKET sock, int hsversion,
+		const struct sockaddr* peeraddr, const char* streamid);
 
 	using options = std::map<string, string>;
 	static SRT_GROUP_TYPE detect_group_type(const options& opts);
+
+	void print_member_socket(SRTSOCKET sock);
 
 public:
 	/**

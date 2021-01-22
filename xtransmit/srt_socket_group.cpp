@@ -164,7 +164,7 @@ socket::srt_group::srt_group(const vector<UriParser>& uris)
 	// Create SRT socket group
 	if (m_mode == LISTENER)
 	{
-		spdlog::trace(LOG_SRT_GROUP "Creating a group of listeners.");
+		spdlog::trace(LOG_SRT_GROUP "Creating a group of listeners");
 		create_listeners(uris);
 	}
 	else
@@ -286,10 +286,14 @@ void socket::srt_group::create_callers(const vector<UriParser>& uris, SRT_GROUP_
 		if (SRT_ERROR == srt_epoll_add_usock(m_epoll_io, m_bind_socket, &io_modes))
 			throw socket::exception(srt_getlasterror_str());
 	}
+
+	set_connect_callback();
 }
 
 void socket::srt_group::listen()
 {
+	set_listen_callback();
+
 	for (const auto sockid : m_listeners)
 	{
 		if (srt_listen(sockid, 5) == SRT_ERROR)
@@ -338,15 +342,71 @@ shared_srt_group socket::srt_group::accept()
 	return make_shared<srt_group>(*this, accepted_sock);
 }
 
-void socket::srt_group::set_listen_callback(srt_listen_callback_fn* hook_fn, void* hook_opaque)
+void socket::srt_group::print_member_socket(SRTSOCKET sock)
+{
+	sockaddr_any sa;
+	int sa_len = sa.storage_size();
+	srt_getpeername(sock, sa.get(), &sa_len);
+
+	int weight = -1; // unknown
+	int gtype = -1;
+	int gtype_len = sizeof gtype;
+
+	if (srt_getsockflag(sock, SRTO_GROUPTYPE, (void*) &gtype, &gtype_len) == SRT_SUCCESS
+		&& gtype == SRT_GTYPE_BACKUP)
+	{
+		const SRTSOCKET group_id = srt_groupof(sock);
+		spdlog::trace(LOG_SRT_GROUP "group ID {}.", group_id);
+		SRT_SOCKGROUPDATA gdata[3] = {};
+		size_t gdata_len = 3;
+		const int gsize = srt_group_data(group_id, gdata, &gdata_len);
+		for (int i = 0; i < gsize; ++i)
+		{
+			if (gdata[i].id != sock)
+				continue;
+
+			weight = gdata[i].weight;
+			break;
+		}
+	}
+
+	gtype += 1;
+	gtype = gtype < 0 ? 0 : (gtype > 3 ? 0 : gtype);
+	const char* gtype_str[] = { "NO GROUP", "BROADCAST", "BACKUP", "BALANCING"};
+	spdlog::trace(LOG_SRT_GROUP "Member socket 0x{:X}, {} weight = {} remote IP {}", sock,
+		gtype_str[gtype], weight, sa.str());
+}
+
+int socket::srt_group::on_listen_callback(SRTSOCKET sock)
+{
+	m_scheduler.schedule_in(20ms, &socket::srt_group::print_member_socket, this, sock);
+	return 0;
+}
+
+int socket::srt_group::listen_callback_fn(void* opaq, SRTSOCKET sock, int hsversion,
+	const struct sockaddr* peeraddr, const char* streamid)
+{
+	if (opaq == nullptr)
+	{
+		spdlog::warn(LOG_SRT_GROUP "listen_callback_fn does not have a pointer to the group");
+		return 0;
+	}
+
+	spdlog::trace(LOG_SRT_GROUP "Accepted member socket 0x{:X}", sock);
+
+	// TODO: this group may no longer exist. Use some global array to track valid groups.
+	socket::srt_group* group = reinterpret_cast<socket::srt_group*>(opaq);
+	return group->on_listen_callback(sock);
+}
+
+void socket::srt_group::set_listen_callback()
 {
 	for (const auto sockid : m_listeners)
 	{
-		if (srt_listen_callback(sockid, hook_fn, hook_opaque) == SRT_ERROR)
+		if (srt_listen_callback(sockid, listen_callback_fn, (void*) this) == SRT_ERROR)
 			raise_exception("listen failed with {}", srt_getlasterror_str());
 	}
 }
-// for (auto target : m_targets)
 
 void socket::srt_group::connect_callback_fn(void* opaq, SRTSOCKET sock, int error, const sockaddr* peer, int token)
 {
@@ -396,12 +456,10 @@ void socket::srt_group::on_connect_callback(SRTSOCKET sock, int error, const soc
 		spdlog::warn(LOG_SRT_GROUP "0x{:X}: Could not schedule member reconnection (token {})", m_bind_socket, token);
 
 	return;
-
 }
 
-void socket::srt_group::set_connect_callback(srt_connect_callback_fn* hook_fn, void* hook_opaque)
+void socket::srt_group::set_connect_callback()
 {
-	//srt_connect_callback(m_bind_socket, hook_fn, hook_opaque);
 	srt_connect_callback(m_bind_socket, connect_callback_fn, (void*) this);
 }
 
