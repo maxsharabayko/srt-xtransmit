@@ -374,7 +374,7 @@ void socket::srt_group::print_member_socket(SRTSOCKET sock)
 
 int socket::srt_group::on_listen_callback(SRTSOCKET sock)
 {
-	m_scheduler.schedule_in(20ms, &socket::srt_group::print_member_socket, this, sock);
+	m_scheduler.schedule_in(std::chrono::microseconds(20), &socket::srt_group::print_member_socket, this, sock);
 	return 0;
 }
 
@@ -445,7 +445,7 @@ void socket::srt_group::on_connect_callback(SRTSOCKET sock, int error, const soc
 
 		spdlog::trace(LOG_SRT_GROUP "0x{:X}: Scheduling member reconnection (token {})", m_bind_socket, token);
 		reconn_scheduled = true;
-		m_scheduler.schedule_in(1s, connfn, m_bind_socket, target);
+		m_scheduler.schedule_in(std::chrono::seconds(1), connfn, m_bind_socket, target);
 	}
 
 	if (!reconn_scheduled)
