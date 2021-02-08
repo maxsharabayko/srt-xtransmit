@@ -498,7 +498,7 @@ shared_srt_group socket::srt_group::connect()
 	if (!m_blocking_mode && false)
 	{
 		// This branch does not assign a token to the target
-		// therefiore it is not possible to schedule a reconnection.
+		// therefore it is not possible to schedule a reconnection.
 		// srt_connect_group is to be used instead in both blocking and non-blocking modes.
 		spdlog::debug(
 			LOG_SRT_GROUP "non blocking");

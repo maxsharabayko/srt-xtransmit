@@ -46,7 +46,7 @@ public:
 		else // Packet reordering: pkt_seqno < m_seqno
 		{
 			++m_stats.pkts_reordered;
-			const uint64_t reorder_dist = pkt_seqno - m_stats.expected_seqno;
+			const uint64_t reorder_dist = m_stats.expected_seqno - pkt_seqno;
 			m_stats.reorder_dist = std::max(m_stats.reorder_dist, reorder_dist);
 
 			//spdlog::warn(LOG_SC_RFC4737 "Detected reordered packet, dist {}", reorder_dist);
