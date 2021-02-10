@@ -40,16 +40,16 @@ public:
 		{
 			const uint64_t lost = pkt_seqno - m_stats.expected_seqno;
 			m_stats.pkts_lost += lost;
-			//spdlog::warn(LOG_SC_RFC4737 "Detected loss of {} packets", lost);
+			spdlog::warn("[METRICS] Detected loss of {} packets (seqno [{}; {}))", lost, m_stats.expected_seqno, pkt_seqno);
 			m_stats.expected_seqno = pkt_seqno + 1;
 		}
 		else // Packet reordering: pkt_seqno < m_seqno
 		{
 			++m_stats.pkts_reordered;
-			const uint64_t reorder_dist = pkt_seqno - m_stats.expected_seqno;
+			const uint64_t reorder_dist = m_stats.expected_seqno - pkt_seqno;
 			m_stats.reorder_dist = std::max(m_stats.reorder_dist, reorder_dist);
 
-			//spdlog::warn(LOG_SC_RFC4737 "Detected reordered packet, dist {}", reorder_dist);
+			spdlog::warn("[METRICS] Detected reordered packet, seqno {}, expected {} (dist {})", pkt_seqno, m_stats.expected_seqno, reorder_dist);
 		}
 	}
 
@@ -60,11 +60,6 @@ public:
 
 private:
 	stats m_stats;
-    // uint64_t m_expected_seqno = 0;
-	// uint64_t m_pkts_processed = 0;
-	// uint64_t m_pkts_lost = 0;
-	// uint64_t m_pkts_reordered = 0;
-	// uint64_t m_reorder_dist = 0;
 };
 
 

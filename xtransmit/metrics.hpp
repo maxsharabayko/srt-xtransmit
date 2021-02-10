@@ -75,7 +75,7 @@ namespace metrics
 			m_latency.submit_sample(sys_time, sys_time_now);
 		}
 
-		std:: string stats();
+		std::string stats();
 		std::string stats_csv(bool only_header = false);
 
 	private:
