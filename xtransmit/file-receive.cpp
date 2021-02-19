@@ -81,10 +81,7 @@ bool receive_files(socket::srt& src, const string& dstpath
 	{
 		const size_t bytes = src.read(mutable_buffer(buf.data(), buf.size()), -1);
 		if (bytes == 0)
-		{
-			cerr << "Nothing was received. Closing.";
-			break;
-		}
+			continue;
 
 		int hdr_size = 1;
 		const bool is_first = (buf[0] & 0x01) != 0;

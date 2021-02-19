@@ -429,7 +429,7 @@ size_t socket::srt::read(const mutable_buffer &buffer, int timeout_ms)
 		if (srt_getlasterror(nullptr) != SRT_EASYNCRCV)
 			raise_exception("read::recv");
 
-		spdlog::warn(LOG_SOCK_SRT "recvmsg returned error 6002: read error, try again");
+		spdlog::trace(LOG_SOCK_SRT "recvmsg error 6002: try again (spurious read-ready)");
 		return 0;
 	}
 
