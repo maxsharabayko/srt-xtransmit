@@ -690,15 +690,19 @@ const string socket::srt_group::stats_to_csv(int socketid, const SRT_TRACEBSTATS
 		output << "Timepoint,";
 #endif
 		output << "Time,SocketID,pktFlowWindow,pktCongestionWindow,pktFlightSize,";
-		output << "msRTT,mbpsBandwidth,mbpsMaxBW,pktSent,pktSndLoss,pktSndDrop,";
-		output << "pktRetrans,byteSent,byteAvailSndBuf,byteSndDrop,mbpsSendRate,usPktSndPeriod,msSndBuf,";
-		output << "pktRecv,pktRcvLoss,pktRcvDrop,pktRcvRetrans,pktRcvBelated,";
+		output << "msRTT,mbpsBandwidth,mbpsMaxBW,pktSent,";
+#if HAS_UNIQUE_PKTS
+		output << "pktSentUnique,";
+#endif
+		output << "pktSndLoss,pktSndDrop,pktRetrans,byteSent,";
+		output << "byteAvailSndBuf,byteSndDrop,mbpsSendRate,usPktSndPeriod,msSndBuf,pktRecv,";
+#if HAS_UNIQUE_PKTS
+		output << "pktRecvUnique,";
+#endif
+		output << "pktRcvLoss,pktRcvDrop,pktRcvRetrans,pktRcvBelated,";
 		output << "byteRecv,byteAvailRcvBuf,byteRcvLoss,byteRcvDrop,mbpsRecvRate,msRcvBuf,msRcvTsbPdDelay";
 #if HAS_PKT_REORDER_TOL
 		output << ",pktReorderTolerance";
-#endif
-#if HAS_UNIQUE_PKTS
-		output << ",pktSentUnique,pktRecvUnique";
 #endif
 		output << endl;
 		return output.str();
@@ -718,6 +722,9 @@ const string socket::srt_group::stats_to_csv(int socketid, const SRT_TRACEBSTATS
 	output << stats.mbpsBandwidth << ',';
 	output << stats.mbpsMaxBW << ',';
 	output << stats.pktSent << ',';
+#if HAS_UNIQUE_PKTS
+	output << stats.pktSentUnique << ",";
+#endif
 	output << stats.pktSndLoss << ',';
 	output << stats.pktSndDrop << ',';
 
@@ -730,6 +737,9 @@ const string socket::srt_group::stats_to_csv(int socketid, const SRT_TRACEBSTATS
 	output << stats.msSndBuf << ',';
 
 	output << stats.pktRecv << ',';
+#if HAS_UNIQUE_PKTS
+	output << stats.pktRecvUnique << ",";
+#endif
 	output << stats.pktRcvLoss << ',';
 	output << stats.pktRcvDrop << ',';
 	output << stats.pktRcvRetrans << ',';
@@ -747,11 +757,6 @@ const string socket::srt_group::stats_to_csv(int socketid, const SRT_TRACEBSTATS
 	output << "," << stats.pktReorderTolerance;
 #endif
 
-#if HAS_UNIQUE_PKTS
-	output << "," << stats.pktSentUnique;
-	output << "," << stats.pktRecvUnique;
-#endif
-
 	output << endl;
 
 	return output.str();
@@ -762,15 +767,13 @@ const string socket::srt_group::stats_to_csv(int socketid, const SRT_TRACEBSTATS
 
 const string socket::srt_group::statistics_csv(bool print_header) const
 {
-	//SRT_ASSERT(m_bind_socket != SRT_INVALID_SOCK);
-	SRT_TRACEBSTATS stats;
+	if (print_header)
+		return stats_to_csv(m_bind_socket, SRT_TRACEBSTATS(), print_header);;
+
+	SRT_TRACEBSTATS stats = {};
 	if (SRT_ERROR == srt_bstats(m_bind_socket, &stats, true))
 		raise_exception("statistics");
-
 	string csv_stats = stats_to_csv(m_bind_socket, stats, print_header);
-
-	if (print_header)
-		return csv_stats;
 
 	size_t group_size = 0;
 	if (srt_group_data(m_bind_socket, NULL, &group_size) != SRT_SUCCESS)

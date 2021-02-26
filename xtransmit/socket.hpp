@@ -59,6 +59,7 @@ public:
 	virtual int write(const const_buffer &buffer, int timeout_ms = -1) = 0;
 
 public:
+
 	/** Check if statistics is supported by a socket implementation.
 	 *
 	 * @returns true if statistics is supported, false otherwise.
