@@ -52,13 +52,16 @@ void run_pipe(shared_sock dst, const config& cfg, const atomic_bool& force_break
 		cfg.sendrate ? unique_ptr<ipacer>(new pacer(cfg.sendrate, cfg.message_size))
 					 : (!cfg.playback_csv.empty() ? unique_ptr<ipacer>(new csv_pacer(cfg.playback_csv)) : nullptr);
 
+	long target_bps = cfg.sendrate;
+	bool mininputbw_updated = false;
+
 	try
 	{
 		for (int i = 0; (num_messages < 0 || i < num_messages) && !force_break; ++i)
 		{
 			if (ratepacer)
 			{
-				ratepacer->wait(force_break);
+				target_bps = ratepacer->wait(force_break);
 			}
 
 			// Check if sending duration is respected
@@ -68,6 +71,14 @@ void run_pipe(shared_sock dst, const config& cfg, const atomic_bool& force_break
 			}
 
 			pldgen.generate_payload(message_to_send);
+
+			if (target_bps > 2000000 && !mininputbw_updated)
+			{
+				int64_t value = target_bps / 8;
+				srt_setsockflag(target->id(), SRTO_MININPUTBW, &value, sizeof value);
+				spdlog::info(LOG_SC_GENERATE "Updated SRTO_MININPUTBW to {} kbps", target_bps / 1000);
+				mininputbw_updated = true;
+			}
 
 			target->write(const_buffer(message_to_send.data(), message_to_send.size()));
 
