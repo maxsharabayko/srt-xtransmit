@@ -131,13 +131,13 @@ void xtransmit::route::run(const string& src_url, const string& dst_url,
 	}
 }
 
-CLI::App* xtransmit::route::add_subcommand(CLI::App& app, config& cfg, vector<string>& src_urls, vector<string>& dst_urls)
+CLI::App* xtransmit::route::add_subcommand(CLI::App& app, config& cfg, string& src_url, string& dst_url)
 {
 	const map<string, int> to_ms{ {"s", 1000}, {"ms", 1} };
 
 	CLI::App* sc_route = app.add_subcommand("route", "Route data (SRT, UDP)")->fallthrough();
-	sc_route->add_option("-i,src", src_urls, "Source URI")->expected(1, 10);
-	sc_route->add_option("-o,dst", dst_urls, "Destination URI")->expected(1, 10);
+	sc_route->add_option("-i,src", src_url, "Source URI")->expected(1);
+	sc_route->add_option("-o,dst", dst_url, "Destination URI")->expected(1);
 	sc_route->add_option("--msgsize", cfg.message_size, "Size of a buffer to receive message payload");
 	sc_route->add_flag("--bidir", cfg.bidir, "Enable bidirectional transmission");
 	sc_route->add_option("--statsfile", cfg.stats_file, "output stats report filename");

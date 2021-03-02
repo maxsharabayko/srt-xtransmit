@@ -169,7 +169,7 @@ int main(int argc, char** argv)
 	CLI::App* sc_receive = receive::add_subcommand(app, cfg_receive, src_urls);
 
 	xtransmit::route::config cfg_route;
-	CLI::App* sc_route = route::add_subcommand(app, cfg_route, src_urls, dst_urls);
+	CLI::App* sc_route = route::add_subcommand(app, cfg_route, src, dst);
 
 #if ENABLE_FILE_TRANSFER
 	CLI::App* sc_file = app.add_subcommand("file", "Send/receive a single file or folder contents")->fallthrough();
@@ -209,15 +209,6 @@ int main(int argc, char** argv)
 	}
 	else if (sc_route->parsed())
 	{
-		for (const auto url : src_urls)
-		{
-			spdlog::info("SRC URL: {}", url);
-		}
-		for (const auto url : dst_urls)
-		{
-			spdlog::info("DST URL: {}", url);
-		}
-
 		xtransmit::route::run(src, dst, cfg_route, force_break);
 		return 0;
 	}
