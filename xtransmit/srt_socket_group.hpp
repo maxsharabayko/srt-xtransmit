@@ -100,7 +100,7 @@ public:
 	int                      statistics(SRT_TRACEBSTATS& stats, bool instant = true);
 	bool                     supports_statistics() const final { return true; }
 	const std::string        statistics_csv(bool print_header) const final;
-	static const std::string stats_to_csv(int socketid, const SRT_TRACEBSTATS& stats, bool print_header);
+	static const std::string stats_to_csv(int socketid, const SRT_TRACEBSTATS& stats, uint16_t weight, bool print_header);
 
 private:
 	void raise_exception(const string&& place, SRTSOCKET sock = SRT_INVALID_SOCK) const;

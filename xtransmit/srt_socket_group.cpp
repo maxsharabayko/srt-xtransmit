@@ -675,7 +675,7 @@ int socket::srt_group::statistics(SRT_TRACEBSTATS& stats, bool instant)
 	return srt_bstats(m_bind_socket, &stats, instant);
 }
 
-const string socket::srt_group::stats_to_csv(int socketid, const SRT_TRACEBSTATS& stats, bool print_header)
+const string socket::srt_group::stats_to_csv(int socketid, const SRT_TRACEBSTATS& stats, uint16_t weight, bool print_header)
 {
 	std::ostringstream output;
 
@@ -689,7 +689,7 @@ const string socket::srt_group::stats_to_csv(int socketid, const SRT_TRACEBSTATS
 #ifdef HAS_PUT_TIME
 		output << "Timepoint,";
 #endif
-		output << "Time,SocketID,pktFlowWindow,pktCongestionWindow,pktFlightSize,";
+		output << "Time,SocketID,weight,pktFlowWindow,pktCongestionWindow,pktFlightSize,";
 		output << "msRTT,mbpsBandwidth,mbpsMaxBW,pktSent,";
 #if HAS_UNIQUE_PKTS
 		output << "pktSentUnique,";
@@ -714,6 +714,7 @@ const string socket::srt_group::stats_to_csv(int socketid, const SRT_TRACEBSTATS
 
 	output << stats.msTimeStamp << ',';
 	output << socketid << ',';
+	output << weight << ",";
 	output << stats.pktFlowWindow << ',';
 	output << stats.pktCongestionWindow << ',';
 	output << stats.pktFlightSize << ',';
@@ -768,12 +769,12 @@ const string socket::srt_group::stats_to_csv(int socketid, const SRT_TRACEBSTATS
 const string socket::srt_group::statistics_csv(bool print_header) const
 {
 	if (print_header)
-		return stats_to_csv(m_bind_socket, SRT_TRACEBSTATS(), print_header);;
+		return stats_to_csv(m_bind_socket, SRT_TRACEBSTATS(), 0, print_header);;
 
 	SRT_TRACEBSTATS stats = {};
 	if (SRT_ERROR == srt_bstats(m_bind_socket, &stats, true))
 		raise_exception("statistics");
-	string csv_stats = stats_to_csv(m_bind_socket, stats, print_header);
+	string csv_stats = stats_to_csv(m_bind_socket, stats, 0, print_header);
 
 	size_t group_size = 0;
 	if (srt_group_data(m_bind_socket, NULL, &group_size) != SRT_SUCCESS)
@@ -809,7 +810,7 @@ const string socket::srt_group::statistics_csv(bool print_header) const
 			break;
 		}
 
-		csv_stats += stats_to_csv(id, stats, false);
+		csv_stats += stats_to_csv(id, stats, group_data[i].weight, false);
 	}
 
 	return csv_stats;
