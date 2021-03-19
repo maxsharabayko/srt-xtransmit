@@ -789,7 +789,7 @@ const string socket::srt_group::statistics_csv(bool print_header) const
 	if (num_members == SRT_ERROR)
 	{
 		// Not throwing an exception as group stats was retrieved.
-		spdlog::warn(LOG_SRT_GROUP "0x{:X} statistics_csv: Failed to retrieve group data", m_bind_socket);
+		spdlog::warn(LOG_SRT_GROUP "0x{:X} statistics_csv: Failed to retrieve group data, {}", m_bind_socket, srt_getlasterror_str());
 		return csv_stats;
 	}
 
@@ -800,14 +800,14 @@ const string socket::srt_group::statistics_csv(bool print_header) const
 
 		if (group_data[i].sockstate != SRTS_CONNECTED)
 		{
-			spdlog::trace(LOG_SRT_GROUP "0x{:X} statistics_csv: Socket state is {}, skipping.", id, srt_logging::SockStatusStr(status));
+			spdlog::trace(LOG_SRT_GROUP "0x{:X} statistics_csv: Socket 0x{:X} state is {}, skipping.", m_bind_socket, id, srt_logging::SockStatusStr(status));
 			continue;
 		}
 
 		if (SRT_ERROR == srt_bstats(id, &stats, true))
 		{
-			spdlog::warn(LOG_SRT_GROUP "0x{:X} statistics_csv: Failed to retrieve group member stats. {}", id, srt_getlasterror_str());
-			break;
+			spdlog::warn(LOG_SRT_GROUP "0x{:X} statistics_csv: Failed to retrieve stats for member 0x{:X}. {}", m_bind_socket, id, srt_getlasterror_str());
+			continue;
 		}
 
 		csv_stats += stats_to_csv(id, stats, group_data[i].weight, false);
