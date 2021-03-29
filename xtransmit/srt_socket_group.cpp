@@ -345,7 +345,7 @@ shared_srt_group socket::srt_group::accept()
 void socket::srt_group::print_member_socket(SRTSOCKET sock)
 {
 	int weight = -1; // unknown
-	int gtype = -1;
+	int gtype = 0;
 	int gtype_len = sizeof gtype;
 
 	if (srt_getsockflag(sock, SRTO_GROUPTYPE, (void*) &gtype, &gtype_len) == SRT_SUCCESS
@@ -365,7 +365,6 @@ void socket::srt_group::print_member_socket(SRTSOCKET sock)
 		}
 	}
 
-	gtype += 1;
 	gtype = gtype < 0 ? 0 : (gtype > 3 ? 0 : gtype);
 	const char* gtype_str[] = { "NO GROUP", "BROADCAST", "BACKUP", "BALANCING"};
 	spdlog::trace(LOG_SRT_GROUP "Member socket 0x{:X}, {} weight = {}", sock,
