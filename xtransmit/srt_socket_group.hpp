@@ -96,7 +96,7 @@ public:
 	bool is_caller() const final { return m_mode == CALLER; }
 
 public:
-	int                      id() const final { return m_bind_socket; }
+	SOCKET                   id() const final { return m_bind_socket; }
 	int                      statistics(SRT_TRACEBSTATS& stats, bool instant = true);
 	bool                     supports_statistics() const final { return true; }
 	const std::string        statistics_csv(bool print_header) const final;
@@ -107,7 +107,7 @@ private:
 	void raise_exception(const string&& place, const string&& reason) const;
 
 private:
-	int                    m_bind_socket = SRT_INVALID_SOCK;
+	SRTSOCKET              m_bind_socket = SRT_INVALID_SOCK;
 	std::vector<SRTSOCKET> m_listeners;
 	std::vector<SRT_SOCKGROUPCONFIG> m_targets;
 	int                    m_epoll_connect = -1;
