@@ -63,6 +63,7 @@ namespace metrics
 		// TODO: latency measurements
 		inline void validate_packet(const vector<char>& payload)
 		{
+			// TODO: validate payload
 			const auto sys_time_now = system_clock::now();
 			const auto std_time_now = steady_clock::now();
 			

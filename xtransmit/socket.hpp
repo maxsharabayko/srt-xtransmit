@@ -59,6 +59,7 @@ public:
 	virtual int write(const const_buffer &buffer, int timeout_ms = -1) = 0;
 
 public:
+
 	/** Check if statistics is supported by a socket implementation.
 	 *
 	 * @returns true if statistics is supported, false otherwise.
@@ -75,7 +76,7 @@ public:
 	virtual const std::string statistics_csv(bool print_header) const { return std::string(); }
 
 
-	virtual int id() const = 0;
+	virtual SOCKET id() const = 0;
 };
 
 } // namespace socket

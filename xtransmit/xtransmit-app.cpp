@@ -65,7 +65,7 @@ string create_srt_logfa_description()
 
 	// Each group on a new line
 	stringstream ss;
-	ss << "SRT log functional areas: [";
+	ss << "SRT log functional areas: \n[";
 	int en10 = 0;
 	for (auto entry : revmap)
 	{
@@ -159,15 +159,17 @@ int main(int argc, char** argv)
 	});
 
 	string src, dst;
+	vector<string> src_urls;
+	vector<string> dst_urls;
 
 	generate::config cfg_generate;
-	CLI::App*        sc_generate = generate::add_subcommand(app, cfg_generate, dst);
+	CLI::App* sc_generate = generate::add_subcommand(app, cfg_generate, dst_urls);
 
 	xtransmit::receive::config cfg_receive;
-	CLI::App*                  sc_receive = receive::add_subcommand(app, cfg_receive, src);
+	CLI::App* sc_receive = receive::add_subcommand(app, cfg_receive, src_urls);
 
 	xtransmit::route::config cfg_route;
-	CLI::App*                sc_route = route::add_subcommand(app, cfg_route, src, dst);
+	CLI::App* sc_route = route::add_subcommand(app, cfg_route, src, dst);
 
 #if ENABLE_FILE_TRANSFER
 	CLI::App* sc_file = app.add_subcommand("file", "Send/receive a single file or folder contents")->fallthrough();
@@ -189,12 +191,20 @@ int main(int argc, char** argv)
 	// https://cliutils.gitlab.io/CLI11Tutorial/chapters/an-advanced-example.html
 	if (sc_generate->parsed())
 	{
-		generate::run(dst, cfg_generate, force_break);
+		for (const auto url : dst_urls)
+		{
+			spdlog::info("DST URL: {}", url);
+		}
+		generate::run(dst_urls, cfg_generate, force_break);
 		return 0;
 	}
 	else if (sc_receive->parsed())
 	{
-		xtransmit::receive::run(src, cfg_receive, force_break);
+		for (const auto url : src_urls)
+		{
+			spdlog::info("SRC URL: {}", url);
+		}
+		xtransmit::receive::run(src_urls, cfg_receive, force_break);
 		return 0;
 	}
 	else if (sc_route->parsed())

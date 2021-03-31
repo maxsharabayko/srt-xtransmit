@@ -79,12 +79,12 @@ socket::srt::~srt()
 {
 	if (!m_blocking_mode)
 	{
-		spdlog::debug(LOG_SOCK_SRT "0x{:X} Closing. Releasing epolls", m_bind_socket);
+		spdlog::debug(LOG_SOCK_SRT "@{} srt::~srt. releasing epolls", m_bind_socket);
 		if (m_epoll_connect != -1)
 			srt_epoll_release(m_epoll_connect);
 		srt_epoll_release(m_epoll_io);
 	}
-	spdlog::debug(LOG_SOCK_SRT "0x{:X} Closing", m_bind_socket);
+	spdlog::debug(LOG_SOCK_SRT "0x{:X} srt::~srt: closing", m_bind_socket);
 	srt_close(m_bind_socket);
 }
 
@@ -242,7 +242,7 @@ std::future<shared_srt> socket::srt::async_read(std::vector<char> &buffer)
 	return std::future<shared_srt>();
 }
 
-void socket::srt::assert_options_valid(const std::map<string, string>& options)
+void socket::srt::assert_options_valid(const map<string, string>& options, const unordered_set<string>& extra)
 {
 #ifdef ENABLE_CXX17
 	for (const auto& [key, val] : options)
@@ -263,7 +263,7 @@ void socket::srt::assert_options_valid(const std::map<string, string>& options)
 			break;
 		}
 		
-		if (opt_found || key == "bind" || key == "mode")
+		if (opt_found || extra.count(key))
 			continue;
 
 		stringstream ss;
@@ -275,7 +275,7 @@ void socket::srt::assert_options_valid(const std::map<string, string>& options)
 
 void socket::srt::assert_options_valid() const
 {
-	assert_options_valid(m_options);
+	assert_options_valid(m_options, {"bind", "mode"});
 }
 
 

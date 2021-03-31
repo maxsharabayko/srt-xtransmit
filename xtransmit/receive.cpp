@@ -13,6 +13,7 @@
 // xtransmit
 #include "socket_stats.hpp"
 #include "srt_socket.hpp"
+#include "srt_socket_group.hpp"
 #include "udp_socket.hpp"
 #include "receive.hpp"
 #include "metrics.hpp"
@@ -30,8 +31,6 @@ using shared_srt  = std::shared_ptr<socket::srt>;
 using shared_sock = std::shared_ptr<socket::isocket>;
 
 #define LOG_SC_RECEIVE "RECEIVE "
-
-
 
 
 void trace_message(const size_t bytes, const vector<char> &buffer, int conn_id)
@@ -137,12 +136,19 @@ void run_pipe(shared_sock src, const config &cfg, const atomic_bool &force_break
 	}
 }
 
-void xtransmit::receive::run(const string &src_url, const config &cfg, const atomic_bool &force_break)
+void xtransmit::receive::run(const vector<string> &src_urls, const config &cfg, const atomic_bool &force_break)
 {
-	const UriParser uri(src_url);
+	if (src_urls.empty())
+	{
+		spdlog::error(LOG_SC_RECEIVE "No destination URI was provided");
+		return;
+	}
 
-	shared_sock sock;
-	shared_sock conn;
+	vector<UriParser> urls;
+	for (const string& url : src_urls)
+	{
+		urls.emplace_back(url);
+	}
 
 	unique_ptr<socket::stats_writer> stats;
 
@@ -164,17 +170,33 @@ void xtransmit::receive::run(const string &src_url, const config &cfg, const ato
 	do {
 		try
 		{
-			if (uri.proto() == "udp")
+			shared_sock sock;
+			shared_sock conn;
+
+			if (urls.size() == 1)
 			{
-				conn = make_shared<socket::udp>(uri);
+				if (urls[0].proto() == "udp")
+				{
+					conn = make_shared<socket::udp>(urls[0]);
+				}
+				else
+				{
+					sock = make_shared<socket::srt>(urls[0]);
+					socket::srt* s = dynamic_cast<socket::srt*>(sock.get());
+					const bool   accept = s->mode() == socket::srt::LISTENER;
+					if (accept)
+						s->listen();
+					conn = accept ? s->accept() : s->connect();
+				}
 			}
 			else
 			{
-				sock = make_shared<socket::srt>(uri);
-				socket::srt* s = static_cast<socket::srt*>(sock.get());
-				const bool  accept = s->mode() == socket::srt::LISTENER;
-				if (accept)
+				sock = make_shared<socket::srt_group>(urls);
+				socket::srt_group* s = dynamic_cast<socket::srt_group*>(sock.get());
+				const bool   accept = s->mode() == socket::srt_group::LISTENER;
+				if (accept) {
 					s->listen();
+				}
 				conn = accept ? s->accept() : s->connect();
 			}
 
@@ -187,16 +209,18 @@ void xtransmit::receive::run(const string &src_url, const config &cfg, const ato
 		catch (const socket::exception & e)
 		{
 			spdlog::warn(LOG_SC_RECEIVE "{}", e.what());
+			if (stats)
+				stats->clear();
 		}
 	} while (cfg.reconnect && !force_break);
 }
 
-CLI::App* xtransmit::receive::add_subcommand(CLI::App& app, config& cfg, string& src_url)
+CLI::App* xtransmit::receive::add_subcommand(CLI::App& app, config& cfg, vector<string>& src_urls)
 {
 	const map<string, int> to_ms{ {"s", 1000}, {"ms", 1} };
 
 	CLI::App* sc_receive = app.add_subcommand("receive", "Receive data (SRT, UDP)")->fallthrough();
-	sc_receive->add_option("src", src_url, "Source URI");
+	sc_receive->add_option("--input,-i,src", src_urls, "Source URI");
 	sc_receive->add_option("--msgsize", cfg.message_size, "Size of a buffer to receive message payload");
 	sc_receive->add_option("--statsfile", cfg.stats_file, "output stats report filename");
 	sc_receive->add_option("--statsfreq", cfg.stats_freq_ms, "output stats report frequency (ms)")
@@ -208,6 +232,7 @@ CLI::App* xtransmit::receive::add_subcommand(CLI::App& app, config& cfg, string&
 	sc_receive->add_option("--metricsfreq", cfg.metrics_freq_ms, "Metrics report frequency")
 		->transform(CLI::AsNumberWithUnit(to_ms, CLI::AsNumberWithUnit::CASE_SENSITIVE));
 	sc_receive->add_flag("--twoway", cfg.send_reply, "Both send and receive data");
+	sc_receive->add_option("--input-group", cfg.inputs, "More input group URLs for SRT bonding");
 
 	return sc_receive;
 }

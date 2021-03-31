@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 #include <map>
+#include <unordered_set>
 
 // xtransmit
 #include "buffer.hpp"
@@ -51,9 +52,10 @@ public:
 	/// Verifies URI options provided are valid.
 	///
 	/// @param [in] options  a map of options key-value pairs to validate
+	/// @param [in] extra    a set of extra options that are valid, e.g. "mode", "bind"
 	/// @throw socket::exception on failure
 	///
-	static void assert_options_valid(const std::map<string, string>& options);
+	static void assert_options_valid(const std::map<string, string>& options, const std::unordered_set<string>& extra);
 
 private:
 	void configure(const std::map<string, string>& options);
@@ -88,7 +90,7 @@ public:
 	bool is_caller() const final { return m_mode == CALLER; }
 
 public:
-	int                      id() const final { return m_bind_socket; }
+	SOCKET                   id() const final { return m_bind_socket; }
 	int                      statistics(SRT_TRACEBSTATS& stats, bool instant = true);
 	bool                     supports_statistics() const final { return true; }
 	const std::string        statistics_csv(bool print_header) const final;
@@ -99,7 +101,7 @@ private:
 	void raise_exception(const string&& place, const string&& reason) const;
 
 private:
-	int m_bind_socket   = SRT_INVALID_SOCK;
+	SRTSOCKET m_bind_socket = SRT_INVALID_SOCK;
 	int m_epoll_connect = -1;
 	int m_epoll_io      = -1;
 
