@@ -33,6 +33,27 @@ using shared_sock = std::shared_ptr<socket::isocket>;
 
 #define LOG_SC_GENERATE "GENERATE "
 
+void receive_null(shared_sock src,
+	const config& cfg, const string&& desc, const atomic_bool& force_break)
+{
+	vector<char> buffer(cfg.message_size);
+
+	socket::isocket& sock_src = *src.get();
+
+	//spdlog::info(LOG_SC_ROUTE "{0} Started", desc);
+
+	while (!force_break)
+	{
+		const size_t bytes_read = sock_src.read(mutable_buffer(buffer.data(), buffer.size()), -1);
+
+		if (bytes_read == 0)
+		{
+			//spdlog::info(LOG_SC_ROUTE "{} read 0 bytes on a socket (spurious read-ready?). Retrying.", desc);
+			continue;
+		}
+	}
+}
+
 void run_pipe(shared_sock dst, const config& cfg, const atomic_bool& force_break)
 {
 	vector<char> message_to_send(cfg.message_size);
@@ -137,7 +158,15 @@ void xtransmit::generate::run(const string& dst_url, const config& cfg, const at
 
 			if (stats)
 				stats->add_socket(connection);
+			
+			future<void> nullrcv = ::async(::launch::async, receive_null, connection, cfg, "[DST->SRC]", ref(force_break));
+			
 			run_pipe(connection, cfg, force_break);
+			
+			if (stats && cfg.reconnect)
+				stats->clear();
+
+			nullrcv.wait();
 		}
 		catch (const socket::exception& e)
 		{
