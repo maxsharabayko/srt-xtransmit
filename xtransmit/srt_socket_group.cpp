@@ -426,7 +426,7 @@ void socket::srt_group::on_connect_callback(SRTSOCKET sock, int error, const soc
 		return;
 	}
 
-	spdlog::warn(LOG_SRT_GROUP "Member socket 0x{:X} (token {}) connection failed: ({}) {}.", sock, token, error,
+	spdlog::warn(LOG_SRT_GROUP "Member socket 0x{:X} (token {}) connection error: ({}) {}.", sock, token, error,
 		srt_strerror(error, 0));
 
 	bool reconn_scheduled = false;
