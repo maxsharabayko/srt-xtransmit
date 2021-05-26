@@ -67,7 +67,7 @@ private:
 	void raise_exception(const string&& place, const string&& reason) const;
 
 private:
-	ptls_context_t tlsctx;
+	ptls_context_t m_tlsctx;
 	quicly_context_t ctx;
 };
 

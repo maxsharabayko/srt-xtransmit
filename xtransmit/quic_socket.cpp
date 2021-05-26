@@ -15,8 +15,6 @@ using namespace std;
 using namespace xtransmit;
 using shared_quic = shared_ptr<socket::quic>;
 
-extern const ptls_context_t s_tlsctx;
-
 #define LOG_SOCK_QUIC "SOCKET::QUIC "
 
 struct st_stream_data_t {
@@ -30,9 +28,59 @@ static struct {
 	ptls_aead_context_t* enc, * dec;
 } address_token_aead;
 
-static void on_stop_sending(quicly_stream_t* stream, int err);
-static void on_receive_reset(quicly_stream_t* stream, int err);
-static void server_on_receive(quicly_stream_t* stream, size_t off, const void* src, size_t len);
+static void on_stop_sending(quicly_stream_t* stream, int err)
+{
+	assert(QUICLY_ERROR_IS_QUIC_APPLICATION(err));
+	fprintf(stderr, "received STOP_SENDING: %" PRIu16 "\n", QUICLY_ERROR_GET_ERROR_CODE(err));
+}
+
+static void on_receive_reset(quicly_stream_t* stream, int err)
+{
+	assert(QUICLY_ERROR_IS_QUIC_APPLICATION(err));
+	fprintf(stderr, "received RESET_STREAM: %" PRIu16 "\n", QUICLY_ERROR_GET_ERROR_CODE(err));
+}
+
+
+static void server_on_receive(quicly_stream_t* stream, size_t off, const void* src, size_t len)
+{
+	fprintf(stderr, "server_on_receive \n");
+	return;
+//	char* path;
+//	int is_http1;
+//
+//	if (!quicly_sendstate_is_open(&stream->sendstate))
+//		return;
+//
+//	if (quicly_streambuf_ingress_receive(stream, off, src, len) != 0)
+//		return;
+//
+//	if (!parse_request(quicly_streambuf_ingress_get(stream), &path, &is_http1)) {
+//		if (!quicly_recvstate_transfer_complete(&stream->recvstate))
+//			return;
+//		/* failed to parse request */
+//		send_header(stream, 1, 500, "text/plain; charset=utf-8");
+//		send_str(stream, "failed to parse HTTP request\n");
+//		goto Sent;
+//	}
+//	if (!quicly_recvstate_transfer_complete(&stream->recvstate))
+//		quicly_request_stop(stream, QUICLY_ERROR_FROM_APPLICATION_ERROR_CODE(0));
+//
+//	if (strcmp(path, "/logo.jpg") == 0 && send_file(stream, is_http1, "assets/logo.jpg", "image/jpeg"))
+//		goto Sent;
+//	if (strcmp(path, "/main.jpg") == 0 && send_file(stream, is_http1, "assets/main.jpg", "image/jpeg"))
+//		goto Sent;
+//	if (send_sized_text(stream, path, is_http1))
+//		goto Sent;
+//	if (validate_path(path) && send_file(stream, is_http1, path + 1, "text/plain"))
+//		goto Sent;
+//
+//	send_header(stream, is_http1, 404, "text/plain; charset=utf-8");
+//	send_str(stream, "not found\n");
+//Sent:
+//	quicly_streambuf_egress_shutdown(stream);
+//	quicly_streambuf_ingress_shift(stream, len);
+}
+
 static void client_on_receive(quicly_stream_t* stream, size_t off, const void* src, size_t len);
 
 static const quicly_stream_callbacks_t server_stream_callbacks = { quicly_streambuf_destroy,
@@ -107,7 +155,8 @@ int save_session(const quicly_transport_parameters_t* transport_params)
 	if (session_file == NULL)
 		return 0;
 
-	ptls_buffer_init(&buf, "", 0);
+	char bufnochar[] = "";
+	ptls_buffer_init(&buf, bufnochar, 0);
 
 	/* build data (session ticket and transport parameters) */
 	ptls_buffer_push_block(&buf, 2, { ptls_buffer_pushv(&buf, session_info.address_token.base, session_info.address_token.len); });
@@ -146,12 +195,65 @@ static int save_resumption_token_cb(quicly_save_resumption_token_t* _self, quicl
 
 static quicly_save_resumption_token_t save_resumption_token = { save_resumption_token_cb };
 
+static ptls_key_exchange_algorithm_t* key_exchanges[128];
+static ptls_cipher_suite_t* cipher_suites[128];
+
+int save_session_ticket_cb(ptls_save_ticket_t* _self, ptls_t* tls, ptls_iovec_t src)
+{
+	free(session_info.tls_ticket.base);
+	session_info.tls_ticket = ptls_iovec_init(malloc(src.len), src.len);
+	memcpy(session_info.tls_ticket.base, src.base, src.len);
+
+	quicly_conn_t* conn = (quicly_conn_t*) *ptls_get_data_ptr(tls);
+	return save_session(quicly_get_remote_transport_parameters(conn));
+}
+static ptls_save_ticket_t save_session_ticket = { save_session_ticket_cb };
+
+static struct {
+	ptls_iovec_t list[16];
+	size_t count;
+} negotiated_protocols;
+
+static int on_client_hello_cb(ptls_on_client_hello_t* _self, ptls_t* tls, ptls_on_client_hello_parameters_t* params)
+{
+	int ret;
+
+	if (negotiated_protocols.count != 0) {
+		size_t i, j;
+		const ptls_iovec_t* x, * y;
+		for (i = 0; i != negotiated_protocols.count; ++i) {
+			x = negotiated_protocols.list + i;
+			for (j = 0; j != params->negotiated_protocols.count; ++j) {
+				y = params->negotiated_protocols.list + j;
+				if (x->len == y->len && memcmp(x->base, y->base, x->len) == 0)
+					goto ALPN_Found;
+			}
+		}
+		return PTLS_ALERT_NO_APPLICATION_PROTOCOL;
+	ALPN_Found:
+		if ((ret = ptls_set_negotiated_protocol(tls, (const char*)x->base, x->len)) != 0)
+			return ret;
+	}
+
+	return 0;
+}
+
+static ptls_on_client_hello_t on_client_hello = { on_client_hello_cb };
+
 socket::quic::quic(const UriParser& src_uri)
 	: udp(src_uri)
-	, tlsctx(s_tlsctx)
+	, m_tlsctx()
 {
+	m_tlsctx.random_bytes = ptls_openssl_random_bytes;
+	m_tlsctx.get_time = &ptls_get_time;
+	m_tlsctx.key_exchanges = key_exchanges;
+	m_tlsctx.cipher_suites = cipher_suites;
+	m_tlsctx.require_dhe_on_psk = 1;
+	m_tlsctx.save_ticket = &save_session_ticket;
+	m_tlsctx.on_client_hello = &on_client_hello;
+
 	ctx = quicly_spec_context;
-	ctx.tls = &tlsctx;
+	ctx.tls = &m_tlsctx;
 	ctx.stream_open = &stream_open;
 	ctx.closed_by_remote = &closed_by_remote;
 	ctx.save_resumption_token = &save_resumption_token;

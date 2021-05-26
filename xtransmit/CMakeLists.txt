@@ -3,9 +3,14 @@ project(srt-xtransmit)
 option(ENABLE_CXX17 "Should the c++17 parts (file receive/send) be enabled" OFF)
 
 #AUX_SOURCE_DIRECTORY(SOURCES ./) 
-FILE(GLOB SOURCES *.cpp *.hpp)
+FILE(GLOB SOURCES *.cpp *.hpp *.c)
 
-add_executable(srt-xtransmit ${SOURCES})
+SET(PICOTLS_OPENSSL_FILES
+	${CMAKE_SOURCE_DIR}/submodule/quicly/deps/picotls/lib/openssl.c
+	${CMAKE_SOURCE_DIR}/submodule/quicly/deps/picotls/lib/pembase64.c
+	${CMAKE_SOURCE_DIR}/submodule/quicly/deps/picotls/lib/picotls.c)
+
+add_executable(srt-xtransmit ${SOURCES} ${PICOTLS_OPENSSL_FILES})
 
 message(STATUS "SRT_INCLUDE_DIR: ${SRT_INCLUDE_DIR}")
 message(STATUS "SRT_UTILS_INCLUDE_DIR: ${SRT_UTILS_INCLUDE_DIR}")
@@ -16,6 +21,7 @@ target_include_directories(srt-xtransmit PUBLIC
 	${SRT_INCLUDE_DIR}
 	${SRT_UTILS_INCLUDE_DIR}
 	${CMAKE_SOURCE_DIR}/submodule/quicly/include
+	${CMAKE_SOURCE_DIR}/submodule/quicly/deps/picotls/include
 	${PTHREAD_INCLUDE_DIR}
 	)
 
@@ -38,6 +44,7 @@ set (VIRTUAL_srtsupport $<TARGET_OBJECTS:srtsupport_virtual>)
 target_link_libraries(srt-xtransmit
 	PRIVATE CLI11::CLI11
 	PRIVATE spdlog::spdlog
+	quicly
 	PRIVATE ${TARGET_srt}_static ${VIRTUAL_srtsupport} ${LINKSTDCPP_FS})
 
 set_target_properties(srt-xtransmit
