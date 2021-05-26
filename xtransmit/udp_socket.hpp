@@ -40,8 +40,8 @@ public:
 	 *
 	 * @throws socket_exception Thrown on failure.
 	 */
-	size_t read(const mutable_buffer &buffer, int timeout_ms = -1) final;
-	int    write(const const_buffer &buffer, int timeout_ms = -1) final;
+	size_t read(const mutable_buffer &buffer, int timeout_ms = -1) override;
+	int    write(const const_buffer &buffer, int timeout_ms = -1) override;
 
 private:
 	SOCKET m_bind_socket = -1; // INVALID_SOCK;

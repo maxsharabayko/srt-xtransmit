@@ -11,9 +11,11 @@ message(STATUS "SRT_INCLUDE_DIR: ${SRT_INCLUDE_DIR}")
 message(STATUS "SRT_UTILS_INCLUDE_DIR: ${SRT_UTILS_INCLUDE_DIR}")
 message(STATUS "CMAKE_BINARY_DIR: ${CMAKE_BINARY_DIR}")
 message(STATUS "VIRTUAL_srtsupport: ${VIRTUAL_srtsupport}")
+message(STATUS "QUICLY_INCLUDE_DIR: ${QUICLY_INCLUDE_DIR}")
 target_include_directories(srt-xtransmit PUBLIC
 	${SRT_INCLUDE_DIR}
 	${SRT_UTILS_INCLUDE_DIR}
+	${CMAKE_SOURCE_DIR}/submodule/quicly/include
 	${PTHREAD_INCLUDE_DIR}
 	)
 

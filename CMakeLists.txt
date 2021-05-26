@@ -29,6 +29,8 @@ SET(ENABLE_SHARED OFF)
 SET(ENABLE_ENCRYPTION ON)
 add_subdirectory(submodule/srt)
 
+add_subdirectory(submodule/quicly)
+
 #set_target_properties(srt-live-transmit
 #	PROPERTIES
 #	ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
