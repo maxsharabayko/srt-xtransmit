@@ -14,6 +14,7 @@
 #include "socket_stats.hpp"
 #include "srt_socket.hpp"
 #include "udp_socket.hpp"
+#include "quic_socket.hpp"
 #include "receive.hpp"
 #include "metrics.hpp"
 
@@ -167,6 +168,15 @@ void xtransmit::receive::run(const string &src_url, const config &cfg, const ato
 			if (uri.proto() == "udp")
 			{
 				conn = make_shared<socket::udp>(uri);
+			}
+			else if (uri.proto() == "quic")
+			{
+				sock = make_shared<socket::quic>(uri);
+				socket::quic* s = static_cast<socket::quic*>(sock.get());
+				const bool  accept = !s->is_caller();
+				if (accept)
+					s->listen();
+				conn = accept ? s->accept() : s->connect();
 			}
 			else
 			{

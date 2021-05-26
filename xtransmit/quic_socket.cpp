@@ -272,6 +272,19 @@ socket::quic::quic(const UriParser& src_uri)
 
 socket::quic::~quic() { }
 
+
+shared_quic socket::quic::connect()
+{
+	struct sockaddr_in local;
+	int ret;
+	quicly_conn_t* conn = NULL;
+
+	ret = quicly_connect(&conn, &ctx, host, sa, NULL, &next_cid, resumption_token, &hs_properties, &resumed_transport_params);
+	assert(ret == 0);
+
+	shared_quic
+}
+
 size_t socket::quic::read(const mutable_buffer& buffer, int timeout_ms)
 {
 	const size_t udp_read = udp::read(buffer, timeout_ms);
