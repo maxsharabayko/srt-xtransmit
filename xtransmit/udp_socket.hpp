@@ -43,7 +43,7 @@ public:
 	size_t read(const mutable_buffer &buffer, int timeout_ms = -1) override;
 	int    write(const const_buffer &buffer, int timeout_ms = -1) override;
 
-private:
+protected:
 	SOCKET m_bind_socket = -1; // INVALID_SOCK;
 	sockaddr_in m_dst_addr = {};
 

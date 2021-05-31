@@ -240,6 +240,14 @@ static int on_client_hello_cb(ptls_on_client_hello_t* _self, ptls_t* tls, ptls_o
 
 static ptls_on_client_hello_t on_client_hello = { on_client_hello_cb };
 
+static void on_receive_datagram_frame(quicly_receive_datagram_frame_t* self, quicly_conn_t* conn, ptls_iovec_t payload)
+{
+	printf("DATAGRAM: %.*s\n", (int)payload.len, payload.base);
+	/* send responds with a datagram frame */
+	if (!quicly_is_client(conn))
+		quicly_send_datagram_frames(conn, &payload, 1);
+}
+
 socket::quic::quic(const UriParser& src_uri)
 	: udp(src_uri)
 	, m_tlsctx()
@@ -259,6 +267,8 @@ socket::quic::quic(const UriParser& src_uri)
 	ctx.save_resumption_token = &save_resumption_token;
 	ctx.generate_resumption_token = &generate_resumption_token;
 
+	key_exchanges[0] = &ptls_openssl_secp256r1;
+
 	setup_session_cache(ctx.tls);
 	quicly_amend_ptls_context(ctx.tls);
 
@@ -268,21 +278,41 @@ socket::quic::quic(const UriParser& src_uri)
 		address_token_aead.enc = ptls_aead_new(&ptls_openssl_aes128gcm, &ptls_openssl_sha256, 1, secret, "");
 		address_token_aead.dec = ptls_aead_new(&ptls_openssl_aes128gcm, &ptls_openssl_sha256, 0, secret, "");
 	}
+
+	// Amend cipher-suites. Copy the defaults when `-y` option is not used. Otherwise, complain if aes128gcmsha256 is not specified.
+	size_t i;
+	for (i = 0; ptls_openssl_cipher_suites[i] != NULL; ++i) {
+		cipher_suites[i] = ptls_openssl_cipher_suites[i];
+	}
+
+	// Send datagram frame.
+	static quicly_receive_datagram_frame_t cb = { on_receive_datagram_frame };
+	ctx.receive_datagram_frame = &cb;
+	ctx.transport_params.max_datagram_frame_size = ctx.transport_params.max_udp_payload_size;
 }
 
 socket::quic::~quic() { }
+
+static ptls_handshake_properties_t hs_properties;
+static quicly_cid_plaintext_t next_cid;
+static ptls_iovec_t resumption_token;
+static quicly_transport_parameters_t resumed_transport_params;
 
 
 shared_quic socket::quic::connect()
 {
 	struct sockaddr_in local;
-	int ret;
 	quicly_conn_t* conn = NULL;
 
-	ret = quicly_connect(&conn, &ctx, host, sa, NULL, &next_cid, resumption_token, &hs_properties, &resumed_transport_params);
-	assert(ret == 0);
+	hs_properties.client.negotiated_protocols.list = negotiated_protocols.list;
+	hs_properties.client.negotiated_protocols.count = negotiated_protocols.count;
+	// TODO: load session file. See load_session() call.
 
-	shared_quic
+	int ret = quicly_connect(&conn, &ctx, m_host.c_str(), (sockaddr*) &m_dst_addr, NULL, &next_cid, resumption_token, &hs_properties, &resumed_transport_params);
+	assert(ret == 0);
+	++next_cid.master_id;
+
+	return shared_quic();
 }
 
 size_t socket::quic::read(const mutable_buffer& buffer, int timeout_ms)

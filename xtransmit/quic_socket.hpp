@@ -43,14 +43,14 @@ public:
 	std::future<shared_quic> async_accept() noexcept(false);
 
 	shared_quic connect();
-	shared_quic accept();
+	shared_quic accept() { return shared_quic(); }
 
 	/**
 	 * Start listening on the incomming connection requests.
 	 *
 	 * May throw a socket::exception.
 	 */
-	void listen() noexcept(false);
+	void listen() noexcept(false) {}
 
 public:
 	std::future<shared_quic> async_read(std::vector<char>& buffer);
