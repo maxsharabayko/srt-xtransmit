@@ -83,6 +83,12 @@ static void server_on_receive(quicly_stream_t* stream, size_t off, const void* s
 
 static void client_on_receive(quicly_stream_t* stream, size_t off, const void* src, size_t len);
 
+static void client_on_receive(quicly_stream_t* stream, size_t off, const void* src, size_t len)
+{
+	fprintf(stderr, "client_on_receive \n");
+	return;
+}
+
 static const quicly_stream_callbacks_t server_stream_callbacks = { quicly_streambuf_destroy,
 																  quicly_streambuf_egress_shift,
 																  quicly_streambuf_egress_emit,
@@ -298,21 +304,98 @@ static quicly_cid_plaintext_t next_cid;
 static ptls_iovec_t resumption_token;
 static quicly_transport_parameters_t resumed_transport_params;
 
+/**
+ * list of requests to be processed, terminated by reqs[N].path == NULL
+ */
+struct {
+	const char* path;
+	int to_file;
+} *reqs;
+
+static void send_str(quicly_stream_t* stream, const char* s)
+{
+	quicly_streambuf_egress_write(stream, s, strlen(s));
+}
+
+static int64_t enqueue_requests_at = 0, request_interval = 0;
+
+static void enqueue_requests(quicly_conn_t* conn)
+{
+	size_t i;
+	int ret;
+
+	for (i = 0; reqs[i].path != NULL; ++i) {
+		char req[1024], destfile[1024];
+		quicly_stream_t* stream;
+		ret = quicly_open_stream(conn, &stream, 0);
+		assert(ret == 0);
+		sprintf(req, "GET %s\r\n", reqs[i].path);
+		send_str(stream, req);
+		quicly_streambuf_egress_shutdown(stream);
+
+		//if (reqs[i].to_file && !suppress_output) {
+		//	struct st_stream_data_t* stream_data = stream->data;
+		//	sprintf(destfile, "%s.downloaded", strrchr(reqs[i].path, '/') + 1);
+		//	stream_data->outfp = fopen(destfile, "w");
+		//	if (stream_data->outfp == NULL) {
+		//		fprintf(stderr, "failed to open destination file:%s:%s\n", reqs[i].path, strerror(errno));
+		//		exit(1);
+		//	}
+		//}
+	}
+	enqueue_requests_at = INT64_MAX;
+}
+
+static void send_packets_default(int fd, struct sockaddr* dest, struct iovec* packets, size_t num_packets)
+{
+	for (size_t i = 0; i != num_packets; ++i) {
+		struct msghdr mess;
+		memset(&mess, 0, sizeof(mess));
+		mess.msg_name = dest;
+		mess.msg_namelen = quicly_get_socklen(dest);
+		mess.msg_iov = &packets[i];
+		mess.msg_iovlen = 1;
+		int ret;
+		while ((ret = (int)sendmsg(fd, &mess, 0)) == -1 && errno == EINTR)
+			;
+		if (ret == -1)
+			perror("sendmsg failed");
+	}
+}
+
+#define MAX_BURST_PACKETS 10
+
+static int send_pending(int fd, quicly_conn_t* conn)
+{
+	quicly_address_t dest, src;
+	struct iovec packets[MAX_BURST_PACKETS];
+	uint8_t buf[MAX_BURST_PACKETS * quicly_get_context(conn)->transport_params.max_udp_payload_size];
+	size_t num_packets = MAX_BURST_PACKETS;
+	int ret;
+
+	if ((ret = quicly_send(conn, &dest, &src, packets, &num_packets, buf, sizeof(buf))) == 0 && num_packets != 0)
+		send_packets_default(fd, &dest.sa, packets, num_packets);
+
+	return ret;
+}
+
 
 shared_quic socket::quic::connect()
 {
 	struct sockaddr_in local;
-	quicly_conn_t* conn = NULL;
 
 	hs_properties.client.negotiated_protocols.list = negotiated_protocols.list;
 	hs_properties.client.negotiated_protocols.count = negotiated_protocols.count;
 	// TODO: load session file. See load_session() call.
 
-	int ret = quicly_connect(&conn, &ctx, m_host.c_str(), (sockaddr*) &m_dst_addr, NULL, &next_cid, resumption_token, &hs_properties, &resumed_transport_params);
+	int ret = quicly_connect(&m_conn, &ctx, m_host.c_str(), (sockaddr*) &m_dst_addr, NULL, &next_cid, resumption_token, &hs_properties, &resumed_transport_params);
 	assert(ret == 0);
 	++next_cid.master_id;
 
-	return shared_quic();
+	enqueue_requests(m_conn);
+	send_pending(m_bind_socket, m_conn);
+
+	return shared_from_this();
 }
 
 size_t socket::quic::read(const mutable_buffer& buffer, int timeout_ms)

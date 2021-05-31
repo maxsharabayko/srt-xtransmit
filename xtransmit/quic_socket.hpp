@@ -69,6 +69,7 @@ private:
 private:
 	ptls_context_t m_tlsctx;
 	quicly_context_t ctx;
+	quicly_conn_t* m_conn = nullptr;
 };
 
 } // namespace socket
