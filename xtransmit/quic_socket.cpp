@@ -266,21 +266,21 @@ socket::quic::quic(const UriParser& src_uri)
 	m_tlsctx.save_ticket = &save_session_ticket;
 	m_tlsctx.on_client_hello = &on_client_hello;
 
-	ctx = quicly_spec_context;
-	ctx.tls = &m_tlsctx;
-	ctx.stream_open = &stream_open;
-	ctx.closed_by_remote = &closed_by_remote;
-	ctx.save_resumption_token = &save_resumption_token;
-	ctx.generate_resumption_token = &generate_resumption_token;
+	m_ctx = quicly_spec_context;
+	m_ctx.tls = &m_tlsctx;
+	m_ctx.stream_open = &stream_open;
+	m_ctx.closed_by_remote = &closed_by_remote;
+	m_ctx.save_resumption_token = &save_resumption_token;
+	m_ctx.generate_resumption_token = &generate_resumption_token;
 
 	key_exchanges[0] = &ptls_openssl_secp256r1;
 
-	setup_session_cache(ctx.tls);
-	quicly_amend_ptls_context(ctx.tls);
+	setup_session_cache(m_ctx.tls);
+	quicly_amend_ptls_context(m_ctx.tls);
 
 	{
 		uint8_t secret[PTLS_MAX_DIGEST_SIZE];
-		ctx.tls->random_bytes(secret, ptls_openssl_sha256.digest_size);
+		m_ctx.tls->random_bytes(secret, ptls_openssl_sha256.digest_size);
 		address_token_aead.enc = ptls_aead_new(&ptls_openssl_aes128gcm, &ptls_openssl_sha256, 1, secret, "");
 		address_token_aead.dec = ptls_aead_new(&ptls_openssl_aes128gcm, &ptls_openssl_sha256, 0, secret, "");
 	}
@@ -293,8 +293,8 @@ socket::quic::quic(const UriParser& src_uri)
 
 	// Send datagram frame.
 	static quicly_receive_datagram_frame_t cb = { on_receive_datagram_frame };
-	ctx.receive_datagram_frame = &cb;
-	ctx.transport_params.max_datagram_frame_size = ctx.transport_params.max_udp_payload_size;
+	m_ctx.receive_datagram_frame = &cb;
+	m_ctx.transport_params.max_datagram_frame_size = m_ctx.transport_params.max_udp_payload_size;
 }
 
 socket::quic::~quic() { }
@@ -389,6 +389,69 @@ static int send_pending(int fd, quicly_conn_t* conn)
 	return ret;
 }
 
+static void th_receive(quicly_conn_t* conn, quicly_context_t* ctx, int fd)
+{
+	struct sockaddr_in local;
+	int ret;
+
+	while (1) {
+		fd_set readfds;
+		struct timeval* tv, tvbuf;
+		do {
+			int64_t timeout_at = conn != NULL ? quicly_get_first_timeout(conn) : INT64_MAX;
+			if (enqueue_requests_at < timeout_at)
+				timeout_at = enqueue_requests_at;
+			if (timeout_at != INT64_MAX) {
+				quicly_context_t* ctx = quicly_get_context(conn);
+				int64_t delta = timeout_at - ctx->now->cb(ctx->now);
+				if (delta > 0) {
+					tvbuf.tv_sec = delta / 1000;
+					tvbuf.tv_usec = (delta % 1000) * 1000;
+				}
+				else {
+					tvbuf.tv_sec = 0;
+					tvbuf.tv_usec = 0;
+				}
+				tv = &tvbuf;
+			}
+			else {
+				tv = NULL;
+			}
+			FD_ZERO(&readfds);
+			FD_SET(fd, &readfds);
+		} while (select(fd + 1, &readfds, NULL, NULL, tv) == -1 && errno == EINTR);
+		if (enqueue_requests_at <= ctx->now->cb(ctx->now))
+			enqueue_requests(conn);
+		if (FD_ISSET(fd, &readfds)) {
+			while (1) {
+				uint8_t buf[1500];
+				struct msghdr mess;
+				struct sockaddr sa;
+				struct iovec vec;
+				memset(&mess, 0, sizeof(mess));
+				mess.msg_name = &sa;
+				mess.msg_namelen = sizeof(sa);
+				vec.iov_base = buf;
+				vec.iov_len = sizeof(buf);
+				mess.msg_iov = &vec;
+				mess.msg_iovlen = 1;
+				ssize_t rret;
+				while ((rret = recvmsg(fd, &mess, 0)) == -1 && errno == EINTR)
+					;
+				if (rret <= 0)
+					break;
+				size_t off = 0;
+				while (off != rret) {
+					quicly_decoded_packet_t packet;
+					if (quicly_decode_packet(ctx, &packet, buf, rret, &off) == SIZE_MAX)
+						break;
+					quicly_receive(conn, NULL, &sa, &packet);
+				}
+			}
+		}
+	}
+}
+
 
 shared_quic socket::quic::connect()
 {
@@ -399,12 +462,14 @@ shared_quic socket::quic::connect()
 	// TODO: load session file. See load_session() call.
 
 	sockaddr_in dst_addr = m_udp.dst_addr();
-	int ret = quicly_connect(&m_conn, &ctx, m_udp.host(), (sockaddr*) &dst_addr, NULL, &next_cid, resumption_token, &hs_properties, &resumed_transport_params);
+	int ret = quicly_connect(&m_conn, &m_ctx, m_udp.host(), (sockaddr*) &dst_addr, NULL, &next_cid, resumption_token, &hs_properties, &resumed_transport_params);
 	assert(ret == 0);
 	++next_cid.master_id;
 
 	enqueue_requests(m_conn);
 	send_pending(m_udp.id(), m_conn);
+
+	m_rcvth = ::async(::launch::async, th_receive, m_conn, &m_ctx, m_udp.id());
 
 	return shared_from_this();
 }
@@ -420,18 +485,15 @@ size_t socket::quic::read(const mutable_buffer& buffer, int timeout_ms)
 
 int socket::quic::write(const const_buffer& buffer, int timeout_ms)
 {
-	quicly_address_t dest, src;
-	struct iovec packets[MAX_BURST_PACKETS];
-	uint8_t buf[MAX_BURST_PACKETS * 1500];
-	size_t num_packets = MAX_BURST_PACKETS;
+	ptls_iovec_t datagram = ptls_iovec_init(buffer.data(), buffer.size());
+	quicly_send_datagram_frames(m_conn, &datagram, 1);
 
-	int ret;
-
-	if ((ret = quicly_send(m_conn, &dest, &src, packets, &num_packets, const_cast<void*>(buffer.data()), buffer.size())) == 0 && num_packets != 0)
-		send_packets_default(m_udp.id(), &dest.sa, packets, num_packets);
-	else
-		fprintf(stderr, "send_pending error %d\n", ret);
-
+	int ret = send_pending(m_udp.id(), m_conn);
+	if (ret != 0) {
+		quicly_free(m_conn);
+		m_conn = NULL;
+		fprintf(stderr, "quicly_send returned %d\n", ret);
+	}
 
 	//const size_t udp_write = m_udp.write(buffer, timeout_ms);
 

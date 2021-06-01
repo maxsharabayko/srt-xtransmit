@@ -69,9 +69,10 @@ private:
 
 private:
 	ptls_context_t m_tlsctx;
-	quicly_context_t ctx;
+	quicly_context_t m_ctx;
 	quicly_conn_t* m_conn = nullptr;
 	socket::udp    m_udp;
+	std::future<void>   m_rcvth;
 };
 
 } // namespace socket
