@@ -354,6 +354,7 @@ static void enqueue_requests(quicly_conn_t* conn)
 
 static void send_packets_default(int fd, struct sockaddr* dest, struct iovec* packets, size_t num_packets)
 {
+	fprintf(stderr, "send_packets_default: %d pkts, len %d \n", (int) num_packets, packets[0].iov_len);
 	for (size_t i = 0; i != num_packets; ++i) {
 		struct msghdr mess;
 		memset(&mess, 0, sizeof(mess));
@@ -366,8 +367,6 @@ static void send_packets_default(int fd, struct sockaddr* dest, struct iovec* pa
 			;
 		if (ret == -1)
 			perror("sendmsg failed");
-		else
-			fprintf(stderr, "send_packets_default \n");
 	}
 }
 
@@ -383,26 +382,26 @@ static int send_pending(int fd, quicly_conn_t* conn)
 
 	if ((ret = quicly_send(conn, &dest, &src, packets, &num_packets, buf, sizeof(buf))) == 0 && num_packets != 0)
 		send_packets_default(fd, &dest.sa, packets, num_packets);
+	else if (num_packets == 0)
+		fprintf(stderr, "send_pending no packets to send\n");
 	else
 		fprintf(stderr, "send_pending error %d\n", ret);
 
 	return ret;
 }
 
-static void th_receive(quicly_conn_t* conn, quicly_context_t* ctx, int fd)
+static void th_receive(quicly_conn_t* conn, int fd)
 {
 	struct sockaddr_in local;
 	int ret;
+	quicly_context_t* ctx = quicly_get_context(conn);
 
 	while (1) {
 		fd_set readfds;
 		struct timeval* tv, tvbuf;
 		do {
-			int64_t timeout_at = conn != NULL ? quicly_get_first_timeout(conn) : INT64_MAX;
-			if (enqueue_requests_at < timeout_at)
-				timeout_at = enqueue_requests_at;
+			const int64_t timeout_at = 100; // ms
 			if (timeout_at != INT64_MAX) {
-				quicly_context_t* ctx = quicly_get_context(conn);
 				int64_t delta = timeout_at - ctx->now->cb(ctx->now);
 				if (delta > 0) {
 					tvbuf.tv_sec = delta / 1000;
@@ -420,8 +419,8 @@ static void th_receive(quicly_conn_t* conn, quicly_context_t* ctx, int fd)
 			FD_ZERO(&readfds);
 			FD_SET(fd, &readfds);
 		} while (select(fd + 1, &readfds, NULL, NULL, tv) == -1 && errno == EINTR);
-		if (enqueue_requests_at <= ctx->now->cb(ctx->now))
-			enqueue_requests(conn);
+		//if (enqueue_requests_at <= ctx->now->cb(ctx->now))
+		//	enqueue_requests(conn);
 		if (FD_ISSET(fd, &readfds)) {
 			while (1) {
 				uint8_t buf[1500];
@@ -466,10 +465,10 @@ shared_quic socket::quic::connect()
 	assert(ret == 0);
 	++next_cid.master_id;
 
-	enqueue_requests(m_conn);
+	//enqueue_requests(m_conn);
 	send_pending(m_udp.id(), m_conn);
 
-	m_rcvth = ::async(::launch::async, th_receive, m_conn, &m_ctx, m_udp.id());
+	m_rcvth = ::async(::launch::async, th_receive, m_conn, m_udp.id());
 
 	return shared_from_this();
 }
@@ -485,8 +484,12 @@ size_t socket::quic::read(const mutable_buffer& buffer, int timeout_ms)
 
 int socket::quic::write(const const_buffer& buffer, int timeout_ms)
 {
-	ptls_iovec_t datagram = ptls_iovec_init(buffer.data(), buffer.size());
+	ptls_iovec_t datagram = ptls_iovec_init(buffer.data(), 128/*buffer.size()*/);
 	quicly_send_datagram_frames(m_conn, &datagram, 1);
+
+	/*const char* message = "hello datagram!";
+	ptls_iovec_t datagram = ptls_iovec_init(message, strlen(message));
+	quicly_send_datagram_frames(m_conn, &datagram, 1);*/
 
 	int ret = send_pending(m_udp.id(), m_conn);
 	if (ret != 0) {

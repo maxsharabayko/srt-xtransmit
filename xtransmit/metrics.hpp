@@ -40,10 +40,10 @@ namespace metrics
 		inline void generate_payload(vector<char>& payload)
 		{
 			iota(payload.begin(), payload.end(), static_cast<char>(m_seqno));
+			write_packet_seqno(payload, m_seqno++);
+
 			if (!m_enable_metrics)
 				return;
-
-			write_packet_seqno(payload, m_seqno++);
 			write_steadyclock_timestamp(payload);
 			write_sysclock_timestamp(payload);
 		}
