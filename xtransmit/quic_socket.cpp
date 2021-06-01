@@ -255,7 +255,7 @@ static void on_receive_datagram_frame(quicly_receive_datagram_frame_t* self, qui
 }
 
 socket::quic::quic(const UriParser& src_uri)
-	: udp(src_uri)
+	: m_udp(src_uri)
 	, m_tlsctx()
 {
 	m_tlsctx.random_bytes = ptls_openssl_random_bytes;
@@ -310,10 +310,11 @@ static quicly_transport_parameters_t resumed_transport_params;
 struct {
 	const char* path;
 	int to_file;
-} *reqs;
+} *reqs = {};
 
 static void send_str(quicly_stream_t* stream, const char* s)
 {
+	fprintf(stderr, "send_str \n");
 	quicly_streambuf_egress_write(stream, s, strlen(s));
 }
 
@@ -321,6 +322,9 @@ static int64_t enqueue_requests_at = 0, request_interval = 0;
 
 static void enqueue_requests(quicly_conn_t* conn)
 {
+	if (reqs == nullptr)
+		return;
+
 	size_t i;
 	int ret;
 
@@ -332,6 +336,8 @@ static void enqueue_requests(quicly_conn_t* conn)
 		sprintf(req, "GET %s\r\n", reqs[i].path);
 		send_str(stream, req);
 		quicly_streambuf_egress_shutdown(stream);
+
+		fprintf(stderr, "enqueue_requests \n");
 
 		//if (reqs[i].to_file && !suppress_output) {
 		//	struct st_stream_data_t* stream_data = stream->data;
@@ -360,6 +366,8 @@ static void send_packets_default(int fd, struct sockaddr* dest, struct iovec* pa
 			;
 		if (ret == -1)
 			perror("sendmsg failed");
+		else
+			fprintf(stderr, "send_packets_default \n");
 	}
 }
 
@@ -375,6 +383,8 @@ static int send_pending(int fd, quicly_conn_t* conn)
 
 	if ((ret = quicly_send(conn, &dest, &src, packets, &num_packets, buf, sizeof(buf))) == 0 && num_packets != 0)
 		send_packets_default(fd, &dest.sa, packets, num_packets);
+	else
+		fprintf(stderr, "send_pending error %d\n", ret);
 
 	return ret;
 }
@@ -388,19 +398,20 @@ shared_quic socket::quic::connect()
 	hs_properties.client.negotiated_protocols.count = negotiated_protocols.count;
 	// TODO: load session file. See load_session() call.
 
-	int ret = quicly_connect(&m_conn, &ctx, m_host.c_str(), (sockaddr*) &m_dst_addr, NULL, &next_cid, resumption_token, &hs_properties, &resumed_transport_params);
+	sockaddr_in dst_addr = m_udp.dst_addr();
+	int ret = quicly_connect(&m_conn, &ctx, m_udp.host(), (sockaddr*) &dst_addr, NULL, &next_cid, resumption_token, &hs_properties, &resumed_transport_params);
 	assert(ret == 0);
 	++next_cid.master_id;
 
 	enqueue_requests(m_conn);
-	send_pending(m_bind_socket, m_conn);
+	send_pending(m_udp.id(), m_conn);
 
 	return shared_from_this();
 }
 
 size_t socket::quic::read(const mutable_buffer& buffer, int timeout_ms)
 {
-	const size_t udp_read = udp::read(buffer, timeout_ms);
+	const size_t udp_read = m_udp.read(buffer, timeout_ms);
 
 	// TODO: Add QUIC decode.
 
@@ -409,9 +420,22 @@ size_t socket::quic::read(const mutable_buffer& buffer, int timeout_ms)
 
 int socket::quic::write(const const_buffer& buffer, int timeout_ms)
 {
-	const size_t udp_write = udp::write(buffer, timeout_ms);
+	quicly_address_t dest, src;
+	struct iovec packets[MAX_BURST_PACKETS];
+	uint8_t buf[MAX_BURST_PACKETS * 1500];
+	size_t num_packets = MAX_BURST_PACKETS;
+
+	int ret;
+
+	if ((ret = quicly_send(m_conn, &dest, &src, packets, &num_packets, const_cast<void*>(buffer.data()), buffer.size())) == 0 && num_packets != 0)
+		send_packets_default(m_udp.id(), &dest.sa, packets, num_packets);
+	else
+		fprintf(stderr, "send_pending error %d\n", ret);
+
+
+	//const size_t udp_write = m_udp.write(buffer, timeout_ms);
 
 	// TODO: Add QUIC encode.
 
-	return udp_write;
+	return buffer.size();
 }

@@ -34,6 +34,10 @@ public:
 
 	int id() const final { return m_bind_socket; }
 
+	const char* host() const { return m_host.c_str(); }
+
+	sockaddr_in dst_addr() const { return m_dst_addr; }
+
 public:
 	/**
 	 * @returns The number of bytes received.
