@@ -252,8 +252,8 @@ static void on_receive_datagram_frame(quicly_receive_datagram_frame_t* self, qui
 		 << ", length " << payload.len << "\n";
 	//printf("DATAGRAM: %.*s\n", (int)payload.len, payload.base);
 	/* send responds with a datagram frame */
-	if (!quicly_is_client(conn))
-		quicly_send_datagram_frames(conn, &payload, 1);
+	//if (!quicly_is_client(conn))
+	//	quicly_send_datagram_frames(conn, &payload, 1);
 }
 
 socket::quic::quic(const UriParser& src_uri)
@@ -499,11 +499,10 @@ static void send_one_packet(int fd, struct sockaddr* dest, const void* payload, 
 	send_packets_default(fd, dest, &vec, 1);
 }
 
-static void th_receive(quicly_conn_t*& conn, int fd, atomic_bool& closing)
+static void th_receive(quicly_context_t* ctx, quicly_conn_t*& conn, int fd, atomic_bool& closing, socket::quic* self)
 {
 	struct sockaddr_in local;
 	int ret;
-	quicly_context_t* ctx = quicly_get_context(conn);
 	const bool enforce_retry = false; // -R option in quicly cli app
 
 	while (!closing) {
@@ -535,11 +534,11 @@ static void th_receive(quicly_conn_t*& conn, int fd, atomic_bool& closing)
 			while (1) {
 				uint8_t buf[1500];
 				struct msghdr mess;
-				struct sockaddr sa;
+				quicly_address_t remote = {};
 				struct iovec vec;
 				memset(&mess, 0, sizeof(mess));
-				mess.msg_name = &sa;
-				mess.msg_namelen = sizeof(sa);
+				mess.msg_name = &remote.sa;
+				mess.msg_namelen = sizeof(remote.sa);
 				vec.iov_base = buf;
 				vec.iov_len = sizeof(buf);
 				mess.msg_iov = &vec;
@@ -557,7 +556,7 @@ static void th_receive(quicly_conn_t*& conn, int fd, atomic_bool& closing)
 
 					// Begin server code
 					quicly_conn_t* dispatch_conn = NULL;
-					quicly_address_t remote;
+					
 					if (conn == nullptr || !quicly_is_client(conn))
 					{
 						if (QUICLY_PACKET_IS_LONG_HEADER(packet.octets.base[0])) {
@@ -574,7 +573,7 @@ static void th_receive(quicly_conn_t*& conn, int fd, atomic_bool& closing)
 								break;
 						}
 
-						if (quicly_is_destination(conn, NULL, &remote.sa, &packet)) {
+						if (conn != nullptr && quicly_is_destination(conn, NULL, &remote.sa, &packet)) {
 							dispatch_conn = conn;
 						}
 					}
@@ -586,7 +585,7 @@ static void th_receive(quicly_conn_t*& conn, int fd, atomic_bool& closing)
 
 					if (dispatch_conn != NULL)
 					{
-						quicly_receive(dispatch_conn, NULL, &sa, &packet);
+						quicly_receive(dispatch_conn, NULL, &remote.sa, &packet);
 					}
 					// Begin server code
 					else if (QUICLY_PACKET_IS_INITIAL(packet.octets.base[0])) {
@@ -634,7 +633,9 @@ static void th_receive(quicly_conn_t*& conn, int fd, atomic_bool& closing)
 								assert(new_conn != nullptr); //new connection is accepted.
 								assert(conn == nullptr); // no connection has been established till now
 								++next_cid.master_id;
-								conn = new_conn;
+
+								self->on_accept_new_conn(new_conn);
+								assert(conn != nullptr); // now conn must be set
 							}
 							else {
 								spdlog::warn(LOG_SOCK_QUIC "failed to accept new connection.");
@@ -660,6 +661,32 @@ static void th_receive(quicly_conn_t*& conn, int fd, atomic_bool& closing)
 	}
 }
 
+void socket::quic::listen() noexcept(false)
+{
+	if (m_rcvth.valid())
+		return;
+	spdlog::trace(LOG_SOCK_QUIC "listening.");
+	m_rcvth = ::async(::launch::async, th_receive, &m_ctx, ref(m_conn), m_udp.id(), ref(m_closing), this);
+}
+
+shared_quic socket::quic::accept()
+{
+	while (m_conn == nullptr)
+	{
+		unique_lock<mutex> lck(m_mtx_accept);
+		m_cv_accept.wait(lck);
+	}
+
+	spdlog::trace(LOG_SOCK_QUIC "connection accepted.");
+	return shared_from_this();
+}
+
+void socket::quic::on_accept_new_conn(quicly_conn_t* new_conn)
+{
+	unique_lock<mutex> lck(m_mtx_accept);
+	m_conn = new_conn;
+	m_cv_accept.notify_all();
+}
 
 shared_quic socket::quic::connect()
 {
@@ -677,7 +704,7 @@ shared_quic socket::quic::connect()
 	//enqueue_requests(m_conn);
 	send_pending(m_udp.id(), m_conn);
 
-	m_rcvth = ::async(::launch::async, th_receive, ref(m_conn), m_udp.id(), ref(m_closing));
+	m_rcvth = ::async(::launch::async, th_receive, &m_ctx, ref(m_conn), m_udp.id(), ref(m_closing), this);
 
 	return shared_from_this();
 }

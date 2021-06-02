@@ -47,14 +47,14 @@ public:
 	int id() const final { return m_udp.id(); }
 
 	shared_quic connect();
-	shared_quic accept() { return shared_quic(); }
+	shared_quic accept();
 
 	/**
 	 * Start listening on the incomming connection requests.
 	 *
 	 * May throw a socket::exception.
 	 */
-	void listen() noexcept(false) {}
+	void listen() noexcept(false);
 
 public:
 	/// @returns The number of bytes received.
@@ -62,6 +62,9 @@ public:
 	size_t read(const mutable_buffer& buffer, int timeout_ms = -1);
 
 	int    write(const const_buffer& buffer, int timeout_ms = -1);
+
+	// Internally used
+	void on_accept_new_conn(quicly_conn_t* new_conn);
 	
 private:
 	void raise_exception(const string&& place) const;
@@ -74,6 +77,9 @@ private:
 	socket::udp    m_udp;
 	std::future<void>   m_rcvth;
 	std::atomic_bool m_closing;
+
+	std::mutex m_mtx_accept;
+	std::condition_variable m_cv_accept;
 };
 
 } // namespace socket
