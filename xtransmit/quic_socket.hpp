@@ -73,6 +73,7 @@ private:
 	quicly_conn_t* m_conn = nullptr;
 	socket::udp    m_udp;
 	std::future<void>   m_rcvth;
+	std::atomic_bool m_closing;
 };
 
 } // namespace socket

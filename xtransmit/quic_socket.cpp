@@ -248,7 +248,9 @@ static ptls_on_client_hello_t on_client_hello = { on_client_hello_cb };
 
 static void on_receive_datagram_frame(quicly_receive_datagram_frame_t* self, quicly_conn_t* conn, ptls_iovec_t payload)
 {
-	printf("DATAGRAM: %.*s\n", (int)payload.len, payload.base);
+	cerr << "DATAGRAM: 0x" << hex << setw(8) << setfill('0') << *reinterpret_cast<int*>(payload.base)
+		 << ", length " << payload.len << "\n";
+	//printf("DATAGRAM: %.*s\n", (int)payload.len, payload.base);
 	/* send responds with a datagram frame */
 	if (!quicly_is_client(conn))
 		quicly_send_datagram_frames(conn, &payload, 1);
@@ -257,6 +259,7 @@ static void on_receive_datagram_frame(quicly_receive_datagram_frame_t* self, qui
 socket::quic::quic(const UriParser& src_uri)
 	: m_udp(src_uri)
 	, m_tlsctx()
+	, m_closing(false)
 {
 	m_tlsctx.random_bytes = ptls_openssl_random_bytes;
 	m_tlsctx.get_time = &ptls_get_time;
@@ -297,7 +300,15 @@ socket::quic::quic(const UriParser& src_uri)
 	m_ctx.transport_params.max_datagram_frame_size = m_ctx.transport_params.max_udp_payload_size;
 }
 
-socket::quic::~quic() { }
+socket::quic::~quic()
+{
+	quicly_close(m_conn, 0, "");
+	m_closing = true;
+	spdlog::debug(LOG_SOCK_QUIC "Closing receiving thread.");
+	m_rcvth.wait();
+	quicly_free(m_conn);
+
+}
 
 static ptls_handshake_properties_t hs_properties;
 static quicly_cid_plaintext_t next_cid;
@@ -390,13 +401,13 @@ static int send_pending(int fd, quicly_conn_t* conn)
 	return ret;
 }
 
-static void th_receive(quicly_conn_t* conn, int fd)
+static void th_receive(quicly_conn_t* conn, int fd, atomic_bool& closing)
 {
 	struct sockaddr_in local;
 	int ret;
 	quicly_context_t* ctx = quicly_get_context(conn);
 
-	while (1) {
+	while (!closing) {
 		fd_set readfds;
 		struct timeval* tv, tvbuf;
 		do {
@@ -468,7 +479,7 @@ shared_quic socket::quic::connect()
 	//enqueue_requests(m_conn);
 	send_pending(m_udp.id(), m_conn);
 
-	m_rcvth = ::async(::launch::async, th_receive, m_conn, m_udp.id());
+	m_rcvth = ::async(::launch::async, th_receive, m_conn, m_udp.id(), ref(m_closing));
 
 	return shared_from_this();
 }
@@ -484,7 +495,7 @@ size_t socket::quic::read(const mutable_buffer& buffer, int timeout_ms)
 
 int socket::quic::write(const const_buffer& buffer, int timeout_ms)
 {
-	ptls_iovec_t datagram = ptls_iovec_init(buffer.data(), 128/*buffer.size()*/);
+	ptls_iovec_t datagram = ptls_iovec_init(buffer.data(), buffer.size());
 	quicly_send_datagram_frames(m_conn, &datagram, 1);
 
 	/*const char* message = "hello datagram!";
