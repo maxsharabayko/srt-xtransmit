@@ -337,6 +337,76 @@ static quicly_cid_plaintext_t next_cid;
 static ptls_iovec_t resumption_token;
 static quicly_transport_parameters_t resumed_transport_params;
 
+static int validate_token(quicly_context_t& ctx, struct sockaddr* remote, ptls_iovec_t client_cid, ptls_iovec_t server_cid,
+	quicly_address_token_plaintext_t* token, const char** err_desc)
+{
+	int64_t age;
+	int port_is_equal;
+
+	/* calculate and normalize age */
+	if ((age = ctx.now->cb(ctx.now) - token->issued_at) < 0)
+		age = 0;
+
+	/* check address, deferring the use of port number match to type-specific checks */
+	if (remote->sa_family != token->remote.sa.sa_family)
+		goto AddressMismatch;
+	switch (remote->sa_family) {
+	case AF_INET: {
+		struct sockaddr_in* sin = (struct sockaddr_in*)remote;
+		if (sin->sin_addr.s_addr != token->remote.sin.sin_addr.s_addr)
+			goto AddressMismatch;
+		port_is_equal = sin->sin_port == token->remote.sin.sin_port;
+	} break;
+	case AF_INET6: {
+		struct sockaddr_in6* sin6 = (struct sockaddr_in6*)remote;
+		if (memcmp(&sin6->sin6_addr, &token->remote.sin6.sin6_addr, sizeof(sin6->sin6_addr)) != 0)
+			goto AddressMismatch;
+		port_is_equal = sin6->sin6_port == token->remote.sin6.sin6_port;
+	} break;
+	default:
+		goto UnknownAddressType;
+	}
+
+	/* type-specific checks */
+	switch (token->type) {
+	case st_quicly_address_token_plaintext_t::QUICLY_ADDRESS_TOKEN_TYPE_RETRY:
+		if (age > 30000)
+			goto Expired;
+		if (!port_is_equal)
+			goto AddressMismatch;
+		if (!quicly_cid_is_equal(&token->retry.client_cid, client_cid))
+			goto CIDMismatch;
+		if (!quicly_cid_is_equal(&token->retry.server_cid, server_cid))
+			goto CIDMismatch;
+		break;
+	case st_quicly_address_token_plaintext_t::QUICLY_ADDRESS_TOKEN_TYPE_RESUMPTION:
+		if (age > 10 * 60 * 1000)
+			goto Expired;
+		break;
+	default:
+		assert(!"unexpected token type");
+		abort();
+		break;
+	}
+
+	/* success */
+	*err_desc = NULL;
+	return 1;
+
+AddressMismatch:
+	*err_desc = "token address mismatch";
+	return 0;
+UnknownAddressType:
+	*err_desc = "unknown address type";
+	return 0;
+Expired:
+	*err_desc = "token expired";
+	return 0;
+CIDMismatch:
+	*err_desc = "CID mismatch";
+	return 0;
+}
+
 /**
  * list of requests to be processed, terminated by reqs[N].path == NULL
  */
@@ -423,11 +493,18 @@ static int send_pending(int fd, quicly_conn_t* conn)
 	return ret;
 }
 
-static void th_receive(quicly_conn_t* conn, int fd, atomic_bool& closing)
+static void send_one_packet(int fd, struct sockaddr* dest, const void* payload, size_t payload_len)
+{
+	struct iovec vec = { .iov_base = (void*)payload, .iov_len = payload_len };
+	send_packets_default(fd, dest, &vec, 1);
+}
+
+static void th_receive(quicly_conn_t*& conn, int fd, atomic_bool& closing)
 {
 	struct sockaddr_in local;
 	int ret;
 	quicly_context_t* ctx = quicly_get_context(conn);
+	const bool enforce_retry = false; // -R option in quicly cli app
 
 	while (!closing) {
 		fd_set readfds;
@@ -477,7 +554,106 @@ static void th_receive(quicly_conn_t* conn, int fd, atomic_bool& closing)
 					quicly_decoded_packet_t packet;
 					if (quicly_decode_packet(ctx, &packet, buf, rret, &off) == SIZE_MAX)
 						break;
-					quicly_receive(conn, NULL, &sa, &packet);
+
+					// Begin server code
+					quicly_conn_t* dispatch_conn = NULL;
+					quicly_address_t remote;
+					if (conn == nullptr || !quicly_is_client(conn))
+					{
+						if (QUICLY_PACKET_IS_LONG_HEADER(packet.octets.base[0])) {
+							if (packet.version != 0 && !quicly_is_supported_version(packet.version)) {
+								uint8_t payload[1500]; // originally ctx.transport_params.max_udp_payload_size
+								size_t payload_len = quicly_send_version_negotiation(ctx, packet.cid.src, packet.cid.dest.encrypted,
+									quicly_supported_versions, payload);
+								assert(payload_len != SIZE_MAX);
+								send_one_packet(fd, &remote.sa, payload, payload_len);
+								break;
+							}
+							/* there is no way to send response to these v1 packets */
+							if (packet.cid.dest.encrypted.len > QUICLY_MAX_CID_LEN_V1 || packet.cid.src.len > QUICLY_MAX_CID_LEN_V1)
+								break;
+						}
+
+						if (quicly_is_destination(conn, NULL, &remote.sa, &packet)) {
+							dispatch_conn = conn;
+						}
+					}
+					// End server code
+					else
+					{
+						dispatch_conn = conn;
+					}
+
+					if (dispatch_conn != NULL)
+					{
+						quicly_receive(dispatch_conn, NULL, &sa, &packet);
+					}
+					// Begin server code
+					else if (QUICLY_PACKET_IS_INITIAL(packet.octets.base[0])) {
+						/* long header packet; potentially a new connection */
+						quicly_address_token_plaintext_t* token = NULL, token_buf;
+						if (packet.token.len != 0) {
+							const char* err_desc = NULL;
+							int ret = quicly_decrypt_address_token(address_token_aead.dec, &token_buf, packet.token.base,
+								packet.token.len, 0, &err_desc);
+							if (ret == 0 &&
+								validate_token(*ctx, &remote.sa, packet.cid.src, packet.cid.dest.encrypted, &token_buf, &err_desc)) {
+								token = &token_buf;
+							}
+							else if (enforce_retry && (ret == QUICLY_TRANSPORT_ERROR_INVALID_TOKEN ||
+								(ret == 0 && token_buf.type == st_quicly_address_token_plaintext_t::QUICLY_ADDRESS_TOKEN_TYPE_RETRY))) {
+								/* Token that looks like retry was unusable, and we require retry. There's no chance of the
+								 * handshake succeeding. Therefore, send close without aquiring state. */
+								uint8_t payload[1500]; // originally: ctx.transport_params.max_udp_payload_size
+								size_t payload_len = quicly_send_close_invalid_token(ctx, packet.version, packet.cid.src,
+									packet.cid.dest.encrypted, err_desc, payload);
+								assert(payload_len != SIZE_MAX);
+								send_one_packet(fd, &remote.sa, payload, payload_len);
+							}
+						}
+						if (enforce_retry && token == NULL && packet.cid.dest.encrypted.len >= 8) {
+							/* unbound connection; send a retry token unless the client has supplied the correct one, but not too
+							 * many
+							 */
+							uint8_t new_server_cid[8], payload[1500]; // originally ctx.transport_params.max_udp_payload_size
+							memcpy(new_server_cid, packet.cid.dest.encrypted.base, sizeof(new_server_cid));
+							new_server_cid[0] ^= 0xff;
+							size_t payload_len = quicly_send_retry(
+								ctx, address_token_aead.enc, packet.version, &remote.sa, packet.cid.src, NULL,
+								ptls_iovec_init(new_server_cid, sizeof(new_server_cid)), packet.cid.dest.encrypted,
+								ptls_iovec_init(NULL, 0), ptls_iovec_init(NULL, 0), NULL, payload);
+							assert(payload_len != SIZE_MAX);
+							send_one_packet(fd, &remote.sa, payload, payload_len);
+							break;
+						}
+						else {
+							/* new connection */
+							quicly_conn_t* new_conn = nullptr;
+							int ret = quicly_accept(&new_conn, ctx, NULL, &remote.sa, &packet, token, &next_cid, NULL);
+							if (ret == 0) {
+								assert(new_conn != nullptr); //new connection is accepted.
+								assert(conn == nullptr); // no connection has been established till now
+								++next_cid.master_id;
+								conn = new_conn;
+							}
+							else {
+								spdlog::warn(LOG_SOCK_QUIC "failed to accept new connection.");
+								assert(new_conn == NULL);
+							}
+						}
+					}
+					else if (!QUICLY_PACKET_IS_LONG_HEADER(packet.octets.base[0])) {
+						/* short header packet; potentially a dead connection. No need to check the length of the incoming packet,
+						 * because loop is prevented by authenticating the CID (by checking node_id and thread_id). If the peer is
+						 * also sending a reset, then the next CID is highly likely to contain a non-authenticating CID, ... */
+						if (packet.cid.dest.plaintext.node_id == 0 && packet.cid.dest.plaintext.thread_id == 0) {
+							uint8_t payload[1500]; // originally ctx.transport_params.max_udp_payload_size
+							size_t payload_len = quicly_send_stateless_reset(ctx, packet.cid.dest.encrypted.base, payload);
+							assert(payload_len != SIZE_MAX);
+							send_one_packet(fd, &remote.sa, payload, payload_len);
+						}
+					}
+					// End server code
 				}
 			}
 		}
@@ -501,7 +677,7 @@ shared_quic socket::quic::connect()
 	//enqueue_requests(m_conn);
 	send_pending(m_udp.id(), m_conn);
 
-	m_rcvth = ::async(::launch::async, th_receive, m_conn, m_udp.id(), ref(m_closing));
+	m_rcvth = ::async(::launch::async, th_receive, ref(m_conn), m_udp.id(), ref(m_closing));
 
 	return shared_from_this();
 }
