@@ -288,6 +288,28 @@ socket::quic::quic(const UriParser& src_uri)
 		address_token_aead.dec = ptls_aead_new(&ptls_openssl_aes128gcm, &ptls_openssl_sha256, 0, secret, "");
 	}
 
+	const char* tlskeyopt  = "tlskey";
+	const char* tlscertopt = "tlscert";
+
+	if (src_uri.parameters().count(tlskeyopt))
+	{
+		const string keyfile = src_uri.parameters().at(tlskeyopt);
+		load_private_key(m_ctx.tls, keyfile.c_str());
+	}
+
+	if (src_uri.parameters().count(tlscertopt))
+	{
+		const string certfile = src_uri.parameters().at(tlscertopt);
+		load_certificate_chain(m_ctx.tls, certfile.c_str());
+
+		static char random_key[17];
+		m_tlsctx.random_bytes(random_key, sizeof(random_key) - 1);
+		// TODO: this CID encryption key can be provided as an option. See '-B' opt in quicly.
+		const char* cid_key = random_key;
+		m_ctx.cid_encryptor = quicly_new_default_cid_encryptor(&ptls_openssl_bfecb, &ptls_openssl_aes128ecb, &ptls_openssl_sha256,
+			ptls_iovec_init(cid_key, strlen(cid_key)));
+	}
+
 	// Amend cipher-suites. Copy the defaults when `-y` option is not used. Otherwise, complain if aes128gcmsha256 is not specified.
 	size_t i;
 	for (i = 0; ptls_openssl_cipher_suites[i] != NULL; ++i) {
