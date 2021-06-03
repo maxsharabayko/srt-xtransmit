@@ -467,7 +467,7 @@ static void enqueue_requests(quicly_conn_t* conn)
 
 static void send_packets_default(int fd, struct sockaddr* dest, struct iovec* packets, size_t num_packets)
 {
-	fprintf(stderr, "send_packets_default: %d pkts, len %d \n", (int) num_packets, packets[0].iov_len);
+	spdlog::trace(LOG_SOCK_QUIC "send_packets_default: {} pkts, len {}", num_packets, packets[0].iov_len);
 	for (size_t i = 0; i != num_packets; ++i) {
 		struct msghdr mess;
 		memset(&mess, 0, sizeof(mess));
@@ -644,6 +644,7 @@ static void th_receive(quicly_context_t* ctx, int fd, atomic_bool& closing, sock
 								assert(new_conn != nullptr); //new connection is accepted.
 								assert(conn == nullptr); // no connection has been established till now
 								++next_cid.master_id;
+								spdlog::trace(LOG_SOCK_QUIC "accepted new connection");
 
 								conn = self->quic_conn(new_conn);
 								assert(conn != nullptr); // now conn must be set
@@ -651,6 +652,11 @@ static void th_receive(quicly_context_t* ctx, int fd, atomic_bool& closing, sock
 							else {
 								spdlog::warn(LOG_SOCK_QUIC "failed to accept new connection.");
 								assert(new_conn == NULL);
+							}
+
+							if (new_conn != nullptr && send_pending(fd, new_conn) != 0) {
+								spdlog::error(LOG_SOCK_QUIC "send_pending failed unexpectedly.");
+								quicly_free(new_conn);
 							}
 						}
 					}
