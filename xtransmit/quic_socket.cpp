@@ -244,7 +244,6 @@ static void on_receive_datagram_frame(quicly_receive_datagram_frame_t* self, qui
 		return;
 	}
 
-	spdlog::trace(LOG_SOCK_QUIC "Got a datagram. Passing to reader.");
 	socket::quic* qsock = reinterpret_cast<socket::quic::receive_datagram_cb*>(self)->quic_socket_ptr;
 	qsock->on_canread_datagram(payload);
 
@@ -490,16 +489,17 @@ static int send_pending(int fd, quicly_conn_t* conn)
 {
 	quicly_address_t dest, src;
 	struct iovec packets[MAX_BURST_PACKETS];
-	uint8_t buf[MAX_BURST_PACKETS * quicly_get_context(conn)->transport_params.max_udp_payload_size];
+	//uint8_t buf[MAX_BURST_PACKETS * quicly_get_context(conn)->transport_params.max_udp_payload_size];
+	uint8_t buf[MAX_BURST_PACKETS * 1500];
 	size_t num_packets = MAX_BURST_PACKETS;
 	int ret;
 
 	if ((ret = quicly_send(conn, &dest, &src, packets, &num_packets, buf, sizeof(buf))) == 0 && num_packets != 0)
 		send_packets_default(fd, &dest.sa, packets, num_packets);
 	else if (num_packets == 0)
-		fprintf(stderr, "send_pending no packets to send\n");
+		spdlog::trace(LOG_SOCK_QUIC "send_pending no packets to send.");
 	else
-		fprintf(stderr, "send_pending error %d\n", ret);
+		spdlog::error(LOG_SOCK_QUIC "send_pending error %d\n", ret);
 
 	return ret;
 }
@@ -759,6 +759,7 @@ size_t socket::quic::read(const mutable_buffer& buffer, int timeout_ms)
 
 void socket::quic::on_canread_datagram(ptls_iovec_t payload)
 {
+	spdlog::trace(LOG_SOCK_QUIC "DATAGRAM: received {} bytes. Notifying reader.", payload.len);
 	unique_lock<mutex> lck(m_mtx_read);
 
 	m_pkt_to_read = const_buffer(payload.base, payload.len);
@@ -770,6 +771,8 @@ void socket::quic::on_canread_datagram(ptls_iovec_t payload)
 	{
 		m_cv_read.wait_for(lck, chrono::milliseconds(10));
 	}
+
+	spdlog::trace(LOG_SOCK_QUIC "DATAGRAM: reader is notified.");
 
 	/*if (m_closing) {
 		spdlog::trace(LOG_SOCK_QUIC "can read, but closing. Lost a datagram.");
