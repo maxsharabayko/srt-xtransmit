@@ -14,8 +14,7 @@ jobs:
     - uses: actions/checkout@v1
     - name: submodule
       run: |
-        git submodule init
-        git submodule update
+        git submodule update --init --recursive
         dpkg --list | grep compiler
     - if: matrix.compiler == 'g++-4.8' && matrix.os != 'macOS-latest'
       name: install gcc 4.8

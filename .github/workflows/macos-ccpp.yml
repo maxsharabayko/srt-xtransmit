@@ -11,8 +11,7 @@ jobs:
     - uses: actions/checkout@v1
     - name: submodule
       run: |
-        git submodule init
-        git submodule update
+        git submodule update --init --recursive
     - name: cmake
       run: |
         mkdir _build
