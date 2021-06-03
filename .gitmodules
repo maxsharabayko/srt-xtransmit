@@ -1,6 +1,6 @@
-[submodule "submodule/continuable"]
-	path = submodule/continuable
-	url = https://github.com/Naios/continuable.git
+[submodule "submodule/quicly"]
+	path = submodule/quicly
+	url = https://github.com/maxsharabayko/quicly.git
 [submodule "submodule/function2"]
 	path = submodule/function2
 	url = https://github.com/Naios/function2.git
