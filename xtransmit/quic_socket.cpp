@@ -467,7 +467,7 @@ static void enqueue_requests(quicly_conn_t* conn)
 
 static void send_packets_default(int fd, struct sockaddr* dest, struct iovec* packets, size_t num_packets)
 {
-	spdlog::trace(LOG_SOCK_QUIC "send_packets_default: {} pkts, len {}", num_packets, packets[0].iov_len);
+	spdlog::trace(LOG_SOCK_QUIC "send_packets_default: {} pkts, len {} to {}", num_packets, packets[0].iov_len, sockaddr_any(dest).str());
 	for (size_t i = 0; i != num_packets; ++i) {
 		struct msghdr mess;
 		memset(&mess, 0, sizeof(mess));
@@ -497,7 +497,7 @@ static int send_pending(int fd, quicly_conn_t* conn)
 	if ((ret = quicly_send(conn, &dest, &src, packets, &num_packets, buf, sizeof(buf))) == 0 && num_packets != 0)
 		send_packets_default(fd, &dest.sa, packets, num_packets);
 	else if (num_packets == 0)
-		spdlog::trace(LOG_SOCK_QUIC "send_pending no packets to send.");
+		spdlog::debug(LOG_SOCK_QUIC "send_pending no packets to send.");
 	else
 		spdlog::error(LOG_SOCK_QUIC "send_pending error %d\n", ret);
 
@@ -515,6 +515,8 @@ static void th_receive(quicly_context_t* ctx, int fd, atomic_bool& closing, sock
 	struct sockaddr_in local;
 	int ret;
 	const bool enforce_retry = false; // -R option in quicly cli app
+
+	auto ts_periodic_seend = chrono::steady_clock::now();
 
 	while (!closing) {
 		fd_set readfds;
@@ -675,6 +677,17 @@ static void th_receive(quicly_context_t* ctx, int fd, atomic_bool& closing, sock
 				}
 			}
 		}
+
+		quicly_conn_t* conn = self->quic_conn();
+		const auto ts_now = chrono::steady_clock::now();
+		if (conn != nullptr && ts_now > ts_periodic_seend) {
+			ts_periodic_seend = ts_now + chrono::milliseconds(25);
+			const int ret = send_pending(fd, conn);
+			if (ret != 0) {
+				spdlog::error(LOG_SOCK_QUIC "send_pending failed unexpectedly.");
+				//quicly_free(conn);
+			}
+		}
 	}
 }
 
@@ -778,7 +791,7 @@ void socket::quic::on_canread_datagram(ptls_iovec_t payload)
 		m_cv_read.wait_for(lck, chrono::milliseconds(10));
 	}
 
-	spdlog::trace(LOG_SOCK_QUIC "DATAGRAM: reader is notified.");
+	spdlog::debug(LOG_SOCK_QUIC "DATAGRAM: reader is notified.");
 
 	/*if (m_closing) {
 		spdlog::trace(LOG_SOCK_QUIC "can read, but closing. Lost a datagram.");
