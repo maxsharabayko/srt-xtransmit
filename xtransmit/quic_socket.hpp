@@ -68,6 +68,10 @@ public:
 
 	quicly_conn_t* quic_conn() const;
 
+	// Called from quicly as a callback when there is a new datagram to read.
+	// Sets m_pkt_to_read and notifies datagram consumer.
+	void on_canread_datagram(ptls_iovec_t payload);
+
 
 	struct resumption_token_cb
 		: public quicly_generate_resumption_token_t
@@ -77,6 +81,12 @@ public:
 
 	static int on_generate_resumption_token(quicly_generate_resumption_token_t* self, quicly_conn_t* conn, ptls_buffer_t* buf,
 		quicly_address_token_plaintext_t* token);
+
+	struct receive_datagram_cb
+		: public quicly_receive_datagram_frame_t
+	{
+		quic* quic_socket_ptr;
+	};
 	
 private:
 	void raise_exception(const string&& reason) const;
@@ -92,6 +102,12 @@ private:
 	mutable std::mutex m_mtx_accept;
 	std::condition_variable m_cv_accept;
 	resumption_token_cb m_resump_token_ctx;// = { &quic::on_generate_resumption_token, m_tlsctx };
+
+	receive_datagram_cb m_receive_datagram_cb;
+
+	mutable std::mutex m_mtx_read;	// protects simulteneous access to m_pkt_to_read
+	std::condition_variable m_cv_read;
+	const_buffer m_pkt_to_read;
 };
 
 } // namespace socket

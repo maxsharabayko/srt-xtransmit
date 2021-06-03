@@ -43,6 +43,8 @@ class mutable_buffer
 	/// Get the size of the memory range.
 	std::size_t size() const noexcept { return size_; }
 
+	bool empty() const noexcept { return size_ == 0; }
+
 	/// Move the start of the buffer by the specified number of bytes.
 	mutable_buffer &operator+=(std::size_t n) noexcept
 	{
@@ -84,7 +86,7 @@ class const_buffer
   public:
 	/// Construct an empty buffer.
 	const_buffer() noexcept
-	    : data_(0)
+	    : data_(nullptr)
 	    , size_(0)
 	{
 	}
@@ -111,6 +113,8 @@ class const_buffer
 
 	/// Get the size of the memory range.
 	std::size_t size() const noexcept { return size_; }
+
+	bool empty() const noexcept { return size_ == 0; }
 
 	/// Move the start of the buffer by the specified number of bytes.
 	const_buffer &operator+=(std::size_t n) noexcept

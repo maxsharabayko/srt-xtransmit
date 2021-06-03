@@ -149,6 +149,9 @@ void xtransmit::generate::run(const string& dst_url, const config& cfg, const at
 				stats->add_socket(connection);
 			
 			run_pipe(connection, cfg, force_break);
+
+			if (stats && cfg.reconnect)
+				stats->clear();
 		}
 		catch (const socket::exception& e)
 		{

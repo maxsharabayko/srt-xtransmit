@@ -238,12 +238,18 @@ static ptls_on_client_hello_t on_client_hello = { on_client_hello_cb };
 
 static void on_receive_datagram_frame(quicly_receive_datagram_frame_t* self, quicly_conn_t* conn, ptls_iovec_t payload)
 {
-	cerr << "DATAGRAM: 0x" << hex << setw(8) << setfill('0') << *reinterpret_cast<int*>(payload.base)
-		 << ", length " << payload.len << "\n";
-	//printf("DATAGRAM: %.*s\n", (int)payload.len, payload.base);
-	/* send responds with a datagram frame */
-	//if (!quicly_is_client(conn))
-	//	quicly_send_datagram_frames(conn, &payload, 1);
+	if (self == nullptr)
+	{
+		spdlog::error(LOG_SOCK_QUIC "on_receive_datagram_frame: no pointer to quic socket.");
+		return;
+	}
+
+	spdlog::trace(LOG_SOCK_QUIC "Got a datagram. Passing to reader.");
+	socket::quic* qsock = reinterpret_cast<socket::quic::receive_datagram_cb*>(self)->quic_socket_ptr;
+	qsock->on_canread_datagram(payload);
+
+	/*cerr << "DATAGRAM: 0x" << hex << setw(8) << setfill('0') << *reinterpret_cast<int*>(payload.base)
+		 << ", length " << payload.len << "\n";*/
 }
 
 int socket::quic::on_generate_resumption_token(quicly_generate_resumption_token_t* self, quicly_conn_t* conn, ptls_buffer_t* buf,
@@ -318,8 +324,11 @@ socket::quic::quic(const UriParser& src_uri)
 	}
 
 	// Send datagram frame.
-	static quicly_receive_datagram_frame_t cb = { on_receive_datagram_frame };
-	m_ctx.receive_datagram_frame = &cb;
+
+	m_receive_datagram_cb.cb = { on_receive_datagram_frame };
+	m_receive_datagram_cb.quic_socket_ptr = this;
+
+	m_ctx.receive_datagram_frame = &m_receive_datagram_cb;
 	m_ctx.transport_params.max_datagram_frame_size = m_ctx.transport_params.max_udp_payload_size;
 }
 
@@ -723,11 +732,54 @@ shared_quic socket::quic::connect()
 
 size_t socket::quic::read(const mutable_buffer& buffer, int timeout_ms)
 {
-	const size_t udp_read = m_udp.read(buffer, timeout_ms);
+	unique_lock<mutex> lck(m_mtx_read);
 
-	// TODO: Add QUIC decode.
+	chrono::steady_clock::duration timout = timeout_ms >= 0
+		? chrono::milliseconds(timeout_ms)
+		: chrono::seconds(1);
+	if (!m_cv_read.wait_for(lck, timout, [&] { return !m_pkt_to_read.empty(); }))
+	{
+		// wait timeout, nothing to read.
+		return 0;
+	}
+	
+	const uint8_t* begin = reinterpret_cast<const uint8_t*>(m_pkt_to_read.data());
+	const size_t read_size = m_pkt_to_read.size();
+	// TODO: throw an exception
+	assert(buffer.size() >= read_size);
+	const uint8_t* end   = begin + read_size;
+	std::copy(begin, end, reinterpret_cast<uint8_t*>(buffer.data()));
 
-	return udp_read;
+	// Now reset m_pkt_to_read and notify packet supplier.
+	m_pkt_to_read = const_buffer();
+	m_cv_read.notify_all();
+
+	return read_size;
+}
+
+void socket::quic::on_canread_datagram(ptls_iovec_t payload)
+{
+	unique_lock<mutex> lck(m_mtx_read);
+
+	m_pkt_to_read = const_buffer(payload.base, payload.len);
+
+	m_cv_read.notify_one(); // read-ready
+
+	// Wait for a packet to be consumed
+	while (!m_pkt_to_read.empty() && !m_closing)
+	{
+		m_cv_read.wait_for(lck, chrono::milliseconds(10));
+	}
+
+	/*if (m_closing) {
+		spdlog::trace(LOG_SOCK_QUIC "can read, but closing. Lost a datagram.");
+		return;
+	}*/
+
+
+	/*cerr << "DATAGRAM: 0x" << hex << setw(8) << setfill('0') << *reinterpret_cast<int*>(payload.base)
+		<< ", length " << payload.len << "\n";*/
+
 }
 
 int socket::quic::write(const const_buffer& buffer, int timeout_ms)
