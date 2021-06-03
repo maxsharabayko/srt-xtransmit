@@ -64,11 +64,22 @@ public:
 	int    write(const const_buffer& buffer, int timeout_ms = -1);
 
 	// Internally used
-	void on_accept_new_conn(quicly_conn_t* new_conn);
+	quicly_conn_t* quic_conn(quicly_conn_t* new_conn);
+
+	quicly_conn_t* quic_conn() const;
+
+
+	struct resumption_token_cb
+		: public quicly_generate_resumption_token_t
+	{
+		ptls_context_t* tls_ctx;
+	};
+
+	static int on_generate_resumption_token(quicly_generate_resumption_token_t* self, quicly_conn_t* conn, ptls_buffer_t* buf,
+		quicly_address_token_plaintext_t* token);
 	
 private:
-	void raise_exception(const string&& place) const;
-	void raise_exception(const string&& place, const string&& reason) const;
+	void raise_exception(const string&& reason) const;
 
 private:
 	ptls_context_t m_tlsctx;
@@ -78,8 +89,9 @@ private:
 	std::future<void>   m_rcvth;
 	std::atomic_bool m_closing;
 
-	std::mutex m_mtx_accept;
+	mutable std::mutex m_mtx_accept;
 	std::condition_variable m_cv_accept;
+	resumption_token_cb m_resump_token_ctx;// = { &quic::on_generate_resumption_token, m_tlsctx };
 };
 
 } // namespace socket

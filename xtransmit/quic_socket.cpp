@@ -26,7 +26,7 @@ static const char* session_file = NULL;
 
 static struct {
 	ptls_aead_context_t* enc, * dec;
-} address_token_aead;
+} s_address_token_aead;
 
 static void on_stop_sending(quicly_stream_t* stream, int err)
 {
@@ -139,18 +139,10 @@ static void on_closed_by_remote(quicly_closed_by_remote_t* self, quicly_conn_t* 
 
 static quicly_closed_by_remote_t closed_by_remote = { &on_closed_by_remote };
 
-static int on_generate_resumption_token(quicly_generate_resumption_token_t* self, quicly_conn_t* conn, ptls_buffer_t* buf,
-	quicly_address_token_plaintext_t* token)
-{
-	spdlog::info("quic::on_generate_resumption_token not implemented.");
-	return 0;
-	//return quicly_encrypt_address_token(tlsctx.random_bytes, address_token_aead.enc, buf, buf->off, token);
-}
-
 static struct {
 	ptls_iovec_t tls_ticket;
 	ptls_iovec_t address_token;
-} session_info;
+} s_session_info;
 
 int save_session(const quicly_transport_parameters_t* transport_params)
 {
@@ -165,8 +157,8 @@ int save_session(const quicly_transport_parameters_t* transport_params)
 	ptls_buffer_init(&buf, bufnochar, 0);
 
 	/* build data (session ticket and transport parameters) */
-	ptls_buffer_push_block(&buf, 2, { ptls_buffer_pushv(&buf, session_info.address_token.base, session_info.address_token.len); });
-	ptls_buffer_push_block(&buf, 2, { ptls_buffer_pushv(&buf, session_info.tls_ticket.base, session_info.tls_ticket.len); });
+	ptls_buffer_push_block(&buf, 2, { ptls_buffer_pushv(&buf, s_session_info.address_token.base, s_session_info.address_token.len); });
+	ptls_buffer_push_block(&buf, 2, { ptls_buffer_pushv(&buf, s_session_info.tls_ticket.base, s_session_info.tls_ticket.len); });
 	ptls_buffer_push_block(&buf, 2, {
 		if ((ret = quicly_encode_transport_parameter_list(&buf, transport_params, NULL, NULL, NULL, NULL, 0)) != 0)
 			goto Exit;
@@ -188,13 +180,11 @@ Exit:
 	return 0;
 }
 
-static quicly_generate_resumption_token_t generate_resumption_token = { &on_generate_resumption_token };
-
 static int save_resumption_token_cb(quicly_save_resumption_token_t* _self, quicly_conn_t* conn, ptls_iovec_t token)
 {
-	free(session_info.address_token.base);
-	session_info.address_token = ptls_iovec_init(malloc(token.len), token.len);
-	memcpy(session_info.address_token.base, token.base, token.len);
+	free(s_session_info.address_token.base);
+	s_session_info.address_token = ptls_iovec_init(malloc(token.len), token.len);
+	memcpy(s_session_info.address_token.base, token.base, token.len);
 
 	return save_session(quicly_get_remote_transport_parameters(conn));
 }
@@ -206,9 +196,9 @@ static ptls_cipher_suite_t* cipher_suites[128];
 
 int save_session_ticket_cb(ptls_save_ticket_t* _self, ptls_t* tls, ptls_iovec_t src)
 {
-	free(session_info.tls_ticket.base);
-	session_info.tls_ticket = ptls_iovec_init(malloc(src.len), src.len);
-	memcpy(session_info.tls_ticket.base, src.base, src.len);
+	free(s_session_info.tls_ticket.base);
+	s_session_info.tls_ticket = ptls_iovec_init(malloc(src.len), src.len);
+	memcpy(s_session_info.tls_ticket.base, src.base, src.len);
 
 	quicly_conn_t* conn = (quicly_conn_t*) *ptls_get_data_ptr(tls);
 	return save_session(quicly_get_remote_transport_parameters(conn));
@@ -256,6 +246,14 @@ static void on_receive_datagram_frame(quicly_receive_datagram_frame_t* self, qui
 	//	quicly_send_datagram_frames(conn, &payload, 1);
 }
 
+int socket::quic::on_generate_resumption_token(quicly_generate_resumption_token_t* self, quicly_conn_t* conn, ptls_buffer_t* buf,
+	quicly_address_token_plaintext_t* token)
+{
+	ptls_context_t* tlsctx = reinterpret_cast<resumption_token_cb*>(self)->tls_ctx;
+	assert(tlsctx != nullptr);
+	return quicly_encrypt_address_token(tlsctx->random_bytes, s_address_token_aead.enc, buf, buf->off, token);
+}
+
 socket::quic::quic(const UriParser& src_uri)
 	: m_udp(src_uri)
 	, m_tlsctx()
@@ -274,7 +272,10 @@ socket::quic::quic(const UriParser& src_uri)
 	m_ctx.stream_open = &stream_open;
 	m_ctx.closed_by_remote = &closed_by_remote;
 	m_ctx.save_resumption_token = &save_resumption_token;
-	m_ctx.generate_resumption_token = &generate_resumption_token;
+
+	m_resump_token_ctx.cb = &quic::on_generate_resumption_token;
+	m_resump_token_ctx.tls_ctx = &m_tlsctx;
+	m_ctx.generate_resumption_token = &m_resump_token_ctx;
 
 	key_exchanges[0] = &ptls_openssl_secp256r1;
 
@@ -284,8 +285,8 @@ socket::quic::quic(const UriParser& src_uri)
 	{
 		uint8_t secret[PTLS_MAX_DIGEST_SIZE];
 		m_ctx.tls->random_bytes(secret, ptls_openssl_sha256.digest_size);
-		address_token_aead.enc = ptls_aead_new(&ptls_openssl_aes128gcm, &ptls_openssl_sha256, 1, secret, "");
-		address_token_aead.dec = ptls_aead_new(&ptls_openssl_aes128gcm, &ptls_openssl_sha256, 0, secret, "");
+		s_address_token_aead.enc = ptls_aead_new(&ptls_openssl_aes128gcm, &ptls_openssl_sha256, 1, secret, "");
+		s_address_token_aead.dec = ptls_aead_new(&ptls_openssl_aes128gcm, &ptls_openssl_sha256, 0, secret, "");
 	}
 
 	const char* tlskeyopt  = "tlskey";
@@ -328,8 +329,9 @@ socket::quic::~quic()
 	m_closing = true;
 	spdlog::debug(LOG_SOCK_QUIC "Closing receiving thread.");
 	m_rcvth.wait();
-	quicly_free(m_conn);
-
+	
+	// Free connection
+	quic_conn(nullptr);
 }
 
 static ptls_handshake_properties_t hs_properties;
@@ -499,7 +501,7 @@ static void send_one_packet(int fd, struct sockaddr* dest, const void* payload, 
 	send_packets_default(fd, dest, &vec, 1);
 }
 
-static void th_receive(quicly_context_t* ctx, quicly_conn_t*& conn, int fd, atomic_bool& closing, socket::quic* self)
+static void th_receive(quicly_context_t* ctx, int fd, atomic_bool& closing, socket::quic* self)
 {
 	struct sockaddr_in local;
 	int ret;
@@ -528,8 +530,7 @@ static void th_receive(quicly_context_t* ctx, quicly_conn_t*& conn, int fd, atom
 			FD_ZERO(&readfds);
 			FD_SET(fd, &readfds);
 		} while (select(fd + 1, &readfds, NULL, NULL, tv) == -1 && errno == EINTR);
-		//if (enqueue_requests_at <= ctx->now->cb(ctx->now))
-		//	enqueue_requests(conn);
+
 		if (FD_ISSET(fd, &readfds)) {
 			while (1) {
 				uint8_t buf[1500];
@@ -555,7 +556,8 @@ static void th_receive(quicly_context_t* ctx, quicly_conn_t*& conn, int fd, atom
 						break;
 
 					// Begin server code
-					quicly_conn_t* dispatch_conn = NULL;
+					quicly_conn_t* conn = self->quic_conn();
+					quicly_conn_t* dispatch_conn = nullptr;
 					
 					if (conn == nullptr || !quicly_is_client(conn))
 					{
@@ -593,7 +595,7 @@ static void th_receive(quicly_context_t* ctx, quicly_conn_t*& conn, int fd, atom
 						quicly_address_token_plaintext_t* token = NULL, token_buf;
 						if (packet.token.len != 0) {
 							const char* err_desc = NULL;
-							int ret = quicly_decrypt_address_token(address_token_aead.dec, &token_buf, packet.token.base,
+							int ret = quicly_decrypt_address_token(s_address_token_aead.dec, &token_buf, packet.token.base,
 								packet.token.len, 0, &err_desc);
 							if (ret == 0 &&
 								validate_token(*ctx, &remote.sa, packet.cid.src, packet.cid.dest.encrypted, &token_buf, &err_desc)) {
@@ -618,7 +620,7 @@ static void th_receive(quicly_context_t* ctx, quicly_conn_t*& conn, int fd, atom
 							memcpy(new_server_cid, packet.cid.dest.encrypted.base, sizeof(new_server_cid));
 							new_server_cid[0] ^= 0xff;
 							size_t payload_len = quicly_send_retry(
-								ctx, address_token_aead.enc, packet.version, &remote.sa, packet.cid.src, NULL,
+								ctx, s_address_token_aead.enc, packet.version, &remote.sa, packet.cid.src, NULL,
 								ptls_iovec_init(new_server_cid, sizeof(new_server_cid)), packet.cid.dest.encrypted,
 								ptls_iovec_init(NULL, 0), ptls_iovec_init(NULL, 0), NULL, payload);
 							assert(payload_len != SIZE_MAX);
@@ -634,7 +636,7 @@ static void th_receive(quicly_context_t* ctx, quicly_conn_t*& conn, int fd, atom
 								assert(conn == nullptr); // no connection has been established till now
 								++next_cid.master_id;
 
-								self->on_accept_new_conn(new_conn);
+								conn = self->quic_conn(new_conn);
 								assert(conn != nullptr); // now conn must be set
 							}
 							else {
@@ -666,7 +668,7 @@ void socket::quic::listen() noexcept(false)
 	if (m_rcvth.valid())
 		return;
 	spdlog::trace(LOG_SOCK_QUIC "listening.");
-	m_rcvth = ::async(::launch::async, th_receive, &m_ctx, ref(m_conn), m_udp.id(), ref(m_closing), this);
+	m_rcvth = ::async(::launch::async, th_receive, &m_ctx, m_udp.id(), ref(m_closing), this);
 }
 
 shared_quic socket::quic::accept()
@@ -681,11 +683,21 @@ shared_quic socket::quic::accept()
 	return shared_from_this();
 }
 
-void socket::quic::on_accept_new_conn(quicly_conn_t* new_conn)
+quicly_conn_t* socket::quic::quic_conn(quicly_conn_t* new_conn)
 {
 	unique_lock<mutex> lck(m_mtx_accept);
+	if (m_conn != nullptr)
+		quicly_free(m_conn);
 	m_conn = new_conn;
+	spdlog::trace(LOG_SOCK_QUIC "connection {}.", new_conn != nullptr ? "set" : "closed");
 	m_cv_accept.notify_all();
+	return m_conn;
+}
+
+quicly_conn_t* socket::quic::quic_conn() const
+{
+	lock_guard<mutex> lck(m_mtx_accept);
+	return m_conn;
 }
 
 shared_quic socket::quic::connect()
@@ -704,7 +716,7 @@ shared_quic socket::quic::connect()
 	//enqueue_requests(m_conn);
 	send_pending(m_udp.id(), m_conn);
 
-	m_rcvth = ::async(::launch::async, th_receive, &m_ctx, ref(m_conn), m_udp.id(), ref(m_closing), this);
+	m_rcvth = ::async(::launch::async, th_receive, &m_ctx, m_udp.id(), ref(m_closing), this);
 
 	return shared_from_this();
 }
@@ -720,6 +732,12 @@ size_t socket::quic::read(const mutable_buffer& buffer, int timeout_ms)
 
 int socket::quic::write(const const_buffer& buffer, int timeout_ms)
 {
+	if (m_conn == nullptr)
+	{
+		spdlog::trace(LOG_SOCK_QUIC "There is no connection.");
+		raise_exception("connection lost");
+	}
+
 	ptls_iovec_t datagram = ptls_iovec_init(buffer.data(), buffer.size());
 	quicly_send_datagram_frames(m_conn, &datagram, 1);
 
@@ -729,9 +747,9 @@ int socket::quic::write(const const_buffer& buffer, int timeout_ms)
 
 	int ret = send_pending(m_udp.id(), m_conn);
 	if (ret != 0) {
-		quicly_free(m_conn);
-		m_conn = NULL;
-		fprintf(stderr, "quicly_send returned %d\n", ret);
+		this->quic_conn(nullptr);
+		spdlog::trace(LOG_SOCK_QUIC "quicly_send returned {}. Connection closed.", ret);
+		raise_exception("connection lost");
 	}
 
 	//const size_t udp_write = m_udp.write(buffer, timeout_ms);
@@ -739,4 +757,9 @@ int socket::quic::write(const const_buffer& buffer, int timeout_ms)
 	// TODO: Add QUIC encode.
 
 	return buffer.size();
+}
+
+void socket::quic::raise_exception(const string&& message) const
+{
+	throw socket::exception(string("ERROR: ") + message);
 }
