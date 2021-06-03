@@ -22,6 +22,7 @@ target_include_directories(srt-xtransmit PUBLIC
 	${SRT_UTILS_INCLUDE_DIR}
 	${CMAKE_SOURCE_DIR}/submodule/quicly/include
 	${CMAKE_SOURCE_DIR}/submodule/quicly/deps/picotls/include
+	${OPENSSL_INCLUDE_DIR} # picotls/utils.h includes openSSL header
 	${PTHREAD_INCLUDE_DIR}
 	)
 
