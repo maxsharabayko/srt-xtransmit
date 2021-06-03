@@ -32,7 +32,7 @@ public:
 public:
 	bool is_caller() const final { return m_host != ""; }
 
-	int id() const final { return m_bind_socket; }
+	SOCKET id() const final { return m_bind_socket; }
 
 public:
 	/**

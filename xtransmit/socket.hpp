@@ -75,7 +75,7 @@ public:
 	virtual const std::string statistics_csv(bool print_header) const { return std::string(); }
 
 
-	virtual int id() const = 0;
+	virtual SOCKET id() const = 0;
 };
 
 } // namespace socket
