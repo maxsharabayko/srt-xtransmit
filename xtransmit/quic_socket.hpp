@@ -87,6 +87,8 @@ public:
 	{
 		quic* quic_socket_ptr;
 	};
+
+	std::mutex& mtx_conn() const { return m_mtx_conn; }
 	
 private:
 	void raise_exception(const string&& reason) const;
@@ -94,6 +96,7 @@ private:
 private:
 	ptls_context_t m_tlsctx;
 	quicly_context_t m_ctx;
+	mutable std::mutex m_mtx_conn; // protect concurrent work with the quic connection.
 	quicly_conn_t* m_conn = nullptr;
 	socket::udp    m_udp;
 	std::future<void>   m_rcvth;

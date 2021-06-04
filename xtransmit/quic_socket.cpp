@@ -237,101 +237,101 @@ static int on_client_hello_cb(ptls_on_client_hello_t* _self, ptls_t* tls, ptls_o
 
 static inline void load_certificate_chain(ptls_context_t *ctx, const char *fn)
 {
-    if (ptls_load_certificates(ctx, (char *)fn) != 0) {
-        fprintf(stderr, "failed to load certificate:%s:%s\n", fn, strerror(errno));
-        exit(1);
-    }
+	if (ptls_load_certificates(ctx, (char *)fn) != 0) {
+		fprintf(stderr, "failed to load certificate:%s:%s\n", fn, strerror(errno));
+		exit(1);
+	}
 }
 
 static inline void load_raw_public_key(ptls_iovec_t *raw_public_key, char const *cert_pem_file)
 {
-    size_t count;
-    if (ptls_load_pem_objects(cert_pem_file, "PUBLIC KEY", raw_public_key, 1, &count) != 0) {
-        fprintf(stderr, "failed to load public key:%s:%s\n", cert_pem_file, strerror(errno));
-        exit(1);
-    }
+	size_t count;
+	if (ptls_load_pem_objects(cert_pem_file, "PUBLIC KEY", raw_public_key, 1, &count) != 0) {
+		fprintf(stderr, "failed to load public key:%s:%s\n", cert_pem_file, strerror(errno));
+		exit(1);
+	}
 }
 
 static inline void load_private_key(ptls_context_t *ctx, const char *fn)
 {
-    static ptls_openssl_sign_certificate_t sc;
-    FILE *fp;
-    EVP_PKEY *pkey;
+	static ptls_openssl_sign_certificate_t sc;
+	FILE *fp;
+	EVP_PKEY *pkey;
 
-    if ((fp = fopen(fn, "rb")) == NULL) {
-        fprintf(stderr, "failed to open file:%s:%s\n", fn, strerror(errno));
-        exit(1);
-    }
-    pkey = PEM_read_PrivateKey(fp, NULL, NULL, NULL);
-    fclose(fp);
+	if ((fp = fopen(fn, "rb")) == NULL) {
+		fprintf(stderr, "failed to open file:%s:%s\n", fn, strerror(errno));
+		exit(1);
+	}
+	pkey = PEM_read_PrivateKey(fp, NULL, NULL, NULL);
+	fclose(fp);
 
-    if (pkey == NULL) {
-        fprintf(stderr, "failed to read private key from file:%s\n", fn);
-        exit(1);
-    }
+	if (pkey == NULL) {
+		fprintf(stderr, "failed to read private key from file:%s\n", fn);
+		exit(1);
+	}
 
-    ptls_openssl_init_sign_certificate(&sc, pkey);
-    EVP_PKEY_free(pkey);
+	ptls_openssl_init_sign_certificate(&sc, pkey);
+	EVP_PKEY_free(pkey);
 
-    ctx->sign_certificate = &sc.super;
+	ctx->sign_certificate = &sc.super;
 }
 
 /* single-entry session cache */
 struct st_util_session_cache_t {
-    ptls_encrypt_ticket_t super;
-    uint8_t id[32];
-    ptls_iovec_t data;
+	ptls_encrypt_ticket_t super;
+	uint8_t id[32];
+	ptls_iovec_t data;
 };
 
 static int encrypt_ticket_cb(ptls_encrypt_ticket_t *_self, ptls_t *tls, int is_encrypt, ptls_buffer_t *dst, ptls_iovec_t src)
 {
-    struct st_util_session_cache_t *self = (struct st_util_session_cache_t*)_self;
-    int ret;
+	struct st_util_session_cache_t *self = (struct st_util_session_cache_t*)_self;
+	int ret;
 
-    if (is_encrypt) {
+	if (is_encrypt) {
 
-        /* replace the cached entry along with a newly generated session id */
-        free(self->data.base);
-        if ((self->data.base = (uint8_t *) malloc(src.len)) == NULL)
-            return PTLS_ERROR_NO_MEMORY;
+		/* replace the cached entry along with a newly generated session id */
+		free(self->data.base);
+		if ((self->data.base = (uint8_t *) malloc(src.len)) == NULL)
+			return PTLS_ERROR_NO_MEMORY;
 
-        ptls_get_context(tls)->random_bytes(self->id, sizeof(self->id));
-        memcpy(self->data.base, src.base, src.len);
-        self->data.len = src.len;
+		ptls_get_context(tls)->random_bytes(self->id, sizeof(self->id));
+		memcpy(self->data.base, src.base, src.len);
+		self->data.len = src.len;
 
-        /* store the session id in buffer */
-        if ((ret = ptls_buffer_reserve(dst, sizeof(self->id))) != 0)
-            return ret;
-        memcpy(dst->base + dst->off, self->id, sizeof(self->id));
-        dst->off += sizeof(self->id);
+		/* store the session id in buffer */
+		if ((ret = ptls_buffer_reserve(dst, sizeof(self->id))) != 0)
+			return ret;
+		memcpy(dst->base + dst->off, self->id, sizeof(self->id));
+		dst->off += sizeof(self->id);
 
-    } else {
+	} else {
 
-        /* check if session id is the one stored in cache */
-        if (src.len != sizeof(self->id))
-            return PTLS_ERROR_SESSION_NOT_FOUND;
-        if (memcmp(self->id, src.base, sizeof(self->id)) != 0)
-            return PTLS_ERROR_SESSION_NOT_FOUND;
+		/* check if session id is the one stored in cache */
+		if (src.len != sizeof(self->id))
+			return PTLS_ERROR_SESSION_NOT_FOUND;
+		if (memcmp(self->id, src.base, sizeof(self->id)) != 0)
+			return PTLS_ERROR_SESSION_NOT_FOUND;
 
-        /* return the cached value */
-        if ((ret = ptls_buffer_reserve(dst, self->data.len)) != 0)
-            return ret;
-        memcpy(dst->base + dst->off, self->data.base, self->data.len);
-        dst->off += self->data.len;
-    }
+		/* return the cached value */
+		if ((ret = ptls_buffer_reserve(dst, self->data.len)) != 0)
+			return ret;
+		memcpy(dst->base + dst->off, self->data.base, self->data.len);
+		dst->off += self->data.len;
+	}
 
-    return 0;
+	return 0;
 }
 
 static inline void setup_session_cache(ptls_context_t *ctx)
 {
-    static struct st_util_session_cache_t sc;
+	static struct st_util_session_cache_t sc;
 
-    sc.super.cb = encrypt_ticket_cb;
+	sc.super.cb = encrypt_ticket_cb;
 
-    ctx->ticket_lifetime = 86400;
-    ctx->max_early_data_size = 8192;
-    ctx->encrypt_ticket = &sc.super;
+	ctx->ticket_lifetime = 86400;
+	ctx->max_early_data_size = 8192;
+	ctx->encrypt_ticket = &sc.super;
 }
 
 static ptls_on_client_hello_t on_client_hello = { on_client_hello_cb };
@@ -698,6 +698,7 @@ static void th_receive(quicly_context_t* ctx, int fd, atomic_bool& closing, sock
 
 					if (dispatch_conn != NULL)
 					{
+						lock_guard<mutex> lck(self->mtx_conn());
 						quicly_receive(dispatch_conn, NULL, &remote.sa, &packet);
 					}
 					// Begin server code
@@ -758,6 +759,7 @@ static void th_receive(quicly_context_t* ctx, int fd, atomic_bool& closing, sock
 
 							if (new_conn != nullptr && send_pending(fd, new_conn) != 0) {
 								spdlog::error(LOG_SOCK_QUIC "send_pending failed unexpectedly.");
+								lock_guard<mutex> lck(self->mtx_conn());
 								quicly_free(new_conn);
 							}
 						}
@@ -782,6 +784,7 @@ static void th_receive(quicly_context_t* ctx, int fd, atomic_bool& closing, sock
 		const auto ts_now = chrono::steady_clock::now();
 		if (conn != nullptr && ts_now > ts_periodic_seend) {
 			ts_periodic_seend = ts_now + chrono::milliseconds(25);
+			lock_guard<mutex> lck(self->mtx_conn());
 			const int ret = send_pending(fd, conn);
 			if (ret != 0) {
 				spdlog::error(LOG_SOCK_QUIC "send_pending failed unexpectedly.");
@@ -913,6 +916,7 @@ int socket::quic::write(const const_buffer& buffer, int timeout_ms)
 	}
 
 	ptls_iovec_t datagram = ptls_iovec_init(buffer.data(), buffer.size());
+	lock_guard<mutex> lck(mtx_conn());
 	quicly_send_datagram_frames(m_conn, &datagram, 1);
 
 	/*const char* message = "hello datagram!";
