@@ -416,6 +416,8 @@ socket::quic::quic(const UriParser& src_uri)
 	m_resump_token_ctx.tls_ctx = &m_tlsctx;
 	m_ctx.generate_resumption_token = &m_resump_token_ctx;
 
+	m_ctx.initial_egress_max_udp_payload_size = 1350; // !!! Increasing maximum allowed UDP payload.
+
 	key_exchanges[0] = &ptls_openssl_secp256r1;
 
 	setup_session_cache(m_ctx.tls);
