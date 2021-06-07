@@ -859,16 +859,21 @@ size_t socket::quic::read(const mutable_buffer& buffer, int timeout_ms)
 	chrono::steady_clock::duration timout = timeout_ms >= 0
 		? chrono::milliseconds(timeout_ms)
 		: chrono::seconds(1);
-	if (!m_cv_read.wait_for(lck, timout, [&] { return !m_pkt_to_read.empty(); }))
+
+	while (m_pkt_to_read.empty() && !m_closing)
 	{
-		// wait timeout, nothing to read.
-		return 0;
+		m_cv_read.wait_for(lck, timout);
 	}
+
+	if (m_pkt_to_read.empty() || m_closing)
+		return 0;
 	
 	const uint8_t* begin = reinterpret_cast<const uint8_t*>(m_pkt_to_read.data());
 	const size_t read_size = m_pkt_to_read.size();
-	// TODO: throw an exception
-	assert(buffer.size() >= read_size);
+
+	if (buffer.size() < read_size)
+		raise_exception(LOG_SOCK_QUIC "read: buffer too small");
+
 	const uint8_t* end   = begin + read_size;
 	std::copy(begin, end, reinterpret_cast<uint8_t*>(buffer.data()));
 
@@ -883,15 +888,13 @@ void socket::quic::on_canread_datagram(ptls_iovec_t payload)
 {
 	spdlog::trace(LOG_SOCK_QUIC "DATAGRAM: received {} bytes. Notifying reader.", payload.len);
 	unique_lock<mutex> lck(m_mtx_read);
-
 	m_pkt_to_read = const_buffer(payload.base, payload.len);
-
 	m_cv_read.notify_one(); // read-ready
 
 	// Wait for a packet to be consumed
 	while (!m_pkt_to_read.empty() && !m_closing)
 	{
-		m_cv_read.wait_for(lck, chrono::milliseconds(10));
+		m_cv_read.wait_for(lck, chrono::milliseconds(1));
 	}
 
 	spdlog::debug(LOG_SOCK_QUIC "DATAGRAM: reader is notified.");
@@ -916,23 +919,19 @@ int socket::quic::write(const const_buffer& buffer, int timeout_ms)
 	}
 
 	ptls_iovec_t datagram = ptls_iovec_init(buffer.data(), buffer.size());
-	lock_guard<mutex> lck(mtx_conn());
-	quicly_send_datagram_frames(m_conn, &datagram, 1);
 
-	/*const char* message = "hello datagram!";
-	ptls_iovec_t datagram = ptls_iovec_init(message, strlen(message));
-	quicly_send_datagram_frames(m_conn, &datagram, 1);*/
+	auto send_payload = [&]() {
+		lock_guard<mutex> lck(mtx_conn());
+		quicly_send_datagram_frames(m_conn, &datagram, 1);
+		return send_pending(m_udp.id(), m_conn);
+	};
 
-	int ret = send_pending(m_udp.id(), m_conn);
+	const int ret = send_payload();
 	if (ret != 0) {
 		this->quic_conn(nullptr);
 		spdlog::trace(LOG_SOCK_QUIC "quicly_send returned {}. Connection closed.", ret);
 		raise_exception("connection lost");
 	}
-
-	//const size_t udp_write = m_udp.write(buffer, timeout_ms);
-
-	// TODO: Add QUIC encode.
 
 	return buffer.size();
 }
