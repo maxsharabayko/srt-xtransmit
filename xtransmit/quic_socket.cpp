@@ -359,6 +359,40 @@ int socket::quic::on_generate_resumption_token(quicly_generate_resumption_token_
 	return quicly_encrypt_address_token(tlsctx->random_bytes, s_address_token_aead.enc, buf, buf->off, token);
 }
 
+struct st_util_log_event_t {
+	ptls_log_event_t super;
+	FILE* fp;
+};
+
+static void log_event_cb(ptls_log_event_t* _self, ptls_t* tls, const char* type, const char* fmt, ...)
+{
+	struct st_util_log_event_t* self = reinterpret_cast<st_util_log_event_t*>(_self);
+	char randomhex[PTLS_HELLO_RANDOM_SIZE * 2 + 1];
+	va_list args;
+
+	ptls_hexdump(randomhex, ptls_get_client_random(tls).base, PTLS_HELLO_RANDOM_SIZE);
+	fprintf(self->fp, "%s %s ", type, randomhex);
+
+	va_start(args, fmt);
+	vfprintf(self->fp, fmt, args);
+	va_end(args);
+
+	fprintf(self->fp, "\n");
+	fflush(self->fp);
+}
+
+static inline void setup_log_event(ptls_context_t* ctx, const char* fn)
+{
+	static struct st_util_log_event_t ls;
+
+	if ((ls.fp = fopen(fn, "at")) == NULL) {
+		fprintf(stderr, "failed to open file:%s:%s\n", fn, strerror(errno));
+		exit(1);
+	}
+	ls.super.cb = log_event_cb;
+	ctx->log_event = &ls.super;
+}
+
 socket::quic::quic(const UriParser& src_uri)
 	: m_udp(src_uri)
 	, m_tlsctx()
@@ -396,6 +430,7 @@ socket::quic::quic(const UriParser& src_uri)
 
 	const char* tlskeyopt  = "tlskey";
 	const char* tlscertopt = "tlscert";
+	const char* tlskeylog  = "tlskeylog";
 
 	if (src_uri.parameters().count(tlskeyopt))
 	{
@@ -414,6 +449,12 @@ socket::quic::quic(const UriParser& src_uri)
 		const char* cid_key = random_key;
 		m_ctx.cid_encryptor = quicly_new_default_cid_encryptor(&ptls_openssl_bfecb, &ptls_openssl_aes128ecb, &ptls_openssl_sha256,
 			ptls_iovec_init(cid_key, strlen(cid_key)));
+	}
+
+	if (src_uri.parameters().count(tlskeylog))
+	{
+		const string logfile = src_uri.parameters().at(tlskeylog);
+		setup_log_event(m_ctx.tls, logfile.c_str());
 	}
 
 	// Amend cipher-suites. Copy the defaults when `-y` option is not used. Otherwise, complain if aes128gcmsha256 is not specified.
