@@ -13,6 +13,7 @@
 // xtransmit
 #include "srt_socket.hpp"
 #include "udp_socket.hpp"
+#include "quic_socket.hpp"
 #include "route.hpp"
 #include "socket_stats.hpp"
 
@@ -74,7 +75,15 @@ namespace route
 		{
 			return make_shared<socket::udp>(uri);
 		}
-		
+		if (uri.proto() == "quic")
+		{
+			shared_sock sock = make_shared<socket::quic>(uri);
+			socket::quic* s = static_cast<socket::quic*>(sock.get());
+			const bool  accept = !s->is_caller();
+			if (accept)
+				s->listen();
+			return accept ? s->accept() : s->connect();
+		}
 		if(uri.proto() == "srt")
 		{
 			shared_sock socket = make_shared<socket::srt>(uri);
