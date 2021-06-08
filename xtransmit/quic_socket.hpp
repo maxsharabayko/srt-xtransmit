@@ -49,12 +49,18 @@ public:
 	shared_quic connect();
 	shared_quic accept();
 
-	/**
-	 * Start listening on the incomming connection requests.
-	 *
-	 * May throw a socket::exception.
-	 */
+	/// Start listening on the incomming connection requests.
+	/// May throw a socket::exception.
 	void listen() noexcept(false);
+
+	///Check if statistics is supported by a socket implementation.
+	/// @returns true if statistics is supported, false otherwise.
+	bool supports_statistics() const final { return true; }
+
+	/// Retrieve statistics on a socket.
+	/// @returns The number of bytes received.
+	/// @throws socket::exception Thrown on failure.
+	const std::string statistics_csv(bool print_header) const final;
 
 public:
 	/// @returns The number of bytes received.

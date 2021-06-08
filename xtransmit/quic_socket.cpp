@@ -1,4 +1,5 @@
 #include "quic_socket.hpp"
+#include "misc.hpp"
 #include "apputil.hpp"
 #include "socketoptions.hpp"
 
@@ -982,4 +983,58 @@ int socket::quic::write(const const_buffer& buffer, int timeout_ms)
 void socket::quic::raise_exception(const string&& message) const
 {
 	throw socket::exception(string("ERROR: ") + message);
+}
+
+
+const string socket::quic::statistics_csv(bool print_header) const
+{
+	std::ostringstream output;
+	if (print_header)
+	{
+#ifdef HAS_PUT_TIME
+		output << "Timepoint,";
+#endif
+		// TODO: time elapsed
+		output << "pktRecvTotal,pktDecryptFailTotal,pktSentTotal,pktLostTotal,pktRecvAck,pktRecvLateAck,";
+		output << "msRTTSmoothed,";
+		output << "ccType,ccCwnd,ccSSThresh,ccRecoveryEnd,ccCwndInit,ccCwndExistSlowStart,ccCwndMin,ccCwndMax,ccLossEpisodes";
+
+		output << endl;
+		return output.str();
+	}
+
+	quicly_stats_t stats;
+	{
+		lock_guard<mutex> lck(m_mtx_conn);
+		if (m_conn == nullptr)
+			return "";
+
+		quicly_get_stats(m_conn, &stats);
+	}
+
+#ifdef HAS_PUT_TIME
+	output << print_timestamp_now() << ',';
+#endif // HAS_PUT_TIME
+
+	output << stats.num_packets.received << ",";
+	output << stats.num_packets.decryption_failed << ",";
+	output << stats.num_packets.sent << ",";
+	output << stats.num_packets.lost << ",";
+	output << stats.num_packets.ack_received << ",";
+	output << stats.num_packets.late_acked << ",";
+	output << stats.rtt.smoothed << ",";
+
+
+	output << stats.cc.impl->type << ",";
+	output << stats.cc.cwnd << ",";
+	output << stats.cc.ssthresh << ",";
+	output << stats.cc.recovery_end << ",";
+	//output << stats.cc.state; // depends on CC type
+	output << stats.cc.cwnd_initial << ",";
+	output << stats.cc.cwnd_exiting_slow_start << ",";
+	output << stats.cc.cwnd_minimum << ",";
+	output << stats.cc.cwnd_maximum << ",";
+	output << stats.cc.num_loss_episodes;
+	output << endl;
+	return output.str();
 }
