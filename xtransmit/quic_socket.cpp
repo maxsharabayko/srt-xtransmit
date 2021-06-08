@@ -996,6 +996,7 @@ const string socket::quic::statistics_csv(bool print_header) const
 #endif
 		// TODO: time elapsed
 		output << "pktRecvTotal,pktDecryptFailTotal,pktSentTotal,pktLostTotal,pktRecvAck,pktRecvLateAck,";
+		output << "bytesRecvTotal,bytesSentTotal,";
 		output << "msRTTSmoothed,";
 		output << "ccType,ccCwnd,ccSSThresh,ccRecoveryEnd,ccCwndInit,ccCwndExistSlowStart,ccCwndMin,ccCwndMax,ccLossEpisodes";
 
@@ -1022,8 +1023,11 @@ const string socket::quic::statistics_csv(bool print_header) const
 	output << stats.num_packets.lost << ",";
 	output << stats.num_packets.ack_received << ",";
 	output << stats.num_packets.late_acked << ",";
-	output << stats.rtt.smoothed << ",";
 
+	output << stats.num_bytes.received << ",";
+	output << stats.num_bytes.sent << ",";
+
+	output << stats.rtt.smoothed << ",";
 
 	output << stats.cc.impl->type << ",";
 	output << stats.cc.cwnd << ",";
