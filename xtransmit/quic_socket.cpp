@@ -418,6 +418,7 @@ socket::quic::quic(const UriParser& src_uri)
 	m_ctx.generate_resumption_token = &m_resump_token_ctx;
 
 	m_ctx.initial_egress_max_udp_payload_size = 1350; // !!! Increasing maximum allowed UDP payload.
+	m_ctx.initcwnd_packets = 100000; // !!! Avoid loosing packets in slow start.
 
 	key_exchanges[0] = &ptls_openssl_secp256r1;
 
@@ -434,6 +435,7 @@ socket::quic::quic(const UriParser& src_uri)
 	const char* tlskeyopt  = "tlskey";
 	const char* tlscertopt = "tlscert";
 	const char* tlskeylog  = "tlskeylog";
+	//const char* cctype     = "cc";
 
 	if (src_uri.parameters().count(tlskeyopt))
 	{
@@ -611,7 +613,7 @@ static void enqueue_requests(quicly_conn_t* conn)
 
 static void send_packets_default(int fd, struct sockaddr* dest, struct iovec* packets, size_t num_packets)
 {
-	spdlog::trace(LOG_SOCK_QUIC "send_packets_default: {} pkts, len {} to {}", num_packets, packets[0].iov_len, sockaddr_any(dest).str());
+	SPDLOG_TRACE(LOG_SOCK_QUIC "send_packets_default: {} pkts, len {} to {}", num_packets, packets[0].iov_len, sockaddr_any(dest).str());
 	for (size_t i = 0; i != num_packets; ++i) {
 		struct msghdr mess;
 		memset(&mess, 0, sizeof(mess));
@@ -995,7 +997,7 @@ const string socket::quic::statistics_csv(bool print_header) const
 		output << "Timepoint,";
 #endif
 		// TODO: time elapsed
-		output << "pktRecvTotal,pktDecryptFailTotal,pktSentTotal,pktLostTotal,pktRecvAck,pktRecvLateAck,";
+		output << "pktRecvTotal,pktDecryptFailTotal,pktSentTotal,pktLostTotal,pktRecvAckTotal,pktRecvLateAckTotal,";
 		output << "bytesRecvTotal,bytesSentTotal,";
 		output << "msRTTSmoothed,";
 		output << "ccType,ccCwnd,ccSSThresh,ccRecoveryEnd,ccCwndInit,ccCwndExistSlowStart,ccCwndMin,ccCwndMax,ccLossEpisodes";
