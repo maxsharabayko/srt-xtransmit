@@ -389,6 +389,22 @@ void socket::srt::handle_hosts()
 		spdlog::info(LOG_SOCK_SRT "srt://{}:{:d}: bound to '{}:{}'.",
 			m_host, m_port, bindip, bindport);
 	}
+	else if (m_mode == connection_mode::RENDEZVOUS)
+	{
+		// Implicitely bind to the same port as remote.
+		sockaddr_any sa;
+		try
+		{
+			sa = CreateAddr("", m_port);
+		}
+		catch (const std::invalid_argument& e)
+		{
+			raise_exception("listen::create_addr", e.what());
+		}
+		bind_me(reinterpret_cast<const sockaddr*>(&sa));
+		spdlog::info(LOG_SOCK_SRT "srt://{}:{:d}: bound to '0.0.0.0:{}' (rendezvous default).",
+			m_host, m_port, m_port);
+	}
 
 	if (m_host == "" && !ip_bonded)
 	{
