@@ -80,6 +80,38 @@ string create_srt_logfa_description()
 	return ss.str();
 }
 
+const char* srt_clock_type_str()
+{
+	// srt_clock_type() API function was added in SRT v1.4.3
+#define HAS_CLOCK_TYPE (SRT_VERSION_MAJOR == 1) && ((SRT_VERSION_MINOR > 4) || ((SRT_VERSION_MINOR == 4) && (SRT_VERSION_PATCH >= 3)))
+
+#if HAS_CLOCK_TYPE
+	const int clock_type = srt_clock_type();
+
+	switch (clock_type)
+	{
+	case SRT_SYNC_CLOCK_STDCXX_STEADY:
+		return "CXX11_STEADY";
+	case SRT_SYNC_CLOCK_GETTIME_MONOTONIC:
+		return "GETTIME_MONOTONIC";
+	case SRT_SYNC_CLOCK_WINQPC:
+		return "WIN_QPC";
+	case SRT_SYNC_CLOCK_MACH_ABSTIME:
+		return "MACH_ABSTIME";
+	case SRT_SYNC_CLOCK_POSIX_GETTIMEOFDAY:
+		return "POSIX_GETTIMEOFDAY";
+	default:
+		break;
+	}
+	
+	stringstream ss;
+	ss << "Unknown (" << clock_type << ")";
+	return ss.str().c_str();
+#else
+	return "[n/a prior to v1.4.3]";
+#endif
+}
+
 int main(int argc, char** argv)
 {
 	using namespace xtransmit;
@@ -154,9 +186,12 @@ int main(int argc, char** argv)
 		},
 		logfa_desc);
 
-	CLI::App* cmd_version = app.add_subcommand("version", "Show version info")->callback([]() {
-		cerr << "SRT library v" << SRT_VERSION_STRING << endl;
-	});
+	app.add_flag_function(
+		"--version",
+		[](size_t) {
+			cerr << "SRT library v" << SRT_VERSION_STRING << " clock " << srt_clock_type_str() << endl;
+		},
+		"Show version info");
 
 	string src, dst;
 
