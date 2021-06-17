@@ -116,7 +116,7 @@ void run_pipe(shared_sock src, const config &cfg, const atomic_bool &force_break
 			{
 				if (metrics_file)
 				{
-					metrics_file << validator.stats_csv(false);
+					metrics_file << validator.stats_csv(false) << std::flush;
 				}
 				else
 				{

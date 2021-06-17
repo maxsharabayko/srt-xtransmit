@@ -40,7 +40,7 @@ public:
 		{
 			const uint64_t lost = pkt_seqno - m_stats.expected_seqno;
 			m_stats.pkts_lost += lost;
-			spdlog::warn("[METRICS] Detected loss of {} packets (seqno [{}; {}))", lost, m_stats.expected_seqno, pkt_seqno);
+			spdlog::trace("[METRICS] Detected loss of {} packets (seqno [{}; {}))", lost, m_stats.expected_seqno, pkt_seqno);
 			m_stats.expected_seqno = pkt_seqno + 1;
 		}
 		else // Packet reordering: pkt_seqno < m_seqno
@@ -49,7 +49,7 @@ public:
 			const uint64_t reorder_dist = m_stats.expected_seqno - pkt_seqno;
 			m_stats.reorder_dist = std::max(m_stats.reorder_dist, reorder_dist);
 
-			spdlog::warn("[METRICS] Detected reordered packet, seqno {}, expected {} (dist {})", pkt_seqno, m_stats.expected_seqno, reorder_dist);
+			spdlog::trace("[METRICS] Detected reordered packet, seqno {}, expected {} (dist {})", pkt_seqno, m_stats.expected_seqno, reorder_dist);
 		}
 	}
 
