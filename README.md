@@ -18,7 +18,8 @@
 
 ## Build Instructions
 
-[![Actions Status](https://github.com/maxsharabayko/srt-xtransmit/workflows/C/C++%20CI/badge.svg)](https://github.com/maxsharabayko/srt-xtransmit/actions)
+[![Ubuntu-18.04](https://github.com/maxsharabayko/srt-xtransmit/actions/workflows/ubuntu.yml/badge.svg)](https://github.com/maxsharabayko/srt-xtransmit/actions/workflows/ubuntu.yml)
+[![MacOS](https://github.com/maxsharabayko/srt-xtransmit/actions/workflows/macos-ccpp.yml/badge.svg)](https://github.com/maxsharabayko/srt-xtransmit/actions/workflows/macos-ccpp.yml)
 [![CodeFactor](https://www.codefactor.io/repository/github/maxsharabayko/srt-xtransmit/badge)](https://www.codefactor.io/repository/github/maxsharabayko/srt-xtransmit)
 [![LGTM alerts](https://img.shields.io/lgtm/alerts/g/maxsharabayko/srt-xtransmit.svg?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/maxsharabayko/srt-xtransmit/alerts/)
 
