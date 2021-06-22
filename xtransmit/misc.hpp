@@ -66,7 +66,18 @@ typedef std::shared_ptr<socket::isocket> shared_sock_t;
 /// @param [in,out] listeting_sock existing listening socket if any.
 /// @return socket connection or nullptr
 /// @throws socket::exception
-shared_sock_t create_connection(const UriParser& uri, shared_sock_t& listeting_sock = shared_sock_t());
+shared_sock_t create_connection(const UriParser& uri, shared_sock_t& listeting_sock);
+
+/// @brief Create SRT or UDP socket connection.
+/// The same as with two arguments, but using a temporal listeting_sock variable.
+/// @param uri [in] uri connection URI
+/// @return socket connection or nullptr
+/// @throws socket::exception
+inline shared_sock_t create_connection(const UriParser& uri)
+{
+	shared_sock_t temp_sock;
+	return create_connection(uri, temp_sock);
+}
 
 
 typedef std::function<void(shared_sock_t, const std::atomic_bool&)> processing_fn_t;
