@@ -94,19 +94,16 @@ void run_pipe(shared_sock dst, const config& cfg, const atomic_bool& force_break
 	}
 }
 
-void xtransmit::generate::run(const string& dst_url, const config& cfg, const atomic_bool& force_break)
+
+// Use std::bind to pass the run_pipe function, and bind arguments to it.
+void common_run(const string& dst_url, const config& cfg, const atomic_bool& force_break)
 {
-	const UriParser uri(dst_url);
-
-	shared_sock sock;
-	shared_sock connection;
-
 	const bool write_stats = cfg.stats_file != "" && cfg.stats_freq_ms > 0;
-	// make_unique is not supported by GCC 4.8, only starting from GCC 4.9 :(
 	unique_ptr<socket::stats_writer> stats;
 
 	if (write_stats)
 	{
+		// make_unique is not supported by GCC 4.8, only starting from GCC 4.9 :(
 		try {
 			stats = unique_ptr<socket::stats_writer>(
 				new socket::stats_writer(cfg.stats_file, milliseconds(cfg.stats_freq_ms)));
@@ -118,21 +115,94 @@ void xtransmit::generate::run(const string& dst_url, const config& cfg, const at
 		}
 	}
 
+	const UriParser uri(dst_url);
+	shared_sock listeting_sock; // A shared pointer to store a listening socket for multiple connections.
+	shared_sock connection;
+
 	do {
 		try
 		{
+			connection.reset();
+
 			if (uri.proto() == "udp")
 			{
 				connection = make_shared<socket::udp>(uri);
 			}
 			else
 			{
-				sock = make_shared<socket::srt>(uri);
-				socket::srt* s = static_cast<socket::srt*>(sock.get());
+				const bool is_listening = !!listeting_sock;
+				if (!is_listening)
+					listeting_sock = make_shared<socket::srt>(uri);
+				socket::srt* s = static_cast<socket::srt*>(listeting_sock.get());
 				const bool   accept = s->mode() == socket::srt::LISTENER;
-				if (accept)
+				if (accept && !is_listening)
 					s->listen();
 				connection = accept ? s->accept() : s->connect();
+
+				// Only save the shared pointer for a listener to re-accept a connection.
+				// Closing a listener socket will not allow further connections.
+				if (s->mode() != socket::srt::LISTENER || !cfg.reconnect)
+					listeting_sock.reset();
+			}
+
+			if (stats)
+				stats->add_socket(connection);
+			run_pipe(connection, cfg, force_break);
+		}
+		catch (const socket::exception& e)
+		{
+			spdlog::warn(LOG_SC_GENERATE "{}", e.what());
+		}
+	} while (cfg.reconnect && !force_break);
+}
+
+void xtransmit::generate::run(const string& dst_url, const config& cfg, const atomic_bool& force_break)
+{
+	const bool write_stats = cfg.stats_file != "" && cfg.stats_freq_ms > 0;
+	unique_ptr<socket::stats_writer> stats;
+
+	if (write_stats)
+	{
+		// make_unique is not supported by GCC 4.8, only starting from GCC 4.9 :(
+		try {
+			stats = unique_ptr<socket::stats_writer>(
+				new socket::stats_writer(cfg.stats_file, milliseconds(cfg.stats_freq_ms)));
+		}
+		catch (const socket::exception& e)
+		{
+			spdlog::error(LOG_SC_GENERATE "{}", e.what());
+			return;
+		}
+	}
+
+	const UriParser uri(dst_url);
+	shared_sock listeting_sock; // A shared pointer to store a listening socket for multiple connections.
+	shared_sock connection;
+
+	do {
+		try
+		{
+			connection.reset();
+
+			if (uri.proto() == "udp")
+			{
+				connection = make_shared<socket::udp>(uri);
+			}
+			else
+			{
+				const bool is_listening = !!listeting_sock;
+				if (!is_listening)
+					listeting_sock = make_shared<socket::srt>(uri);
+				socket::srt* s = static_cast<socket::srt*>(listeting_sock.get());
+				const bool   accept = s->mode() == socket::srt::LISTENER;
+				if (accept && !is_listening)
+					s->listen();
+				connection = accept ? s->accept() : s->connect();
+
+				// Only save the shared pointer for a listener to re-accept a connection.
+				// Closing a listener socket will not allow further connections.
+				if (s->mode() != socket::srt::LISTENER || !cfg.reconnect)
+					listeting_sock.reset();
 			}
 
 			if (stats)

@@ -133,11 +133,6 @@ shared_srt socket::srt::accept()
 		raise_exception("accept");
 	}
 
-	// we do one client connection at a time,
-	// so close the listener.
-	// srt_close(m_bindsock);
-	// m_bindsock = SRT_INVALID_SOCK;
-
 	spdlog::debug(LOG_SOCK_SRT "0x{:X} (srt://{}:{:d}) Accepted connection 0x{:X}",
 		m_bind_socket, m_host, m_port, sock);
 
