@@ -5,22 +5,23 @@
 // Third party libraries
 #include "CLI/CLI.hpp"
 
+// xtransmit
+#include "misc.hpp"
+
 namespace xtransmit
 {
 namespace generate
 {
 
-struct config
+struct config : public stats_config
 {
 	int         sendrate       = 0;
 	int         num_messages   = -1;
 	int         duration       = 0;
 	int         message_size   = 1316; ////8 * 1024 * 1024;
-	int         stats_freq_ms  = 0;
 	bool        two_way        = false;
 	bool        reconnect      = false;
 	bool        enable_metrics = false;
-	std::string stats_file;
 	std::string playback_csv;
 };
 

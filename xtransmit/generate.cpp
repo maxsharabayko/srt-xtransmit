@@ -13,8 +13,7 @@
 
 // xtransmit
 #include "socket_stats.hpp"
-#include "srt_socket.hpp"
-#include "udp_socket.hpp"
+#include "misc.hpp"
 #include "generate.hpp"
 #include "pacer.hpp"
 #include "metrics.hpp"
@@ -96,54 +95,9 @@ void run_pipe(shared_sock dst, const config& cfg, const atomic_bool& force_break
 
 void xtransmit::generate::run(const string& dst_url, const config& cfg, const atomic_bool& force_break)
 {
-	const UriParser uri(dst_url);
-
-	shared_sock sock;
-	shared_sock connection;
-
-	const bool write_stats = cfg.stats_file != "" && cfg.stats_freq_ms > 0;
-	// make_unique is not supported by GCC 4.8, only starting from GCC 4.9 :(
-	unique_ptr<socket::stats_writer> stats;
-
-	if (write_stats)
-	{
-		try {
-			stats = unique_ptr<socket::stats_writer>(
-				new socket::stats_writer(cfg.stats_file, milliseconds(cfg.stats_freq_ms)));
-		}
-		catch (const socket::exception& e)
-		{
-			spdlog::error(LOG_SC_GENERATE "{}", e.what());
-			return;
-		}
-	}
-
-	do {
-		try
-		{
-			if (uri.proto() == "udp")
-			{
-				connection = make_shared<socket::udp>(uri);
-			}
-			else
-			{
-				sock = make_shared<socket::srt>(uri);
-				socket::srt* s = static_cast<socket::srt*>(sock.get());
-				const bool   accept = s->mode() == socket::srt::LISTENER;
-				if (accept)
-					s->listen();
-				connection = accept ? s->accept() : s->connect();
-			}
-
-			if (stats)
-				stats->add_socket(connection);
-			run_pipe(connection, cfg, force_break);
-		}
-		catch (const socket::exception& e)
-		{
-			spdlog::warn(LOG_SC_GENERATE "{}", e.what());
-		}
-	} while (cfg.reconnect && !force_break);
+	using namespace std::placeholders;
+	processing_fn_t process_fn = std::bind(run_pipe, _1, cfg, _2);
+	common_run(dst_url, cfg, cfg.reconnect, force_break, process_fn);
 }
 
 CLI::App* xtransmit::generate::add_subcommand(CLI::App& app, config& cfg, string& dst_url)

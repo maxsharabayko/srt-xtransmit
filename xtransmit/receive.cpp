@@ -1,6 +1,7 @@
 #include <atomic>
 #include <chrono>
 #include <ctime>
+#include <functional>
 #include <future>
 #include <iomanip>
 #include <memory>
@@ -12,8 +13,7 @@
 
 // xtransmit
 #include "socket_stats.hpp"
-#include "srt_socket.hpp"
-#include "udp_socket.hpp"
+#include "misc.hpp"
 #include "receive.hpp"
 #include "metrics.hpp"
 
@@ -34,7 +34,7 @@ using shared_sock = std::shared_ptr<socket::isocket>;
 
 
 
-void trace_message(const size_t bytes, const vector<char> &buffer, int conn_id)
+void trace_message(const size_t bytes, const vector<char> &buffer, SOCKET conn_id)
 {
 	::cout << "RECEIVED MESSAGE length " << bytes << " on conn ID " << conn_id;
 
@@ -139,56 +139,9 @@ void run_pipe(shared_sock src, const config &cfg, const atomic_bool &force_break
 
 void xtransmit::receive::run(const string &src_url, const config &cfg, const atomic_bool &force_break)
 {
-	const UriParser uri(src_url);
-
-	shared_sock sock;
-	shared_sock conn;
-
-	unique_ptr<socket::stats_writer> stats;
-
-	const bool write_stats = cfg.stats_file != "" && cfg.stats_freq_ms > 0;
-	if (write_stats)
-	{
-		try {
-			// make_unique is not supported by GCC 4.8, only starting from GCC 4.9 :(
-			stats = unique_ptr<socket::stats_writer>(
-				new socket::stats_writer(cfg.stats_file, milliseconds(cfg.stats_freq_ms)));
-		}
-		catch (const socket::exception& e)
-		{
-			spdlog::error(LOG_SC_RECEIVE "{}", e.what());
-			return;
-		}
-	}
-
-	do {
-		try
-		{
-			if (uri.proto() == "udp")
-			{
-				conn = make_shared<socket::udp>(uri);
-			}
-			else
-			{
-				sock = make_shared<socket::srt>(uri);
-				socket::srt* s = static_cast<socket::srt*>(sock.get());
-				const bool  accept = s->mode() == socket::srt::LISTENER;
-				if (accept)
-					s->listen();
-				conn = accept ? s->accept() : s->connect();
-			}
-
-			if (stats)
-				stats->add_socket(conn);
-			run_pipe(conn, cfg, force_break);
-			if (stats && cfg.reconnect)
-				stats->clear();
-		}
-		catch (const socket::exception & e)
-		{
-			spdlog::warn(LOG_SC_RECEIVE "{}", e.what());
-		}
-	} while (cfg.reconnect && !force_break);
+	using namespace std::placeholders;
+	processing_fn_t process_fn = std::bind(run_pipe, _1, cfg, _2);
+	common_run(src_url, cfg, cfg.reconnect, force_break, process_fn);
 }
 
 CLI::App* xtransmit::receive::add_subcommand(CLI::App& app, config& cfg, string& src_url)
