@@ -31,9 +31,9 @@ using namespace std::chrono;
 namespace xtransmit {
 namespace metrics {
 
-const ptrdiff_t PKT_SEQNO_BYTE_OFFSET     =  0;
-const ptrdiff_t SYS_TIMESTAMP_BYTE_OFFSET =  8;
-const ptrdiff_t STD_TIMESTAMP_BYTE_OFFSET = 16;
+static const ptrdiff_t PKT_SEQNO_BYTE_OFFSET     =  0;
+static const ptrdiff_t SYS_TIMESTAMP_BYTE_OFFSET =  8;
+static const ptrdiff_t STD_TIMESTAMP_BYTE_OFFSET = 16;
 
 void write_sysclock_timestamp(vector<char>& payload)
 {
