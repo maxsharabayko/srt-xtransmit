@@ -46,8 +46,7 @@ git clone https://github.com/maxsharabayko/srt-xtransmit.git srt-xtransmit
 
 ```shell
 cd srt-xtransmit
-git submodule init
-git submodule update
+git submodule update --init --recursive
 ```
 
 <!-- https://git-scm.com/book/en/v2/Git-Tools-Submodules -->
@@ -124,8 +123,7 @@ Before building the project with cmake, checkout the desired SRT library version
 After git submodules are initialized:
 
 ```shell
-git submodule init
-git submodule update
+git submodule update --init -- recursive
 ```
 
 go to srt submodule and checkout, e.g. v1.3.4
