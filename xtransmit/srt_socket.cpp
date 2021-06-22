@@ -159,7 +159,7 @@ void socket::srt::raise_exception(const string &&place) const
 
 void socket::srt::raise_exception(const string &&place, const string &&reason) const
 {
-	spdlog::debug(LOG_SOCK_SRT "0x{:X} {} ERROR {}", m_bind_socket, place, reason);
+	spdlog::debug(LOG_SOCK_SRT "0x{:X} {}. ERROR: {}.", m_bind_socket, place, reason);
 	throw socket::exception(place + ": " + reason);
 }
 

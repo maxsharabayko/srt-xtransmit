@@ -29,7 +29,7 @@ class mutable_buffer
 {
   public:
 	/// Construct an empty buffer.
-	mutable_buffer() noexcept : data_(0), size_(0) {}
+	mutable_buffer() noexcept : data_(nullptr), size_(0) {}
 
 	/// Construct a buffer to represent a given memory range.
 	mutable_buffer(void *data, std::size_t size) noexcept : data_(data), size_(size) {}
@@ -84,7 +84,7 @@ class const_buffer
   public:
 	/// Construct an empty buffer.
 	const_buffer() noexcept
-	    : data_(0)
+	    : data_(nullptr)
 	    , size_(0)
 	{
 	}

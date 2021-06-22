@@ -32,7 +32,7 @@ namespace metrics
 	class generator
 	{
 	public:
-		generator(bool enable_metrics)
+		explicit generator(bool enable_metrics)
 			 :m_enable_metrics(enable_metrics)
 		{}
 

@@ -21,10 +21,9 @@ namespace socket
 
 class exception : public std::exception
 {
-
 public:
-	exception(const std::string &&err)
-		: m_error_msg(err)
+	explicit exception(const std::string &&err)
+		: m_error_msg(std::move(err)) // note "short string optimization" (SSO)
 	{
 	}
 

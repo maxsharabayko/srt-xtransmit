@@ -4,7 +4,7 @@
 #include <iostream>
 #include <thread>
 #include <functional>
-#include <signal.h>
+#include <csignal>
 
 // Third party libraries
 #include "CLI/CLI.hpp"
