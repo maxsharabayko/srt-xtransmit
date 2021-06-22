@@ -1,5 +1,5 @@
-#include <stdio.h>
-#include <string.h>
+#include <cstdio>
+#include <cstring>
 #include <vector>
 #include <iostream>
 #include <thread>
@@ -83,7 +83,7 @@ string create_srt_logfa_description()
 const char* srt_clock_type_str()
 {
 	// srt_clock_type() API function was added in SRT v1.4.3
-#define HAS_CLOCK_TYPE (SRT_VERSION_MAJOR == 1) && ((SRT_VERSION_MINOR > 4) || ((SRT_VERSION_MINOR == 4) && (SRT_VERSION_PATCH >= 3)))
+#define HAS_CLOCK_TYPE (SRT_VERSION_VALUE >= SRT_MAKE_VERSION(1, 4, 3))
 
 #if HAS_CLOCK_TYPE
 	const int clock_type = srt_clock_type();
@@ -104,9 +104,7 @@ const char* srt_clock_type_str()
 		break;
 	}
 	
-	stringstream ss;
-	ss << "Unknown (" << clock_type << ")";
-	return ss.str().c_str();
+	return "UNKNOWN VALUE";
 #else
 	return "[n/a prior to v1.4.3]";
 #endif

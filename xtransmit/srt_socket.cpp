@@ -312,7 +312,7 @@ int socket::srt::configure_pre(SRTSOCKET sock)
 	if (m_mode == connection_mode::RENDEZVOUS)
 	{
 		int yes = 1;
-		const int r = srt_setsockopt(sock, 0, SRTO_RENDEZVOUS, &yes, sizeof yes);
+		result = srt_setsockopt(sock, 0, SRTO_RENDEZVOUS, &yes, sizeof yes);
 		if (result == -1)
 			return result;
 	}
