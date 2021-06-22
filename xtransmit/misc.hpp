@@ -3,8 +3,16 @@
 #include <string.h>
 #include <iostream>
 #include <iomanip>	// std::put_time
+#include <memory>
 #include <sstream>	// std::stringstream, std::stringbuf
 
+// xtransmit
+#include "socket.hpp"
+#include "srt_socket.hpp"
+#include "udp_socket.hpp"
+
+
+namespace xtransmit {
 
 // Note: std::put_time is supported only in GCC 5 and higher
 #if !defined(__GNUC__) || defined(__clang__) || (__GNUC__ >= 5)
@@ -41,3 +49,37 @@ inline std::string print_timestamp_now()
 };
 
 #endif // HAS_PUT_TIME
+
+
+
+struct stats_config
+{
+	int         stats_freq_ms = 0;
+	std::string stats_file;
+};
+
+
+typedef std::shared_ptr<socket::isocket> shared_sock_t;
+
+/// @brief Create SRT or UDP socket connection.
+/// @param [in] uri connection URI
+/// @param [in,out] listeting_sock existing listening socket if any.
+/// @return socket connection or nullptr
+/// @throws socket::exception
+shared_sock_t create_connection(const UriParser& uri, shared_sock_t& listeting_sock = shared_sock_t());
+
+
+typedef std::function<void(shared_sock_t, const std::atomic_bool&)> processing_fn_t;
+
+/// @brief Creates stats writer if needed, establishes a connection, and runs `processing_fn`.
+/// @param dst_url 
+/// @param cfg 
+/// @param reconnect 
+/// @param force_break 
+/// @param processing_fn 
+void common_run(const std::string& dst_url, const stats_config& cfg, bool reconnect, const std::atomic_bool& force_break,
+	processing_fn_t& processing_fn);
+
+
+
+} // namespace xtransmit

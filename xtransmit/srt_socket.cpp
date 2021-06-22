@@ -37,13 +37,20 @@ socket::srt::srt(const UriParser &src_uri)
 		m_options.erase("blocking");
 	}
 
+	assert_options_valid();
+
+	// configure_pre(..) determines connection mode (m_mode).
+	if (SRT_SUCCESS != configure_pre(m_bind_socket))
+		throw socket::exception(srt_getlasterror_str());
+
 	if (!m_blocking_mode)
 	{
 		m_epoll_connect = srt_epoll_create();
 		if (m_epoll_connect == -1)
 			throw socket::exception(srt_getlasterror_str());
 
-		int modes = SRT_EPOLL_OUT | SRT_EPOLL_ERR;
+		const bool to_accept = m_mode == connection_mode::LISTENER;
+		int modes = SRT_EPOLL_ERR | (to_accept ? SRT_EPOLL_IN : SRT_EPOLL_OUT);
 		if (SRT_ERROR == srt_epoll_add_usock(m_epoll_connect, m_bind_socket, &modes))
 			throw socket::exception(srt_getlasterror_str());
 
@@ -52,11 +59,6 @@ socket::srt::srt(const UriParser &src_uri)
 		if (SRT_ERROR == srt_epoll_add_usock(m_epoll_io, m_bind_socket, &modes))
 			throw socket::exception(srt_getlasterror_str());
 	}
-
-	assert_options_valid();
-
-	if (SRT_SUCCESS != configure_pre(m_bind_socket))
-		throw socket::exception(srt_getlasterror_str());
 	
 	// Do binding after PRE options are configured in the above call.
 	handle_hosts();
@@ -79,7 +81,7 @@ socket::srt::~srt()
 {
 	if (!m_blocking_mode)
 	{
-		spdlog::debug(LOG_SOCK_SRT "0x{:X} Closing. Releasing epolls", m_bind_socket);
+		spdlog::debug(LOG_SOCK_SRT "0x{:X} Releasing epolls before closing", m_bind_socket);
 		if (m_epoll_connect != -1)
 			srt_epoll_release(m_epoll_connect);
 		srt_epoll_release(m_epoll_io);
@@ -112,17 +114,21 @@ shared_srt socket::srt::accept()
 	// Wait for REAL connected state if nonblocking mode
 	if (!m_blocking_mode)
 	{
-		// Socket readiness for connection is checked by polling on WRITE allowed sockets.
+		// Socket readiness to accept a new connection is notified with READ event.
+		// See also: https://github.com/Haivision/srt/pull/1831
 		constexpr int timeout_ms = -1;
 		int           len        = 2;
 		SRTSOCKET     ready[2];
-		if (srt_epoll_wait(m_epoll_connect, 0, 0, ready, &len, timeout_ms, 0, 0, 0, 0) == -1)
+		if (srt_epoll_wait(m_epoll_connect, ready, &len, 0, 0, timeout_ms, 0, 0, 0, 0) == -1)
 		{
 			// if (srt_getlasterror(nullptr) == SRT_ETIMEOUT)
 			//	continue;
 
 			raise_exception("accept::epoll_wait");
 		}
+
+		spdlog::debug(LOG_SOCK_SRT "0x{:X} (srt://{}:{:d}) {} ready, [0]: 0x{:X}",
+			m_bind_socket, m_host, m_port, len, ready[0]);
 	}
 
 	sockaddr_in scl;
@@ -272,7 +278,6 @@ void socket::srt::assert_options_valid() const
 {
 	assert_options_valid(m_options);
 }
-
 
 int socket::srt::configure_pre(SRTSOCKET sock)
 {

@@ -6,6 +6,7 @@
 #include <mutex>
 #include <string>
 #include <vector>
+#include <map>
 
 // xtransmit
 #include "socket.hpp"
@@ -24,6 +25,7 @@ public:
 
 public:
 	void add_socket(std::shared_ptr<socket::isocket> sock);
+	void remove_socket(SOCKET sockid);
 	void clear();
 	void stop();
 
@@ -34,7 +36,7 @@ private:
 	using shared_sock = std::shared_ptr<socket::isocket>;
 	std::atomic<bool> m_stop;
 	std::ofstream m_logfile;
-	std::vector<shared_sock> m_sock;
+	std::map<SOCKET, shared_sock> m_sock;
 	std::future<void> m_stat_future;
 	const std::chrono::milliseconds m_interval;
 	std::mutex m_lock;

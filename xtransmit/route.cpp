@@ -13,6 +13,7 @@
 // xtransmit
 #include "srt_socket.hpp"
 #include "udp_socket.hpp"
+#include "misc.hpp"
 #include "route.hpp"
 #include "socket_stats.hpp"
 
@@ -65,29 +66,6 @@ namespace route
 			}
 		}
 	}
-
-	shared_sock create_connection(const string &url)
-	{
-		const UriParser uri(url);
-
-		if (uri.proto() == "udp")
-		{
-			return make_shared<socket::udp>(uri);
-		}
-		
-		if(uri.proto() == "srt")
-		{
-			shared_sock socket = make_shared<socket::srt>(uri);
-			socket::srt* s = static_cast<socket::srt*>(socket.get());
-			const bool  accept = s->mode() == socket::srt::LISTENER;
-			if (accept)
-				s->listen();
-			return accept ? s->accept() : s->connect();
-		}
-
-		return nullptr;
-	}
-
 }
 }
 
