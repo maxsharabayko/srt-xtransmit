@@ -297,13 +297,9 @@ int socket::srt::configure_pre(SRTSOCKET sock)
 
 	if (conmode == SocketOption::FAILURE)
 	{
-		if (Verbose::on)
-		{
-			Verb() << "WARNING: failed to set options: ";
-			copy(failures.begin(), failures.end(), ostream_iterator<string>(*Verbose::cverb, ", "));
-			Verb();
-		}
-
+		stringstream ss;
+		copy(failures.begin(), failures.end(), ostream_iterator<string>(ss, ", "));
+		spdlog::warn(LOG_SOCK_SRT "failed to set options: {}.", ss.str());
 		return SRT_ERROR;
 	}
 
@@ -339,12 +335,9 @@ int socket::srt::configure_post(SRTSOCKET sock)
 
 	if (!failures.empty())
 	{
-		if (Verbose::on)
-		{
-			Verb() << "WARNING: failed to set options: ";
-			copy(failures.begin(), failures.end(), ostream_iterator<string>(*Verbose::cverb, ", "));
-			Verb();
-		}
+		stringstream ss;
+		copy(failures.begin(), failures.end(), ostream_iterator<string>(ss, ", "));
+		spdlog::warn(LOG_SOCK_SRT "failed to set options: {}.", ss.str());
 	}
 
 	return 0;
