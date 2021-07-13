@@ -31,9 +31,6 @@ using shared_sock = std::shared_ptr<socket::isocket>;
 
 #define LOG_SC_RECEIVE "RECEIVE "
 
-
-
-
 void trace_message(const size_t bytes, const vector<char> &buffer, SOCKET conn_id)
 {
 	::cout << "RECEIVED MESSAGE length " << bytes << " on conn ID " << conn_id;
@@ -120,7 +117,7 @@ void run_pipe(shared_sock src, const config &cfg, const atomic_bool &force_break
 				else
 				{
 					const auto stats_str = validator.stats();
-					spdlog::info(LOG_SC_RECEIVE "{}", stats_str);
+					spdlog::info(LOG_SC_RECEIVE "@{}: {}", sock.id(), stats_str);
 				}
 				stat_time = tnow;
 			}
@@ -141,7 +138,7 @@ void xtransmit::receive::run(const string &src_url, const config &cfg, const ato
 {
 	using namespace std::placeholders;
 	processing_fn_t process_fn = std::bind(run_pipe, _1, cfg, _2);
-	common_run(src_url, cfg, cfg.reconnect, force_break, process_fn);
+	common_run(src_url, cfg, cfg, force_break, process_fn);
 }
 
 CLI::App* xtransmit::receive::add_subcommand(CLI::App& app, config& cfg, string& src_url)
@@ -156,6 +153,7 @@ CLI::App* xtransmit::receive::add_subcommand(CLI::App& app, config& cfg, string&
 		->transform(CLI::AsNumberWithUnit(to_ms, CLI::AsNumberWithUnit::CASE_SENSITIVE));
 	sc_receive->add_flag("--printmsg", cfg.print_notifications, "print message into to stdout");
 	sc_receive->add_flag("--reconnect", cfg.reconnect, "Reconnect automatically");
+	sc_receive->add_option("--clients", cfg.client_conns, "Number of client connections to initiate or accept");
 	sc_receive->add_flag("--enable-metrics", cfg.enable_metrics, "Enable checking metrics: jitter, latency, etc.");
 	sc_receive->add_option("--metricsfile", cfg.metrics_file, "Metrics output filename (stdout if not set)");
 	sc_receive->add_option("--metricsfreq", cfg.metrics_freq_ms, "Metrics report frequency")

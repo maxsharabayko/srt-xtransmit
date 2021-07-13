@@ -51,11 +51,18 @@ inline std::string print_timestamp_now()
 #endif // HAS_PUT_TIME
 
 
-
 struct stats_config
 {
 	int         stats_freq_ms = 0;
 	std::string stats_file;
+};
+
+/// Connection establishment config
+struct conn_config
+{
+	bool        reconnect = false; // Try to reconnect broken connections.
+	int         client_conns = 1;  // SRT Caller: the number of client connections to initiate.
+	                               // SRT Listener: the number of allowed clients to accept.
 };
 
 
@@ -84,11 +91,11 @@ typedef std::function<void(shared_sock_t, const std::atomic_bool&)> processing_f
 
 /// @brief Creates stats writer if needed, establishes a connection, and runs `processing_fn`.
 /// @param dst_url 
-/// @param cfg 
-/// @param reconnect 
+/// @param cfg_stats 
+/// @param cfg_conn
 /// @param force_break 
 /// @param processing_fn 
-void common_run(const std::string& dst_url, const stats_config& cfg, bool reconnect, const std::atomic_bool& force_break,
+void common_run(const std::string& dst_url, const stats_config& cfg_stats, const conn_config& cfg_conn, const std::atomic_bool& force_break,
 	processing_fn_t& processing_fn);
 
 

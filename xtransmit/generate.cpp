@@ -97,7 +97,7 @@ void xtransmit::generate::run(const string& dst_url, const config& cfg, const at
 {
 	using namespace std::placeholders;
 	processing_fn_t process_fn = std::bind(run_pipe, _1, cfg, _2);
-	common_run(dst_url, cfg, cfg.reconnect, force_break, process_fn);
+	common_run(dst_url, cfg, cfg, force_break, process_fn);
 }
 
 CLI::App* xtransmit::generate::add_subcommand(CLI::App& app, config& cfg, string& dst_url)
@@ -118,6 +118,7 @@ CLI::App* xtransmit::generate::add_subcommand(CLI::App& app, config& cfg, string
 	sc_generate->add_option("--statsfreq", cfg.stats_freq_ms, "output stats report frequency (ms)")
 		->transform(CLI::AsNumberWithUnit(to_ms, CLI::AsNumberWithUnit::CASE_SENSITIVE));
 	sc_generate->add_flag("--twoway", cfg.two_way, "Both send and receive data");
+	sc_generate->add_option("--clients", cfg.client_conns, "Number of client connections to initiate or accept");
 	sc_generate->add_flag("--reconnect", cfg.reconnect, "Reconnect automatically");
 	sc_generate->add_flag("--enable-metrics", cfg.enable_metrics, "Enable all metrics: latency, loss, reordering, jitter, etc.");
 	sc_generate->add_option("--playback-csv", cfg.playback_csv, "Input CSV file with timestamp of every packet");

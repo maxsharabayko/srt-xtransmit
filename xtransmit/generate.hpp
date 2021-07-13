@@ -13,14 +13,15 @@ namespace xtransmit
 namespace generate
 {
 
-struct config : public stats_config
+struct config
+	: public stats_config
+	, public conn_config
 {
 	int         sendrate       = 0;
 	int         num_messages   = -1;
 	int         duration       = 0;
 	int         message_size   = 1316; ////8 * 1024 * 1024;
 	bool        two_way        = false;
-	bool        reconnect      = false;
 	bool        enable_metrics = false;
 	std::string playback_csv;
 };
