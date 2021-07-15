@@ -117,6 +117,7 @@ int main(int argc, char** argv)
 	CLI::App app("SRT xtransmit tool. SRT library v" SRT_VERSION_STRING);
 	app.set_config("--config");
 	app.set_help_all_flag("--help-all", "Expand all help");
+	app.set_version_flag("--version", string("SRT library v") + SRT_VERSION_STRING + " clock " + srt_clock_type_str());
 
 	spdlog::set_pattern("%H:%M:%S.%f %^[%L]%$ %v");
 	app.add_flag_function(
@@ -183,13 +184,6 @@ int main(int argc, char** argv)
 			return true;
 		},
 		logfa_desc);
-
-	app.add_flag_function(
-		"--version",
-		[](size_t) {
-			cerr << "SRT library v" << SRT_VERSION_STRING << " clock " << srt_clock_type_str() << endl;
-		},
-		"Show version info");
 
 	string src, dst;
 
