@@ -31,9 +31,6 @@ using shared_sock = std::shared_ptr<socket::isocket>;
 
 #define LOG_SC_RECEIVE "RECEIVE "
 
-
-
-
 void trace_message(const size_t bytes, const vector<char> &buffer, SOCKET conn_id)
 {
 	::cout << "RECEIVED MESSAGE length " << bytes << " on conn ID " << conn_id;
@@ -137,19 +134,19 @@ void run_pipe(shared_sock src, const config &cfg, const atomic_bool &force_break
 	}
 }
 
-void xtransmit::receive::run(const string &src_url, const config &cfg, const atomic_bool &force_break)
+void xtransmit::receive::run(const std::vector<std::string>& src_urls, const config &cfg, const atomic_bool &force_break)
 {
 	using namespace std::placeholders;
 	processing_fn_t process_fn = std::bind(run_pipe, _1, cfg, _2);
-	common_run(src_url, cfg, cfg.reconnect, force_break, process_fn);
+	common_run(src_urls, cfg, cfg.reconnect, force_break, process_fn);
 }
 
-CLI::App* xtransmit::receive::add_subcommand(CLI::App& app, config& cfg, string& src_url)
+CLI::App* xtransmit::receive::add_subcommand(CLI::App& app, config& cfg, std::vector<std::string>& src_urls)
 {
 	const map<string, int> to_ms{ {"s", 1000}, {"ms", 1} };
 
 	CLI::App* sc_receive = app.add_subcommand("receive", "Receive data (SRT, UDP)")->fallthrough();
-	sc_receive->add_option("src", src_url, "Source URI");
+	sc_receive->add_option("-i,--input,src", src_urls, "Source URI");
 	sc_receive->add_option("--msgsize", cfg.message_size, "Size of a buffer to receive message payload");
 	sc_receive->add_option("--statsfile", cfg.stats_file, "output stats report filename");
 	sc_receive->add_option("--statsfreq", cfg.stats_freq_ms, "output stats report frequency (ms)")

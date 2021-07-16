@@ -93,21 +93,21 @@ void run_pipe(shared_sock dst, const config& cfg, const atomic_bool& force_break
 	}
 }
 
-void xtransmit::generate::run(const string& dst_url, const config& cfg, const atomic_bool& force_break)
+void xtransmit::generate::run(const std::vector<std::string>& dst_urls, const config& cfg, const atomic_bool& force_break)
 {
 	using namespace std::placeholders;
 	processing_fn_t process_fn = std::bind(run_pipe, _1, cfg, _2);
-	common_run(dst_url, cfg, cfg.reconnect, force_break, process_fn);
+	common_run(dst_urls, cfg, cfg.reconnect, force_break, process_fn);
 }
 
-CLI::App* xtransmit::generate::add_subcommand(CLI::App& app, config& cfg, string& dst_url)
+CLI::App* xtransmit::generate::add_subcommand(CLI::App& app, config& cfg, std::vector<std::string>& dst_urls)
 {
 	const map<string, int> to_bps{{"kbps", 1000}, {"Mbps", 1000000}, {"Gbps", 1000000000}};
 	const map<string, int> to_ms{{"s", 1000}, {"ms", 1}};
 	const map<string, int> to_sec{{"s", 1}, {"min", 60}, {"mins", 60}};
 
 	CLI::App* sc_generate = app.add_subcommand("generate", "Send generated data (SRT, UDP)")->fallthrough();
-	sc_generate->add_option("dst", dst_url, "Destination URI");
+	sc_generate->add_option("-o,--output,dst", dst_urls, "Destination URI");
 	sc_generate->add_option("--msgsize", cfg.message_size, "Size of a message to send");
 	sc_generate->add_option("--sendrate", cfg.sendrate, "Bitrate to generate")
 		->transform(CLI::AsNumberWithUnit(to_bps, CLI::AsNumberWithUnit::CASE_SENSITIVE));

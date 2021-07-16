@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 #include <map>
+#include <unordered_set>
 
 // xtransmit
 #include "buffer.hpp"
@@ -51,9 +52,10 @@ public:
 	/// Verifies URI options provided are valid.
 	///
 	/// @param [in] options  a map of options key-value pairs to validate
+	/// @param [in] extra a set of extra options that are valid, e.g. "mode", "bind"
 	/// @throw socket::exception on failure
 	///
-	static void assert_options_valid(const std::map<string, string>& options);
+	static void assert_options_valid(const std::map<string, string>& options, const std::unordered_set<string>& extra);
 
 private:
 	void configure(const std::map<string, string>& options);

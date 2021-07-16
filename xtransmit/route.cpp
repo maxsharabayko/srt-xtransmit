@@ -70,9 +70,21 @@ namespace route
 }
 
 
-void xtransmit::route::run(const string& src_url, const string& dst_url,
+void xtransmit::route::run(const vector<string>& src_urls, const vector<string>& dst_urls,
 	const config& cfg, const atomic_bool& force_break)
 {
+	vector<UriParser> parsed_src_urls;
+	for (const string& url : src_urls)
+	{
+		parsed_src_urls.emplace_back(url);
+	}
+
+	vector<UriParser> parsed_dst_urls;
+	for (const string& url : dst_urls)
+	{
+		parsed_dst_urls.emplace_back(url);
+	}
+
 	try {
 		const bool write_stats = cfg.stats_file != "" && cfg.stats_freq_ms > 0;
 		// make_unique is not supported by GCC 4.8, only starting from GCC 4.9 :(
@@ -80,8 +92,8 @@ void xtransmit::route::run(const string& src_url, const string& dst_url,
 			? unique_ptr<socket::stats_writer>(new socket::stats_writer(cfg.stats_file, milliseconds(cfg.stats_freq_ms)))
 			: nullptr;
 
-		shared_sock dst = create_connection(dst_url);
-		shared_sock src = create_connection(src_url);
+		shared_sock dst = create_connection(parsed_dst_urls);
+		shared_sock src = create_connection(parsed_src_urls);
 
 		if (stats)
 		{
@@ -103,13 +115,13 @@ void xtransmit::route::run(const string& src_url, const string& dst_url,
 	}
 }
 
-CLI::App* xtransmit::route::add_subcommand(CLI::App& app, config& cfg, string& src_url, string& dst_url)
+CLI::App* xtransmit::route::add_subcommand(CLI::App& app, config& cfg, vector<string>& src_urls, vector<string>& dst_urls)
 {
 	const map<string, int> to_ms{ {"s", 1000}, {"ms", 1} };
 
 	CLI::App* sc_route = app.add_subcommand("route", "Route data (SRT, UDP)")->fallthrough();
-	sc_route->add_option("src", src_url, "Source URI");
-	sc_route->add_option("dst", dst_url, "Destination URI");
+	sc_route->add_option("-i,--input",  src_urls, "Source URIs");
+	sc_route->add_option("-o,--output", dst_urls, "Destination URIs");
 	sc_route->add_option("--msgsize", cfg.message_size, "Size of a buffer to receive message payload");
 	sc_route->add_flag("--bidir", cfg.bidir, "Enable bidirectional transmission");
 	sc_route->add_option("--statsfile", cfg.stats_file, "output stats report filename");
