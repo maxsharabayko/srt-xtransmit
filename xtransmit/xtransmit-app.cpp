@@ -117,7 +117,7 @@ int main(int argc, char** argv)
 	CLI::App app("SRT xtransmit tool. SRT library v" SRT_VERSION_STRING);
 	app.set_config("--config");
 	app.set_help_all_flag("--help-all", "Expand all help");
-	app.set_version_flag("--version", string("srt-xtransmit v0.1.0.\nSRT library v") + SRT_VERSION_STRING + " clock " + srt_clock_type_str());
+	app.set_version_flag("--version", string("srt-xtransmit v0.2.0 dev.\nSRT library v") + SRT_VERSION_STRING + " clock " + srt_clock_type_str());
 
 	spdlog::set_pattern("%H:%M:%S.%f %^[%L]%$ %v");
 	app.add_flag_function(
@@ -185,16 +185,17 @@ int main(int argc, char** argv)
 		},
 		logfa_desc);
 
+	vector<string> src_urls, dst_urls;
 	string src, dst;
 
 	generate::config cfg_generate;
-	CLI::App*        sc_generate = generate::add_subcommand(app, cfg_generate, dst);
+	CLI::App*        sc_generate = generate::add_subcommand(app, cfg_generate, dst_urls);
 
 	xtransmit::receive::config cfg_receive;
-	CLI::App*                  sc_receive = receive::add_subcommand(app, cfg_receive, src);
+	CLI::App*                  sc_receive = receive::add_subcommand(app, cfg_receive, src_urls);
 
 	xtransmit::route::config cfg_route;
-	CLI::App*                sc_route = route::add_subcommand(app, cfg_route, src, dst);
+	CLI::App*                sc_route = route::add_subcommand(app, cfg_route, src_urls, dst_urls);
 
 #if ENABLE_FILE_TRANSFER
 	CLI::App* sc_file = app.add_subcommand("file", "Send/receive a single file or folder contents")->fallthrough();
@@ -216,17 +217,17 @@ int main(int argc, char** argv)
 	// https://cliutils.gitlab.io/CLI11Tutorial/chapters/an-advanced-example.html
 	if (sc_generate->parsed())
 	{
-		generate::run(dst, cfg_generate, force_break);
+		generate::run(dst_urls, cfg_generate, force_break);
 		return 0;
 	}
 	else if (sc_receive->parsed())
 	{
-		xtransmit::receive::run(src, cfg_receive, force_break);
+		xtransmit::receive::run(src_urls, cfg_receive, force_break);
 		return 0;
 	}
 	else if (sc_route->parsed())
 	{
-		xtransmit::route::run(src, dst, cfg_route, force_break);
+		xtransmit::route::run(src_urls, dst_urls, cfg_route, force_break);
 		return 0;
 	}
 #if ENABLE_FILE_TRANSFER

@@ -243,7 +243,7 @@ std::future<shared_srt> socket::srt::async_read(std::vector<char> &buffer)
 	return std::future<shared_srt>();
 }
 
-void socket::srt::assert_options_valid(const std::map<string, string>& options)
+void socket::srt::assert_options_valid(const std::map<string, string>& options, const unordered_set<string>& extra)
 {
 #ifdef ENABLE_CXX17
 	for (const auto& [key, val] : options)
@@ -264,7 +264,7 @@ void socket::srt::assert_options_valid(const std::map<string, string>& options)
 			break;
 		}
 		
-		if (opt_found || key == "bind" || key == "mode")
+		if (opt_found || extra.count(key))
 			continue;
 
 		stringstream ss;
@@ -276,7 +276,7 @@ void socket::srt::assert_options_valid(const std::map<string, string>& options)
 
 void socket::srt::assert_options_valid() const
 {
-	assert_options_valid(m_options);
+	assert_options_valid(m_options, {"bind", "mode"});
 }
 
 int socket::srt::configure_pre(SRTSOCKET sock)

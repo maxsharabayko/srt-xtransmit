@@ -25,9 +25,9 @@ struct config : stats_config
 	int         message_size    = 1316;
 };
 
-void run(const std::string& url, const config& cfg, const std::atomic_bool& force_break);
+void run(const std::vector<std::string>& src_urls, const config& cfg, const std::atomic_bool& force_break);
 
-CLI::App* add_subcommand(CLI::App& app, config& cfg, std::string& src_url);
+CLI::App* add_subcommand(CLI::App& app, config& cfg, std::vector<std::string>& src_urls);
 
 } // namespace receive
 } // namespace xtransmit

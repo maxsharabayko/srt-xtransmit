@@ -62,33 +62,33 @@ struct stats_config
 typedef std::shared_ptr<socket::isocket> shared_sock_t;
 
 /// @brief Create SRT or UDP socket connection.
-/// @param [in] uri connection URI
+/// @param [in] uris connection URIs
 /// @param [in,out] listeting_sock existing listening socket if any.
 /// @return socket connection or nullptr
 /// @throws socket::exception
-shared_sock_t create_connection(const UriParser& uri, shared_sock_t& listeting_sock);
+shared_sock_t create_connection(const std::vector<UriParser>& uris, shared_sock_t& listeting_sock);
 
 /// @brief Create SRT or UDP socket connection.
 /// The same as with two arguments, but using a temporal listeting_sock variable.
-/// @param uri [in] uri connection URI
+/// @param [in] uris connection URIs
 /// @return socket connection or nullptr
 /// @throws socket::exception
-inline shared_sock_t create_connection(const UriParser& uri)
+inline shared_sock_t create_connection(const std::vector<UriParser>& uris)
 {
 	shared_sock_t temp_sock;
-	return create_connection(uri, temp_sock);
+	return create_connection(uris, temp_sock);
 }
 
 
 typedef std::function<void(shared_sock_t, const std::atomic_bool&)> processing_fn_t;
 
 /// @brief Creates stats writer if needed, establishes a connection, and runs `processing_fn`.
-/// @param dst_url 
+/// @param urls a list of URLs to to establish a connection
 /// @param cfg 
 /// @param reconnect 
 /// @param force_break 
 /// @param processing_fn 
-void common_run(const std::string& dst_url, const stats_config& cfg, bool reconnect, const std::atomic_bool& force_break,
+void common_run(const std::vector<std::string>& urls, const stats_config& cfg, bool reconnect, const std::atomic_bool& force_break,
 	processing_fn_t& processing_fn);
 
 

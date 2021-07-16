@@ -25,8 +25,8 @@ struct config : public stats_config
 	std::string playback_csv;
 };
 
-void run(const std::string& dst_url, const config& cfg, const std::atomic_bool& force_break);
+void run(const std::vector<std::string>& dst_urls, const config& cfg, const std::atomic_bool& force_break);
 
-CLI::App* add_subcommand(CLI::App& app, config& cfg, std::string& dst_url);
+CLI::App* add_subcommand(CLI::App& app, config& cfg, std::vector<std::string>& dst_urls);
 } // namespace generate
 } // namespace xtransmit
