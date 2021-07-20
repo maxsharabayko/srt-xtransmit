@@ -12,7 +12,7 @@
 
 # Build results
 _build*/
-build/
+build*/
 [Dd]ebug/
 [Dd]ebugPublic/
 [Rr]elease/
