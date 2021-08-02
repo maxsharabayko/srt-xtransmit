@@ -66,7 +66,16 @@ shared_sock_t create_connection(const vector<UriParser>& parsed_urls, shared_soc
 		const bool   accept = s->mode() == socket::srt::LISTENER;
 		if (accept && !is_listening)
 			s->listen();
-		shared_sock_t connection = accept ? s->accept() : s->connect();
+		shared_sock_t connection;
+		
+		try {
+			connection = accept ? s->accept() : s->connect();
+		}
+		catch (const socket::exception& e)
+		{
+			listeting_sock.reset();
+			throw e;
+		}
 
 		// Only save the shared pointer for a listener to re-accept a connection.
 		if (s->mode() != socket::srt::LISTENER)
@@ -122,10 +131,10 @@ void common_run(const vector<string>& urls, const stats_config& cfg, bool reconn
 			if (tnow < next_reconnect)
 				this_thread::sleep_until(next_reconnect);
 
+			next_reconnect = tnow + seconds(1);
 			// It is important to close `conn` after processing is done.
 			// The scope of `conn` closes it unless stats_writer holds a pointer.
 			shared_sock_t conn = create_connection(parsed_urls, listeting_sock);
-			next_reconnect = tnow + seconds(1);
 
 			// Closing a listener socket (if any) will not allow further connections.
 			if (!reconnect)
