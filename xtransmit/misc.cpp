@@ -13,7 +13,7 @@ namespace xtransmit {
 #define LOG_SC_CONN "CONN "
 
 
-shared_sock_t create_connection(const vector<UriParser>& parsed_urls, shared_sock_t& listeting_sock)
+shared_sock_t create_connection(const vector<UriParser>& parsed_urls, shared_sock_t& listening_sock)
 {
 	if (parsed_urls.empty())
 	{
@@ -30,10 +30,10 @@ shared_sock_t create_connection(const vector<UriParser>& parsed_urls, shared_soc
 	{
 #if ENABLE_EXPERIMENTAL_BONDING
 		// Group SRT connection
-		const bool is_listening = !!listeting_sock;
+		const bool is_listening = !!listening_sock;
 		if (!is_listening)
-			listeting_sock = make_shared<socket::srt_group>(parsed_urls);
-		socket::srt_group* s = dynamic_cast<socket::srt_group*>(listeting_sock.get());
+			listening_sock = make_shared<socket::srt_group>(parsed_urls);
+		socket::srt_group* s = dynamic_cast<socket::srt_group*>(listening_sock.get());
 		const bool  accept = s->mode() == socket::srt_group::LISTENER;
 		if (accept) {
 			s->listen();
@@ -42,7 +42,7 @@ shared_sock_t create_connection(const vector<UriParser>& parsed_urls, shared_soc
 
 		// Only save the shared pointer for a listener to re-accept a connection.
 		if (s->mode() != socket::srt_group::LISTENER)
-			listeting_sock.reset();
+			listening_sock.reset();
 
 		return connection;
 #else
@@ -59,10 +59,10 @@ shared_sock_t create_connection(const vector<UriParser>& parsed_urls, shared_soc
 
 	if (uri.type() == UriParser::SRT)
 	{
-		const bool is_listening = !!listeting_sock;
+		const bool is_listening = !!listening_sock;
 		if (!is_listening)
-			listeting_sock = make_shared<socket::srt>(uri);
-		socket::srt* s = dynamic_cast<socket::srt*>(listeting_sock.get());
+			listening_sock = make_shared<socket::srt>(uri);
+		socket::srt* s = dynamic_cast<socket::srt*>(listening_sock.get());
 		const bool   accept = s->mode() == socket::srt::LISTENER;
 		if (accept && !is_listening)
 			s->listen();
@@ -73,13 +73,13 @@ shared_sock_t create_connection(const vector<UriParser>& parsed_urls, shared_soc
 		}
 		catch (const socket::exception& e)
 		{
-			listeting_sock.reset();
+			listening_sock.reset();
 			throw e;
 		}
 
 		// Only save the shared pointer for a listener to re-accept a connection.
 		if (s->mode() != socket::srt::LISTENER)
-			listeting_sock.reset();
+			listening_sock.reset();
 
 		return connection;
 	}
@@ -121,7 +121,7 @@ void common_run(const vector<string>& urls, const stats_config& cfg, bool reconn
 		parsed_urls.emplace_back(url);
 	}
 
-	shared_sock_t listeting_sock; // A shared pointer to store a listening socket for multiple connections.
+	shared_sock_t listening_sock; // A shared pointer to store a listening socket for multiple connections.
 	steady_clock::time_point next_reconnect = steady_clock::now();
 
 	do {
@@ -134,11 +134,11 @@ void common_run(const vector<string>& urls, const stats_config& cfg, bool reconn
 			next_reconnect = tnow + seconds(1);
 			// It is important to close `conn` after processing is done.
 			// The scope of `conn` closes it unless stats_writer holds a pointer.
-			shared_sock_t conn = create_connection(parsed_urls, listeting_sock);
+			shared_sock_t conn = create_connection(parsed_urls, listening_sock);
 
 			// Closing a listener socket (if any) will not allow further connections.
 			if (!reconnect)
-				listeting_sock.reset();
+				listening_sock.reset();
 
 			if (stats)
 				stats->add_socket(conn);
