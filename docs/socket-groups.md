@@ -95,7 +95,7 @@ srt-xtransmit generate srt://<ip1>:<port1>?grouptype=backup&weight=2 srt://<ip1>
 ## Route Examples
 
 ```shell
-(group listener)
+(group listener-receiver routing to group caller-sender)
 srt-xtransmit route -i srt://<ip1>:<port1>?mode=listener srt://<ip2>:<port2>?mode=listener \
                     -o srt://<ip3>:<port3>?grouptype=backup srt://<ip4>:<port4>
 ```
