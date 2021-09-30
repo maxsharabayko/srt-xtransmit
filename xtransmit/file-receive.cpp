@@ -7,6 +7,7 @@
 #include <vector>
 #include <deque>
 #include <chrono>
+#include <thread>
 
 #include "file-receive.hpp"
 #include "srt_socket.hpp"

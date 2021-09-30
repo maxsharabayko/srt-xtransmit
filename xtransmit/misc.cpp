@@ -1,3 +1,4 @@
+#include <thread>
 #include "misc.hpp"
 #include "socket_stats.hpp"
 #include "srt_socket_group.hpp"

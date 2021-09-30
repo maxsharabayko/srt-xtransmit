@@ -8,6 +8,7 @@
 #include <vector>
 #include <deque>
 #include <chrono>
+#include <thread>
 
 #include "file-send.hpp"
 #include "srt_socket.hpp"
