@@ -398,6 +398,21 @@ void socket::srt::handle_hosts()
 		spdlog::info(LOG_SOCK_SRT "srt://{}:{:d}: bound to '0.0.0.0:{}' (rendezvous default).",
 			m_host, m_port, m_port);
 	}
+	else if (m_mode == connection_mode::LISTENER)
+	{
+		sockaddr_any sa;
+		try
+		{
+			sa = CreateAddr(m_host, m_port);
+		}
+		catch (const std::invalid_argument& e)
+		{
+			raise_exception("listen::create_addr", e.what());
+		}
+		bind_me(reinterpret_cast<const sockaddr*>(&sa));
+		spdlog::info(LOG_SOCK_SRT "srt://{0}:{1:d}: bound to '{0}:{1:d}'.",
+			m_host, m_port);
+	}
 
 	if (m_host == "" && !ip_bonded)
 	{
