@@ -346,7 +346,7 @@ int socket::srt::configure_post(SRTSOCKET sock)
 void socket::srt::handle_hosts()
 {
 	const auto bind_me = [&](const sockaddr* sa) {
-		const int       bind_res = srt_bind(m_bind_socket, sa, sizeof * sa);
+		const int bind_res = srt_bind(m_bind_socket, sa, sizeof * sa);
 		if (bind_res < 0)
 		{
 			srt_close(m_bind_socket);
@@ -354,7 +354,6 @@ void socket::srt::handle_hosts()
 		}
 	};
 
-	bool ip_bonded = false;
 	if (m_options.count("bind"))
 	{
 		string bindipport = m_options.at("bind");
@@ -377,8 +376,6 @@ void socket::srt::handle_hosts()
 		}
 
 		bind_me(reinterpret_cast<const sockaddr*>(&sa_bind));
-		ip_bonded = true;
-
 		spdlog::info(LOG_SOCK_SRT "srt://{}:{:d}: bound to '{}:{}'.",
 			m_host, m_port, bindip, bindport);
 	}
@@ -392,7 +389,7 @@ void socket::srt::handle_hosts()
 		}
 		catch (const std::invalid_argument& e)
 		{
-			raise_exception("listen::create_addr", e.what());
+			raise_exception("create_addr", e.what());
 		}
 		bind_me(reinterpret_cast<const sockaddr*>(&sa));
 		spdlog::info(LOG_SOCK_SRT "srt://{}:{:d}: bound to '0.0.0.0:{}' (rendezvous default).",
@@ -407,26 +404,11 @@ void socket::srt::handle_hosts()
 		}
 		catch (const std::invalid_argument& e)
 		{
-			raise_exception("listen::create_addr", e.what());
+			raise_exception("create_addr", e.what());
 		}
 		bind_me(reinterpret_cast<const sockaddr*>(&sa));
 		spdlog::info(LOG_SOCK_SRT "srt://{0}:{1:d}: bound to '{0}:{1:d}'.",
 			m_host, m_port);
-	}
-
-	if (m_host == "" && !ip_bonded)
-	{
-		// bind listener
-		sockaddr_any sa;
-		try
-		{
-			sa = CreateAddr(m_host, m_port);
-		}
-		catch (const std::invalid_argument & e)
-		{
-			raise_exception("listen::create_addr", e.what());
-		}
-		bind_me(reinterpret_cast<const sockaddr*>(&sa));
 	}
 }
 
