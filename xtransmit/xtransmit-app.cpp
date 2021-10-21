@@ -25,7 +25,6 @@
 #include "route.hpp"
 #include "file-send.hpp"
 #include "file-receive.hpp"
-#include "test.hpp"
 
 using namespace std;
 
@@ -214,8 +213,6 @@ int main(int argc, char** argv)
 	CLI::App*                        sc_forward = xtransmit::forward::add_subcommand(*sc_file, cfg_forward, src, dst);
 #endif
 
-	CLI::App* sc_test = test::add_subcommand(app);
-
 	app.require_subcommand(1);
 	CLI11_PARSE(app, argc, argv);
 
@@ -255,10 +252,6 @@ int main(int argc, char** argv)
 		forward::run(src, dst, cfg_forward, force_break);
 	}
 #endif
-	else if (sc_test->parsed())
-	{
-		test::run();
-	}
 	else
 	{
 		cerr << "Failed to recognize subcommand" << endl;
