@@ -1,5 +1,5 @@
 #include "udp_socket.hpp"
-#include "apputil.hpp"
+#include "misc.hpp"
 #include "socketoptions.hpp"
 
 // submodules
@@ -46,10 +46,10 @@ socket::udp::udp(const UriParser &src_uri)
 		}
 	}
 
-	sockaddr_any sa_requested;
+	netaddr_any sa_requested;
 	try
 	{
-		sa_requested = CreateAddr(m_host, m_port);
+		sa_requested = create_addr(m_host, m_port);
 	}
 	catch (const std::invalid_argument &)
 	{
@@ -76,10 +76,10 @@ socket::udp::udp(const UriParser &src_uri)
 			: m_port;
 		m_options.erase("bind");
 
-		sockaddr_any sa_bind;
+		netaddr_any sa_bind;
 		try
 		{
-			sa_bind = CreateAddr(bindip, bindport);
+			sa_bind = create_addr(bindip, bindport);
 		}
 		catch (const std::invalid_argument&)
 		{

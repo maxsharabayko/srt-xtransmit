@@ -216,7 +216,7 @@ void socket::srt_group::create_listeners(const vector<UriParser>& src_uri)
 	for (size_t i = 0; i < src_uri.size(); ++i)
 	{
 		const UriParser& url = src_uri[i];
-		sockaddr_any     sa  = CreateAddr(url.host(), url.portno());
+		netaddr_any      sa  = create_addr(url.host(), url.portno());
 
 		SRTSOCKET s = srt_create_socket();
 		if (s == SRT_INVALID_SOCK)
@@ -260,7 +260,7 @@ void socket::srt_group::create_callers(const vector<UriParser>& uris, SRT_GROUP_
 
 	for (const auto& uri : uris)
 	{
-		sockaddr_any sa;
+		netaddr_any sa;
 		try
 		{
 			sa = CreateAddr(uri.host(), uri.portno());
@@ -388,7 +388,7 @@ int socket::srt_group::listen_callback_fn(void* opaq, SRTSOCKET sock, int hsvers
 		return 0;
 	}
 
-	sockaddr_any sa(peeraddr);
+	netaddr_any sa(peeraddr);
 	spdlog::trace(LOG_SRT_GROUP "Accepted member socket 0x{:X}, remote IP {}", sock, sa.str());
 
 	// TODO: this group may no longer exist. Use some global array to track valid groups.
@@ -505,7 +505,7 @@ shared_srt_group socket::srt_group::connect()
 			LOG_SRT_GROUP "non blocking");
 		for (auto target : m_targets)
 		{
-			sockaddr_any target_addr(target.peeraddr);
+			netaddr_any target_addr(target.peeraddr);
 			const int    st = srt_connect(m_bind_socket, target_addr.get(), target_addr.size());
 			if (st == SRT_ERROR)
 				raise_exception("srt_group::connect_member");

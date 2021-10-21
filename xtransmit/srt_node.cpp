@@ -6,7 +6,7 @@
 #include <chrono>
 #include <array>
 #include <future>
-#include "apputil.hpp"  // CreateAddrInet
+#include "misc.hpp"
 #include "uriparser.hpp"  // UriParser
 #include "socketoptions.hpp"
 #include "logsupport.hpp"
@@ -15,7 +15,7 @@
 
 
 using namespace std;
-
+using namespace xtransmit;
 
 
 inline std::string print_ts()
@@ -214,7 +214,7 @@ int SrtNode::EstablishConnection(bool caller, int max_conn)
     const int modes = SRT_EPOLL_IN;
     srt_epoll_add_usock(m_epoll_accept, m_bindsock, &modes);
 
-    sockaddr_any sa = CreateAddr(m_host, m_port);
+    netaddr_any sa = create_addr(m_host, m_port);
     sockaddr* psa = (sockaddr*)&sa;
 
     if (caller)

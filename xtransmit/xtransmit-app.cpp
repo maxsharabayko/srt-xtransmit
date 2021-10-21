@@ -25,6 +25,7 @@
 #include "route.hpp"
 #include "file-send.hpp"
 #include "file-receive.hpp"
+#include "test.hpp"
 
 using namespace std;
 
@@ -59,6 +60,9 @@ struct NetworkInit
 
 string create_srt_logfa_description()
 {
+#define HAS_SRTLOGFA_LIST (SRT_VERSION_VALUE >= SRT_MAKE_VERSION(1, 4, 2))
+
+#if HAS_SRTLOGFA_LIST
 	map<int, string> revmap;
 	for (auto entry : SrtLogFAList())
 		revmap[entry.second] = entry.first;
@@ -78,6 +82,9 @@ string create_srt_logfa_description()
 	}
 	ss << " ]";
 	return ss.str();
+#else
+	return "[see SRT docs for SRT prior to v1.4.2]";
+#endif
 }
 
 const char* srt_clock_type_str()
@@ -207,6 +214,8 @@ int main(int argc, char** argv)
 	CLI::App*                        sc_forward = xtransmit::forward::add_subcommand(*sc_file, cfg_forward, src, dst);
 #endif
 
+	CLI::App* sc_test = test::add_subcommand(app);
+
 	app.require_subcommand(1);
 	CLI11_PARSE(app, argc, argv);
 
@@ -246,6 +255,10 @@ int main(int argc, char** argv)
 		forward::run(src, dst, cfg_forward, force_break);
 	}
 #endif
+	else if (sc_test->parsed())
+	{
+		test::run();
+	}
 	else
 	{
 		cerr << "Failed to recognize subcommand" << endl;
