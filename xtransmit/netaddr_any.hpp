@@ -345,7 +345,6 @@ struct netaddr_any
 
             return false;
         }
-
     };
 
     bool equal_address(const netaddr_any& rhs) const
