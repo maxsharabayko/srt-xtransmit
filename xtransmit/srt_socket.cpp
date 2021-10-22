@@ -178,15 +178,16 @@ shared_srt socket::srt::connect()
 	spdlog::debug(LOG_SOCK_SRT "0x{:X} {} Connecting to srt://{}:{:d}",
 		m_bind_socket, m_blocking_mode ? "SYNC" : "ASYNC", m_host, m_port);
 
-	sockaddr *psa = (sockaddr *)&sa;
 	{
-		const int res = srt_connect(m_bind_socket, psa, sizeof sa);
+		const int res = srt_connect(m_bind_socket, sa.get(), sa.size());
 		if (res == SRT_ERROR)
 		{
 			// srt_getrejectreason() added in v1.3.4
 			const auto reason = srt_getrejectreason(m_bind_socket);
 			srt_close(m_bind_socket);
-			raise_exception("connect failed", srt_rejectreason_str(reason));
+			
+			//raise_exception("connect failed", srt_rejectreason_str(reason));
+			raise_exception("connect failed", srt_getlasterror_str());
 		}
 	}
 

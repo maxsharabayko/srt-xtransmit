@@ -263,7 +263,7 @@ void socket::srt_group::create_callers(const vector<UriParser>& uris, SRT_GROUP_
 		netaddr_any sa;
 		try
 		{
-			sa = CreateAddr(uri.host(), uri.portno());
+			sa = create_addr(uri.host(), uri.portno());
 		}
 		catch (const std::invalid_argument& e)
 		{
