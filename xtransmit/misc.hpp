@@ -8,6 +8,7 @@
 
 // xtransmit
 #include "socket.hpp"
+#include "netaddr_any.hpp"
 #include "srt_socket.hpp"
 #include "udp_socket.hpp"
 
@@ -91,6 +92,7 @@ typedef std::function<void(shared_sock_t, const std::atomic_bool&)> processing_f
 void common_run(const std::vector<std::string>& urls, const stats_config& cfg, bool reconnect, const std::atomic_bool& force_break,
 	processing_fn_t& processing_fn);
 
-
+/// @brief Create netaddr_any from host and port values.
+netaddr_any create_addr(const std::string& host, unsigned short port, int pref_family = AF_UNSPEC);
 
 } // namespace xtransmit

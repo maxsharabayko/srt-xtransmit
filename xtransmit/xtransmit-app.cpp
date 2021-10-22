@@ -59,6 +59,9 @@ struct NetworkInit
 
 string create_srt_logfa_description()
 {
+#define HAS_SRTLOGFA_LIST (SRT_VERSION_VALUE >= SRT_MAKE_VERSION(1, 4, 2))
+
+#if HAS_SRTLOGFA_LIST
 	map<int, string> revmap;
 	for (auto entry : SrtLogFAList())
 		revmap[entry.second] = entry.first;
@@ -78,6 +81,9 @@ string create_srt_logfa_description()
 	}
 	ss << " ]";
 	return ss.str();
+#else
+	return "[see SRT docs for SRT prior to v1.4.2]";
+#endif
 }
 
 const char* srt_clock_type_str()
