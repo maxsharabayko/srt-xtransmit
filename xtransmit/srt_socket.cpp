@@ -185,9 +185,7 @@ shared_srt socket::srt::connect()
 			// srt_getrejectreason() added in v1.3.4
 			const auto reason = srt_getrejectreason(m_bind_socket);
 			srt_close(m_bind_socket);
-			
-			//raise_exception("connect failed", srt_rejectreason_str(reason));
-			raise_exception("connect failed", srt_getlasterror_str());
+			raise_exception("connect failed", string(srt_getlasterror_str()) + ". Reject reason: " + srt_rejectreason_str(reason));
 		}
 	}
 
