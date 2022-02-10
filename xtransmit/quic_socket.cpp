@@ -803,8 +803,9 @@ static void th_receive(quicly_context_t* ctx, int fd, atomic_bool& closing, sock
 								assert(new_conn == NULL);
 							}
 
-							if (new_conn != nullptr && send_pending(fd, new_conn) != 0) {
-								spdlog::error(LOG_SOCK_QUIC "send_pending failed unexpectedly.");
+							int ee = 0;
+							if (new_conn != nullptr && (ee = send_pending(fd, new_conn)) != 0) {
+								spdlog::error(LOG_SOCK_QUIC "send_pending failed, errorcode {}.", ee);
 								lock_guard<mutex> lck(self->mtx_conn());
 								quicly_free(new_conn);
 							}
@@ -833,7 +834,7 @@ static void th_receive(quicly_context_t* ctx, int fd, atomic_bool& closing, sock
 			lock_guard<mutex> lck(self->mtx_conn());
 			const int ret = send_pending(fd, conn);
 			if (ret != 0) {
-				spdlog::error(LOG_SOCK_QUIC "send_pending failed unexpectedly.");
+				spdlog::error(LOG_SOCK_QUIC "send_pending failed with code {}.", ret);
 				//quicly_free(conn);
 			}
 		}
