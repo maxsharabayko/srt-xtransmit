@@ -53,7 +53,36 @@ shared_sock_t create_connection(const vector<UriParser>& parsed_urls, shared_soc
 		return make_shared<socket::udp>(uri);
 	}
 
-	if (uri.type() == UriParser::SRT)
+	const auto uri_type = uri.type();
+
+	if (uri_type == UriParser::TCP)
+	{
+		const bool is_listening = !!listening_sock;
+		if (!is_listening)
+			listening_sock = make_shared<socket::tcp>(uri);
+		socket::tcp* s = dynamic_cast<socket::tcp*>(listening_sock.get());
+		const bool   accept = !s->is_caller();
+		if (accept && !is_listening)
+			s->listen();
+		shared_sock_t connection;
+
+		try {
+			connection = accept ? s->accept() : s->connect();
+		}
+		catch (const socket::exception& e)
+		{
+			listening_sock.reset();
+			throw e;
+		}
+
+		// Only save the shared pointer for a listener to re-accept a connection.
+		if (!s->is_caller())
+			listening_sock.reset();
+
+		return connection;
+	}
+
+	if (uri_type == UriParser::SRT)
 	{
 		const bool is_listening = !!listening_sock;
 		if (!is_listening)

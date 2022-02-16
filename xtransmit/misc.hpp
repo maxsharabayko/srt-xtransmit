@@ -14,6 +14,7 @@
 #include "netaddr_any.hpp"
 #include "srt_socket.hpp"
 #include "udp_socket.hpp"
+#include "tcp_socket.hpp"
 
 
 namespace xtransmit {
