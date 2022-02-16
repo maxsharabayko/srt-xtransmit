@@ -27,9 +27,9 @@ where
 - `weight` defines member socket weight in the main/backup connection mode (higher weight means higher priority); ignored in broadcast configuration;
 - other socket options.
 
-Only the first URI in the list has to specify the group connection type. Option specified for the first member (int the first URI)
+Only the first URI in the list has to specify the group connection type. Options specified for the first member (in the first URI)
 are to be inherited by other group members.
-The exception is the `weight` option, which is set only for those member, for which it is provided.
+The exception is the `weight` option, which is only set for those members for which it is provided.
 
 Example URI command-line for main/backup connection:
 
@@ -40,7 +40,7 @@ srt://<ip1>:<port1>?grouptype=backup&weight=10&latency=120 srt://<ip2>:<port2>?w
 ### A Group of Listeners
 
 A single listening socket bound to a specific UDP port can accept group connections.
-Accepting group connections is not allowed by default, thus must be enabled by `groupconnect=1`.
+By default, accepting group connections is not allowed and must be enabled by `groupconnect=1`.
 
 ```shell
 srt://:<port1>?groupconnect=1
@@ -59,7 +59,7 @@ srt://<ip1>:<port1>?mode=listener&groupconnect=1
 ```
 
 To listen on several UDP ports for a group connection several listeners must be initialized.
-If more than one listener is specified, there is no need to set `groupconnect=1`: it is done automatically.
+If more than one listener is specified, there is no need to set `groupconnect=1`, it is done automatically.
 
 ```shell
 srt://:<port1>?bind=<ip1> srt://<ip2>:<port2>?mode=listener
@@ -68,7 +68,7 @@ srt://:<port1>?bind=<ip1> srt://<ip2>:<port2>?mode=listener
 ## Receive and Generate Examples
 
 On the listener side the `--reconnect` flag must be provided to allow further connections
-after the initial one is established. Otherwise, the listener will be closed after the first member gets connected.
+after the initial connection is established. Otherwise, the listener will be closed after the first member gets connected.
 
 On the caller side the `--reconnect` flag enables reconnection attempts for those members, which
 might have been disconnected in run time. For example, if the main link got broken and disconnected,
