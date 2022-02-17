@@ -28,7 +28,7 @@ where
 - other socket options.
 
 Only the first URI in the list has to specify the group connection type. Options specified for the first member (in the first URI)
-are to be inherited by other group members.
+are inherited by other group members.
 The exception is the `weight` option, which is only set for those members for which it is provided.
 
 Example URI command-line for main/backup connection:
