@@ -58,7 +58,7 @@ or explicitly defining the connection method:
 srt://<ip1>:<port1>?mode=listener&groupconnect=1
 ```
 
-To listen on several UDP ports for a group connection several listeners must be initialized.
+To listen on several UDP ports for a group connection, several listeners must be initialized.
 If more than one listener is specified, there is no need to set `groupconnect=1`, it is done automatically.
 
 ```shell
