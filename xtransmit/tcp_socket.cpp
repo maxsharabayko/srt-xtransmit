@@ -157,7 +157,7 @@ shared_tcp socket::tcp::connect()
 		FD_SET(m_bind_socket, &set);
 		tv.tv_sec = 5;
 		tv.tv_usec = 0;
-		const int select_ret = ::select((int)m_bind_socket + 1, &set, NULL, &set, &tv);
+		const int select_ret = ::select((int)m_bind_socket + 1, NULL, &set, &set, &tv);
 
 		if (select_ret == -1) {
 			spdlog::debug(LOG_SOCK_TCP "0x{:X} ASYNC Can't connect to tcp://{}:{:d}. ::select returned {}",
