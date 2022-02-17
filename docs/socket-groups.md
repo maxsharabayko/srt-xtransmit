@@ -67,7 +67,7 @@ srt://:<port1>?bind=<ip1> srt://<ip2>:<port2>?mode=listener
 
 ## Receive and Generate Examples
 
-On the listener side the `--reconnect` flag must be provided to allow further connections
+On the listener side, the `--reconnect` flag must be provided to allow further connections
 after the initial connection is established. Otherwise, the listener will be closed after the first member gets connected.
 
 On the caller side the `--reconnect` flag enables reconnection attempts for those members, which
