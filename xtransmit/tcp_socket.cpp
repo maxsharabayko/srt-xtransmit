@@ -143,8 +143,12 @@ shared_tcp socket::tcp::connect()
 #ifdef _WIN32
 			// See https://docs.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-connect
 			if (get_last_error() != WSAEWOULDBLOCK || m_blocking_mode)
+#else
+			if (get_last_error() != EINPROGRESS || m_blocking_mode)
 #endif
-			raise_exception("connect failed", ::to_string(get_last_error()));
+			{
+				raise_exception("connect failed", ::to_string(get_last_error()));
+			}
 		}
 	}
 
@@ -159,11 +163,11 @@ shared_tcp socket::tcp::connect()
 		tv.tv_usec = 0;
 		const int select_ret = ::select((int)m_bind_socket + 1, NULL, &set, &set, &tv);
 
-		if (select_ret == -1) {
+		if (select_ret <= 1) {
 			spdlog::debug(LOG_SOCK_TCP "0x{:X} ASYNC Can't connect to tcp://{}:{:d}. ::select returned {}",
 				m_bind_socket, m_host, m_port, select_ret);
 
-			raise_exception("connect failed", ::to_string(select_ret));
+			raise_exception("connect failed", ::to_string(get_last_error()));
 		}
 	}
 
@@ -209,8 +213,8 @@ shared_tcp socket::tcp::accept()
 			raise_exception("accept failed", ::to_string(get_last_error()));
 	}
 
-	spdlog::debug(LOG_SOCK_TCP "0x{:X} {} Accepted connection from {}",
-		m_bind_socket, m_blocking_mode ? "SYNC" : "ASYNC", sa.str());
+	spdlog::debug(LOG_SOCK_TCP "0x{:X} {} Accepted connection 0x{:X} from {}",
+		m_bind_socket, m_blocking_mode ? "SYNC" : "ASYNC", sock, sa.str());
 
 	return make_shared<tcp>(sock, m_blocking_mode);
 }
@@ -241,7 +245,7 @@ size_t socket::tcp::read(const mutable_buffer& buffer, int timeout_ms)
 		tv.tv_sec = 0;
 		tv.tv_usec = 10000;
 		const int select_ret = ::select((int)m_bind_socket + 1, &set, NULL, &set, &tv);
-
+		spdlog::debug(LOG_SOCK_TCP "read::select returns {0}. Error code {1}.", select_ret, get_last_error());
 		if (select_ret != 0)    // ready
 			break;
 
@@ -259,6 +263,13 @@ size_t socket::tcp::read(const mutable_buffer& buffer, int timeout_ms)
 
 		spdlog::info("TCP reading failed: error {0}. Again.", err);
 		return 0;
+	}
+	else if (res == 0)
+	{
+		// TODO: receive - receive does not work. Windows side returns 0 and breaks the connection.
+		// With TCP if there was nothing read the connection is likely broken.
+		// On Linux get_last_error() returns 22 (EINVAL - fd is attached to an object which is unsuitable for reading).
+		raise_exception("tcp::read", fmt::format("zero bytes read (connection broken). Error code {}.", get_last_error()));
 	}
 
 	return static_cast<size_t>(res);
@@ -305,6 +316,10 @@ int socket::tcp::write(const const_buffer& buffer, int timeout_ms)
 
 		spdlog::info("tcp::sendto failed: error {0}. Again.", err);
 		return 0;
+	}
+	else if (res == 0)
+	{
+		spdlog::info("tcp::sendto returned 0: error {0}.", get_last_error());
 	}
 
 	return static_cast<size_t>(res);
