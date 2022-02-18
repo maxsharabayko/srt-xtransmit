@@ -198,7 +198,7 @@ shared_tcp socket::tcp::accept()
 	}
 
 	netaddr_any sa(AF_INET);
-	int sa_size = (int)sa.size();
+	socklen_t sa_size = (socklen_t) sa.size();
 	const int sock = ::accept(m_bind_socket, sa.get(), &sa_size);
 	if (sock == -1)
 	{
