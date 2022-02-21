@@ -379,9 +379,10 @@ const string tcp_info_to_csv(int socketid, const tcp_info& stats, bool print_hea
 #endif // HAS_PUT_TIME
 
 	output << 0 << ','; // TODO: Add elapsed timestamp
+	output << socketid << ',';
 	output << stats.tcpi_rtt << ',';
 	output << stats.tcpi_rttvar << ',';
-	output << stats.tcpi_retransmits << ',';
+	output << static_cast<int>(stats.tcpi_retransmits) << ',';
 	output << stats.tcpi_snd_mss << ',';
 	output << stats.tcpi_rcv_mss << ',';
 	output << stats.tcpi_lost << ',';
