@@ -29,22 +29,10 @@ socket::tcp::tcp(const UriParser& src_uri)
 		m_blocking_mode = !false_names.count(m_options.at("blocking"));
 		m_options.erase("blocking");
 	}
+	set_blocking_flags(m_blocking_mode);
 
 	int yes = 1;
 	::setsockopt(m_bind_socket, SOL_SOCKET, SO_REUSEADDR, (const char*)&yes, sizeof yes);
-
-	if (!m_blocking_mode)
-	{ // set non-blocking mode
-		unsigned long nonblocking = 1;
-#if defined(_WIN32)
-		if (ioctlsocket(m_bind_socket, FIONBIO, &nonblocking) == SOCKET_ERROR)
-#else
-		if (ioctl(m_bind_socket, FIONBIO, (const char*)&nonblocking) < 0)
-#endif
-		{
-			throw socket::exception("Failed to set blocking mode for TCP");
-		}
-	}
 
 	netaddr_any sa_requested;
 	try
@@ -106,6 +94,7 @@ socket::tcp::tcp(const int sock, bool blocking)
 	: m_bind_socket(sock)
 	, m_blocking_mode(blocking)
 {
+	set_blocking_flags(m_blocking_mode);
 }
 
 socket::tcp::~tcp() { closesocket(m_bind_socket); }
@@ -163,7 +152,7 @@ shared_tcp socket::tcp::connect()
 		tv.tv_usec = 0;
 		const int select_ret = ::select((int)m_bind_socket + 1, NULL, &set, &set, &tv);
 
-		if (select_ret <= 1) {
+		if (select_ret < 1) {
 			spdlog::debug(LOG_SOCK_TCP "0x{:X} ASYNC Can't connect to tcp://{}:{:d}. ::select returned {}",
 				m_bind_socket, m_host, m_port, select_ret);
 
@@ -234,20 +223,48 @@ int socket::tcp::get_last_error() const
 #endif
 }
 
+void socket::tcp::set_blocking_flags(bool is_blocking) const
+{
+	unsigned long nonblocking = is_blocking ? 0 : 1;
+
+#if defined(_WIN32)
+	if (ioctlsocket(m_bind_socket, FIONBIO, &nonblocking) == SOCKET_ERROR)
+#else
+	if (ioctl(m_bind_socket, FIONBIO, (const char*)&nonblocking) < 0)
+#endif
+	{
+		throw socket::exception("Failed to set blocking mode for TCP");
+	}
+
+	spdlog::debug(LOG_SOCK_TCP "0x{:X}: set blocking {}", m_bind_socket, is_blocking);
+}
+
 size_t socket::tcp::read(const mutable_buffer& buffer, int timeout_ms)
 {
 	while (!m_blocking_mode)
 	{
-		fd_set set;
+		fd_set fdread;
+		fd_set fderror;
 		timeval tv;
-		FD_ZERO(&set);
-		FD_SET(m_bind_socket, &set);
+		FD_ZERO(&fdread);
+		FD_SET(m_bind_socket, &fdread);
+		FD_ZERO(&fderror);
+		FD_SET(m_bind_socket, &fderror);
 		tv.tv_sec = 0;
 		tv.tv_usec = 10000;
-		const int select_ret = ::select((int)m_bind_socket + 1, &set, NULL, &set, &tv);
-		spdlog::debug(LOG_SOCK_TCP "read::select returns {0}. Error code {1}.", select_ret, get_last_error());
+		const int select_ret = ::select((int)(m_bind_socket + 1), &fdread, NULL, &fderror, &tv);
+
+		if (select_ret == -1)
+		{
+			raise_exception("tcp::read::select", fmt::format("{}", get_last_error()));
+		}
+
 		if (select_ret != 0)    // ready
+		{
+			if (FD_ISSET(m_bind_socket, &fderror))
+				spdlog::info(LOG_SOCK_TCP "0x{:X} select signalled error.", m_bind_socket);
 			break;
+		}
 
 		if (timeout_ms >= 0)   // timeout
 			return 0;
@@ -279,16 +296,28 @@ int socket::tcp::write(const const_buffer& buffer, int timeout_ms)
 {
 	while (!m_blocking_mode)
 	{
-		fd_set set;
+		fd_set fdwrite;
+		fd_set fderror;
 		timeval tv;
-		FD_ZERO(&set);
-		FD_SET(m_bind_socket, &set);
+		FD_ZERO(&fdwrite);
+		FD_SET(m_bind_socket, &fdwrite);
+		FD_ZERO(&fderror);
+		FD_SET(m_bind_socket, &fderror);
 		tv.tv_sec = 0;
 		tv.tv_usec = 10000;
-		const int select_ret = ::select((int)m_bind_socket + 1, nullptr, &set, &set, &tv);
+		const int select_ret = ::select((int)m_bind_socket + 1, nullptr, &fdwrite, &fderror, &tv);
+
+		if (select_ret == -1)
+		{
+			raise_exception("tcp::write::select", fmt::format("{}", get_last_error()));
+		}
 
 		if (select_ret != 0)    // ready
+		{
+			if (FD_ISSET(m_bind_socket, &fderror))
+				spdlog::info(LOG_SOCK_TCP "0x{:X} select signalled error.", m_bind_socket);
 			break;
+		}
 
 		if (timeout_ms >= 0)   // timeout
 			return 0;

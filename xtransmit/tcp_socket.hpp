@@ -23,7 +23,7 @@ class tcp
 	using string     = std::string;
 
 public:
-	tcp(const UriParser &src_uri);
+	explicit tcp(const UriParser &src_uri);
 	tcp(const int sock, bool blocking);
 	~tcp();
 
@@ -51,6 +51,11 @@ private:
 	void raise_exception(const string&& place, const string&& reason) const;
 
 	int get_last_error() const;
+
+	/// @brief Sets blocking flags on a socket.
+	/// Does not change the m_blocking_mode.
+	/// @param is_blocking true if blocking mode is requested.
+	void set_blocking_flags(bool is_blocking) const;
 
 private:
 	SOCKET m_bind_socket = -1; // INVALID_SOCK;
