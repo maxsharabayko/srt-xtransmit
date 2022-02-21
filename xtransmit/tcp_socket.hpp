@@ -47,6 +47,10 @@ public:
 	size_t read(const mutable_buffer &buffer, int timeout_ms = -1) final;
 	int    write(const const_buffer &buffer, int timeout_ms = -1) final;
 
+public:
+	bool                     supports_statistics() const final { return true; }
+	const std::string        statistics_csv(bool print_header) const final;
+
 private:
 	void raise_exception(const string&& place, const string&& reason) const;
 

@@ -2,6 +2,11 @@
 #include "misc.hpp"
 #include "socketoptions.hpp"
 
+#ifndef _WIN32
+//#include <linux/tcp.h>
+#include <netinet/tcp.h>
+#endif
+
 // submodules
 #include "spdlog/spdlog.h"
 
@@ -235,8 +240,6 @@ void socket::tcp::set_blocking_flags(bool is_blocking) const
 	{
 		throw socket::exception("Failed to set blocking mode for TCP");
 	}
-
-	spdlog::debug(LOG_SOCK_TCP "0x{:X}: set blocking {}", m_bind_socket, is_blocking);
 }
 
 size_t socket::tcp::read(const mutable_buffer& buffer, int timeout_ms)
@@ -353,3 +356,70 @@ int socket::tcp::write(const const_buffer& buffer, int timeout_ms)
 
 	return static_cast<size_t>(res);
 }
+
+#ifndef _WIN32
+namespace detail {
+const string tcp_info_to_csv(int socketid, const tcp_info& stats, bool print_header)
+{
+	std::ostringstream output;
+
+	if (print_header)
+	{
+#ifdef HAS_PUT_TIME
+		output << "Timepoint,";
+#endif
+		output << "Time,SocketID,";
+		output << "rtt,rttvar,min_rtt,retransmits,snd_mss,rcv_mss,lost,retrans,cwnd,rcv_rtt,rcv_space,bytes_acked,bytes_received,delivery_rate,unacked";
+		output << endl;
+		return output.str();
+	}
+
+#ifdef HAS_PUT_TIME
+	output << print_timestamp_now() << ',';
+#endif // HAS_PUT_TIME
+
+	//output << stats.tcpi_min_rtt << ',';
+	output << stats.tcpi_rtt << ',';
+	output << stats.tcpi_rttvar << ',';
+	output << stats.tcpi_retransmits << ',';
+	output << stats.tcpi_snd_mss << ',';
+	output << stats.tcpi_rcv_mss << ',';
+	output << stats.tcpi_lost << ',';
+	output << stats.tcpi_retrans << ',';
+	output << stats.tcpi_snd_cwnd << ',';
+	output << stats.tcpi_rcv_rtt << ',';
+	output << stats.tcpi_rcv_space << ',';
+	//output << stats.tcpi_bytes_acked << ',';
+	//output << stats.tcpi_bytes_received << ',';
+	//output << stats.tcpi_delivery_rate << ',';
+	output << stats.tcpi_unacked;
+
+	output << endl;
+
+	return output.str();
+
+#undef HAS_PUT_TIME
+}
+}
+#endif
+
+const string socket::tcp::statistics_csv(bool print_header) const
+{
+#ifndef _WIN32
+	tcp_info tcp_stats = {};
+	socklen_t len = sizeof tcp_stats;
+
+	protoent* ent = getprotobyname("tcp");
+	spdlog::info(LOG_SOCK_TCP "getprotobyname TCP {}.", ent->p_proto);
+
+	const int ret = getsockopt(m_bind_socket, SOL_TCP, TCP_INFO, reinterpret_cast<void*>(&tcp_stats), &len);
+	if (ret == -1)
+		raise_exception("statistics", fmt::format("Error {}", get_last_error()));
+
+	return detail::tcp_info_to_csv(m_bind_socket, tcp_stats, print_header);
+#endif
+
+	raise_exception("TCP statistics", "Not implemented");
+}
+
+
