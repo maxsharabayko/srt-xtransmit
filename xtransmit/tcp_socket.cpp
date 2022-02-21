@@ -369,7 +369,7 @@ const string tcp_info_to_csv(int socketid, const tcp_info& stats, bool print_hea
 		output << "Timepoint,";
 #endif
 		output << "Time,SocketID,";
-		output << "rtt,rttvar,min_rtt,retransmits,snd_mss,rcv_mss,lost,retrans,cwnd,rcv_rtt,rcv_space,bytes_acked,bytes_received,delivery_rate,unacked";
+		output << "rtt,rttvar,retransmits,snd_mss,rcv_mss,lost,retrans,snd_cwnd,rcv_rtt,rcv_space,unacked";
 		output << endl;
 		return output.str();
 	}
@@ -378,7 +378,7 @@ const string tcp_info_to_csv(int socketid, const tcp_info& stats, bool print_hea
 	output << print_timestamp_now() << ',';
 #endif // HAS_PUT_TIME
 
-	//output << stats.tcpi_min_rtt << ',';
+	output << 0 << ','; // TODO: Add elapsed timestamp
 	output << stats.tcpi_rtt << ',';
 	output << stats.tcpi_rttvar << ',';
 	output << stats.tcpi_retransmits << ',';
@@ -389,6 +389,7 @@ const string tcp_info_to_csv(int socketid, const tcp_info& stats, bool print_hea
 	output << stats.tcpi_snd_cwnd << ',';
 	output << stats.tcpi_rcv_rtt << ',';
 	output << stats.tcpi_rcv_space << ',';
+	//output << stats.tcpi_min_rtt << ',';
 	//output << stats.tcpi_bytes_acked << ',';
 	//output << stats.tcpi_bytes_received << ',';
 	//output << stats.tcpi_delivery_rate << ',';
@@ -408,9 +409,6 @@ const string socket::tcp::statistics_csv(bool print_header) const
 #ifndef _WIN32
 	tcp_info tcp_stats = {};
 	socklen_t len = sizeof tcp_stats;
-
-	protoent* ent = getprotobyname("tcp");
-	spdlog::info(LOG_SOCK_TCP "getprotobyname TCP {}.", ent->p_proto);
 
 	const int ret = getsockopt(m_bind_socket, SOL_TCP, TCP_INFO, reinterpret_cast<void*>(&tcp_stats), &len);
 	if (ret == -1)
