@@ -416,9 +416,11 @@ const string socket::tcp::statistics_csv(bool print_header) const
 		raise_exception("statistics", fmt::format("Error {}", get_last_error()));
 
 	return detail::tcp_info_to_csv(m_bind_socket, tcp_stats, print_header);
-#endif
 
+#else
 	raise_exception("TCP statistics", "Not implemented");
+	return "";
+#endif
 }
 
 
