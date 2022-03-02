@@ -257,6 +257,10 @@ void socket::srt_group::create_callers(const vector<UriParser>& uris, SRT_GROUP_
 
 	if (SRT_SUCCESS != configure_pre(m_bind_socket, 0))
 		throw socket::exception(srt_getlasterror_str());
+	
+	// Configure POST options before connecting to have them inherited by member sockets.
+	if (SRT_SUCCESS != configure_post(m_bind_socket, 0))
+		throw socket::exception(srt_getlasterror_str());
 
 	for (const auto& uri : uris)
 	{
