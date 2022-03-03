@@ -42,34 +42,34 @@ There are some query fields that do not map into SRT socket options. They are ha
 | `groupconnect`       | {`0`, `1`}       | `SRTO_GROUPCONNECT`       | Accept group connections. |
 | `groupstabtimeo`     | `ms`             | `SRTO_GROUPSTABTIMEO`     | Group stability timeout. |
 | `inputbw`            | `bytes`          | `SRTO_INPUTBW`            | Input bandwidth. |
-| `iptos`              | 0..255           | `SRTO_IPTOS`              | IP socket type of service |
+| `iptos`              | 0..255           | `SRTO_IPTOS`              | IP socket type of service. |
 | `ipttl`              | 1..255           | `SRTO_IPTTL`              | Defines IP socket "time to live" option. |
 | `ipv6only`           | -1..1            | `SRTO_IPV6ONLY`           | Allow only IPv6. |
 | `kmpreannounce`      | 0..              | `SRTO_KMPREANNOUNCE`      | Duration of Stream Encryption key switchover (in packets). |
 | `kmrefreshrate`      | 0..              | `SRTO_KMREFRESHRATE`      | Stream encryption key refresh rate (in packets). |
 | `latency`            | 0..              | `SRTO_LATENCY`            | Defines the maximum accepted transmission latency. |
-| `linger`             | 0..              | `SRTO_LINGER`             | Link linger value |
+| `linger`             | 0..              | `SRTO_LINGER`             | Link linger value. |
 | `lossmaxttl`         | 0..              | `SRTO_LOSSMAXTTL`         | Packet reorder tolerance. |
-| `maxbw`              | 0..              | `SRTO_MAXBW`              | Bandwidth limit in bytes |
+| `maxbw`              | 0..              | `SRTO_MAXBW`              | Bandwidth limit in bytes. |
 | `messageapi`         | `bool`           | `SRTO_MESSAGEAPI`         | Enable SRT message mode. |
 | `minversion`         | maj.min.rev      | `SRTO_MINVERSION`         | Minimum SRT library version of a peer. |
-| `mss`                | 76..             | `SRTO_MSS`                | MTU size |
-| `nakreport`          | `bool`           | `SRTO_NAKREPORT`          | Enables/disables periodic NAK reports |
-| `oheadbw`            | 5..100           | `SRTO_OHEADBW`            | limits bandwidth overhead, percents |
+| `mss`                | 76..             | `SRTO_MSS`                | MTU size. |
+| `nakreport`          | `bool`           | `SRTO_NAKREPORT`          | Enables/disables periodic NAK reports. |
+| `oheadbw`            | 5..100           | `SRTO_OHEADBW`            | limits bandwidth overhead, percents. |
 | `packetfilter`       | `string`         | `SRTO_PACKETFILTER`       | Set up the packet filter. |
 | `passphrase`         | `string`         | `SRTO_PASSPHRASE`         | Password for the encrypted transmission. |
 | `payloadsize`        | 0..              | `SRTO_PAYLOADSIZE`        | Maximum payload size. |
 | `pbkeylen`           | {16, 24, 32}     | `SRTO_PBKEYLEN`           | Crypto key length in bytes. |
 | `peeridletimeo`      | `ms`             | `SRTO_PEERIDLETIMEO`      | Peer idle timeout. |
 | `peerlatency`        | `ms`             | `SRTO_PEERLATENCY`        | Minimum receiver latency to be requested by sender. |
-| `rcvbuf`             | `bytes`          | `SRTO_RCVBUF`             | Receiver buffer size |
+| `rcvbuf`             | `bytes`          | `SRTO_RCVBUF`             | Receiver buffer size. |
 | `rcvlatency`         | `ms`             | `SRTO_RCVLATENCY`         | Receiver-side latency. |
 | `retransmitalgo`     | {`0`, `1`}       | `SRTO_RETRANSMITALGO`     | Packet retransmission algorithm to use. |
 | `sndbuf`             | `bytes`          | `SRTO_SNDBUF`             | Sender buffer size. |
 | `snddropdelay`       | `ms`             | `SRTO_SNDDROPDELAY`       | Sender's delay before dropping packets. |
 | `streamid`           | `string`         | `SRTO_STREAMID`           | Stream ID (settable in caller mode only, visible on the listener peer). |
 | `tlpktdrop`          | `bool`           | `SRTO_TLPKTDROP`          | Drop too late packets. |
-| `transtype`          | {`live`, `file`} | `SRTO_TRANSTYPE`          | Transmission type |
+| `transtype`          | {`live`, `file`} | `SRTO_TRANSTYPE`          | Transmission type. |
 | `tsbpdmode`          | `bool`           | `SRTO_TSBPDMODE`          | Timestamp-based packet delivery mode. |
 
 ### SRT Connection Modes
@@ -77,7 +77,7 @@ There are some query fields that do not map into SRT socket options. They are ha
 SRT can be connected using one of three connection modes:
 
 - **caller**: the "agent" (this application) sends the connection request to
-the peer, which must be **listener**, and this way it initiates the
+the peer **listener** in order to initiate the
 connection.
 
 - **listener**: the "agent" waits to be contacted by any peer **caller**.
@@ -86,8 +86,8 @@ does not use this ability; after the first connection, it no longer
 accepts new connections.
 
 - **rendezvous**: A one-to-one only connection where both parties are
-equivalent and both connect to one another simultaneously. Whoever happened
-to start first (or succeeded to punch through the firewall) is meant to have
+equivalent and both connect to one another simultaneously. Whichever party happened
+to start first (or succeeded in passing through the firewall) is considered to have
 initiated the connection.
 
 ### SRT Example URIs
@@ -97,8 +97,8 @@ initiated the connection.
 - `srt://[::]:5000` defines caller mode (!) with IPv6.
 
 - `srt://[::]:5000?mode=listener` defines listener mode with IPv6. If the
-default value for `IPV6_V6ONLY` system socket option is 0, it will accept
-also IPv4 connections.
+default value for `IPV6_V6ONLY` system socket option is 0, it will also accept IPv4 
+connections.
 
 - `srt://192.168.0.5:5000?mode=rendezvous` will make a rendezvous connection
 with local address `INADDR_ANY` (IPv4) and port 5000 to a destination with
