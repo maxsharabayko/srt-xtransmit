@@ -29,7 +29,7 @@
 * cmake (as a build configuration system)
 * OpenSSL (for encryption - required by SRT)
 
-**Note!** In order to have absolute timepoint in CSV statistics GCC v5.0 (instead of v4.8+) and above is required
+**Note!** In order to have absolute timepoint in CSV statistics, GCC v5.0 (instead of v4.8+) and above is required
 (with support for [std::put_time](https://en.cppreference.com/w/cpp/io/manip/put_time)).
 
 ### Building on Linux/Mac
@@ -51,7 +51,7 @@ git submodule update --init --recursive
 
 <!-- https://git-scm.com/book/en/v2/Git-Tools-Submodules -->
 
-**Tip:** There is another way to do this which is a little simpler, however. If you pass `--recurse-submodules` to the `git clone` command, it will automatically initialize and update each submodule in the repository, including nested submodules if any of the submodules in the repository have submodules themselves.
+**Tip:** There is a simpler method for doing the above. If you pass `--recurse-submodules` to the `git clone` command, it will automatically initialize and update each submodule in the repository, including nested submodules if any of the submodules in the repository have submodules themselves.
 
 **Tip:** If you already cloned the project and forgot `--recurse-submodules`, you can combine the `git submodule init` and `git submodule update` steps by running `git submodule update --init`. To also initialize, fetch and checkout any nested submodules, you can use the foolproof `git submodule update --init --recursive`.
 
