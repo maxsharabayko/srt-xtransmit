@@ -341,7 +341,7 @@ shared_srt_group socket::srt_group::accept()
 	}
 
 	spdlog::info(LOG_SRT_GROUP "Accepted connection sock 0x{:X}", accepted_sock);
-	const int res = configure_post(accepted_sock, 0); // TODO: are there POST options per link?
+	const int res = configure_post(accepted_sock, 0);
 	if (res == SRT_ERROR)
 		raise_exception("accept::configure_post");
 
@@ -639,7 +639,7 @@ size_t socket::srt_group::read(const mutable_buffer& buffer, int timeout_ms)
 		if (srt_getlasterror(nullptr) != SRT_EASYNCRCV)
 			raise_exception("read::recv");
 
-		spdlog::warn(LOG_SRT_GROUP "recvmsg returned error 6002: read error, try again");
+		spdlog::warn(LOG_SRT_GROUP "recvmsg returned error SRT_EASYNCRCV, try again");
 		return 0;
 	}
 
