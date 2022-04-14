@@ -1,11 +1,9 @@
 from collections import namedtuple
-import os
 import pathlib
 
 import bokeh.io
 import bokeh.layouts as layouts
 import bokeh.models as models
-from bokeh.models.plots import _list_attr_splat
 import bokeh.plotting as plotting
 import click
 import pandas as pd
@@ -13,8 +11,24 @@ import pandas as pd
 
 PLOT_WIDTH = 700
 PLOT_HEIGHT = 300
+TABLE_WIDTH = 900
 TOOLS = 'pan,xwheel_pan,box_zoom,reset,save'
 linedesc = namedtuple("linedesc", ['col', 'legend', 'color'])
+
+STATS_LIST = [
+    'Number of observations',
+    'Min, us',
+    'Max, us',
+    'Mean, us',
+    'Standard deviation, us',
+    '25th percentile (Q1), us',
+    '50th percentile (Median, Q2), us',
+    '75th percentile (Q3), us',
+    '90th percentile, us',
+    '95th percentile, us',
+    '99th percentile, us',
+    'Interquartile range (IQR, Q3 - Q1), us',
+]
 
 
 class IsNotCSVFile(Exception):
@@ -27,6 +41,23 @@ def export_plot_png(export_png, plot, name, postfix):
         plot.toolbar.logo = None
         plot.toolbar_location = None
         bokeh.io.export_png(plot, filename=f'{name}-{postfix}.png')
+
+
+def get_stats(s: pd.Series):
+    """ Calculate basic sample `s` statistics. """
+    q1 = round(s.quantile(0.25), 2)
+    median = round(s.median(), 2)
+    q3 = round(s.quantile(0.75), 2)
+    p90 = round(s.quantile(0.90), 2)
+    p95 = round(s.quantile(0.95), 2)
+    p99 = round(s.quantile(0.99), 2)
+    iqr = round(q3 - q1, 2)
+    mean = round(s.mean(), 2)
+    std = round(s.std(), 2)
+    minimum = round(s.min(), 2)
+    maximum = round(s.max(), 2)
+    n = len(s)
+    return [n, minimum, maximum, mean, std, q1, median, q3, p90, p95, p99, iqr]
 
 
 def create_plot(title, xlabel, ylabel, source, lines, yformatter=None):
@@ -47,9 +78,9 @@ def create_plot(title, xlabel, ylabel, source, lines, yformatter=None):
     for x in lines:
         if x.legend != '':
             is_legend = True
-            fig.line(x='Time', y=x.col, color=x.color, legend_label=x.legend, source=source)
+            fig.line(x='sTime', y=x.col, color=x.color, legend_label=x.legend, source=source)
         else:
-            fig.line(x='Time', y=x.col, color=x.color, source=source)
+            fig.line(x='sTime', y=x.col, color=x.color, source=source)
 
     if is_legend:
         fig.legend.click_policy="hide"
@@ -60,48 +91,52 @@ def create_plot(title, xlabel, ylabel, source, lines, yformatter=None):
 def create_packets_plot(source):
     lines = [
         linedesc('pktReceivedInInterval', 'Received', 'green'),
-        linedesc('pktLostInInterval', 'Lost', 'brown'),
-        linedesc('pktReorderedInInterval', 'Reordered', 'red')
+        linedesc('pktLostInInterval', 'Lost', 'red'),
+        linedesc('pktReorderedInInterval', 'Reordered', 'blue')
     ]
 
     return create_plot(
         'Packets',
-        'Time (ms)',
+        'Time (s)',
         'Number of Packets',
         source,
         lines,
         models.NumeralTickFormatter(format='0,0')
     )
 
+
 def create_latency_plot(source):
     lines = [
-        linedesc('usLatencyMin', 'Min Latency', 'green'),
-        linedesc('usLatencyMax', 'Max Latency', 'red'),
-        linedesc('usLatencyAvg', 'Avg Latency', 'black')
+        linedesc('msLatencyMin', 'Min', 'blue'),
+        linedesc('msLatencyMax', 'Max', 'red'),
+        linedesc('msLatencyAvg', 'Smoothed', 'green')
     ]
 
     return create_plot(
-        'End-to-End Latency (System Clock Delta)',
-        'Time (ms)',
-        'Latency (μs)',
+        'Transmission Delay (System Clock Delta)',
+        'Time (s)',
+        'Delay (ms)',
         source,
         lines,
         models.NumeralTickFormatter(format='0,0')
     )
+
 
 def create_jitter_plot(source):
     lines = [
-        linedesc('usJitter', 'Jitter', 'black')
+        linedesc('usDelayFactor', 'TS-DF', 'red'),
+        linedesc('usJitter', 'Jitter', 'green'),
     ]
 
     return create_plot(
-        'Reading Jitter',
-        'Time (ms)',
-        'Jitter (μs)',
+        'Time-Stamped Delay Factor (TS-DF) vs Interarrival Jitter (RFC 3550)',
+        'Time (s)',
+        'Jitter (us)',
         source,
         lines,
         models.NumeralTickFormatter(format='0,0')
     )
+
 
 @click.command()
 @click.argument(
@@ -117,7 +152,7 @@ def create_jitter_plot(source):
 )
 def plot_metrics(metrics_filepath, export_png):
     """
-    This script processes a .csv file with metrics produced by
+    This script processes a .csv file with metrics produced by the
     srt-xtransmit application and visualizes the data.
     """
     filepath = pathlib.Path(metrics_filepath)
@@ -133,39 +168,88 @@ def plot_metrics(metrics_filepath, export_png):
 
     # Prepare data
     df = pd.read_csv(filepath)
-    df.Timepoint = pd.to_datetime(df.Timepoint)
-    start_time = df.Timepoint[0]
-    print(f'Start time: {start_time}')
-    df['Time'] = df.Timepoint.apply(lambda row: row - start_time)
-    print(df.Time)
-    df['pktReceivedInInterval'] = df.pktReceived.diff()
-    df['pktLostInInterval'] = df.pktLost.diff()
-    df['pktReorderedInInterval'] = df.pktReordered.diff()
+
+    df['Timepoint'] = pd.to_datetime(df['Timepoint'])
+    df['Time'] = df['Timepoint'] - df['Timepoint'].iloc[0]
+    df['sTime'] = df['Time'].dt.total_seconds()
+
+    df['pktReceivedInInterval'] = df['pktReceived'].diff()
+    df['pktLostInInterval'] = df['pktLost'].diff()
+    df['pktReorderedInInterval'] = df['pktReordered'].diff()
+
+    df['msLatencyMin'] = df['usLatencyMin'] / 1000
+    df['msLatencyMax'] = df['usLatencyMax'] / 1000
+    df['msLatencyAvg'] = df['usLatencyAvg'] / 1000
     
-    # A dict for storing plots
-    plots_array = []
+    # A list for storing plots
+    plots = []
     src = models.ColumnDataSource(df)
-    plots_array.append(create_packets_plot(src))
-    plots_array.append(create_latency_plot(src))
-    plots_array.append(create_jitter_plot(src))
-    
+
+    fig_packets = create_packets_plot(src)
+    fig_latency = create_latency_plot(src)
+    fig_jitter = create_jitter_plot(src)
+    plots.append(fig_packets)
+    plots.append(fig_latency)
+    plots.append(fig_jitter)
+
+    # Table: Latency Statistics
+    latency_stats = {}
+    latency_stats['stats'] = STATS_LIST
+    latency_stats['min'] = get_stats(df['msLatencyMin'])
+    latency_stats['max'] = get_stats(df['msLatencyMax'])
+    latency_stats['smoothed'] = get_stats(df['msLatencyAvg'])
+
+    latency_source = models.ColumnDataSource(pd.DataFrame(latency_stats))
+    latency_columns = [
+        models.widgets.TableColumn(field='stats', title='Statistic'),
+        models.widgets.TableColumn(field='min', title='Min'),
+        models.widgets.TableColumn(field='max', title='Max'),
+        models.widgets.TableColumn(field='smoothed', title='Smoothed'),
+    ]
+    latency_table = models.widgets.DataTable(
+        columns=latency_columns,
+        source=latency_source,
+        width=TABLE_WIDTH
+    )
+
+    # Table: Jitter Statistics
+    jitter_stats = {}
+    jitter_stats['stats'] = STATS_LIST
+    jitter_stats['delay_factor'] = get_stats(df['usDelayFactor'])
+    jitter_stats['jitter'] = get_stats(df['usJitter'])
+
+    jitter_source = models.ColumnDataSource(pd.DataFrame(jitter_stats))
+    jitter_columns = [
+        models.widgets.TableColumn(field='stats', title='Statistic'),
+        models.widgets.TableColumn(field='delay_factor', title='TS-DF'),
+        models.widgets.TableColumn(field='jitter', title='Jitter'),
+    ]
+    jitter_table = models.widgets.DataTable(
+        columns=jitter_columns,
+        source=jitter_source,
+        width=TABLE_WIDTH
+    )
+
     # Output to static .html file
     plotting.output_file(html_filepath, title="SRT Metrics Visualization")
 
     # Synchronize x-ranges of figures
-    last_fig = plots_array[-1]
-    print(f'plots_array: {plots_array}')
-    print(f'Last fig: {last_fig}')
-    
-    for fig in plots_array:
+    last_fig = plots[-1]
+
+    for fig in plots:
         if fig is None:
             continue
         fig.x_range = last_fig.x_range
 
     # Show the results
     grid = layouts.gridplot(
-        [[el] for el in plots_array] 
+        [
+            [fig_packets, None],
+            [fig_latency, latency_table],
+            [fig_jitter, jitter_table]
+        ]
     )
+
     plotting.show(grid)
 
 if __name__ == '__main__':
