@@ -9,8 +9,8 @@ using namespace std;
 using namespace std::chrono;
 
 
-/// Enabling the metrics functionality expects certain fields to be transmitted in the payload.
-/// The structure of the payload is the following:
+/// Enabling metrics functionality is possible if certain fields are transmitted
+/// within the packet payload. The structure of the payload is the following:
 ///
 ///     0         1         2         3         4         5         6
 ///     0 2 4 6 8 0 2 4 6 8 0 2 4 6 8 0 2 4 6 8 0 2 4 6 8 0 2 4 6 8 0 2 4
@@ -28,8 +28,10 @@ using namespace std::chrono;
 ///
 /// TODO: Consider using "%d.%m.%Y.%H:%M:%S.microseconds" as the SYSTIME format
 
-namespace xtransmit {
-namespace metrics {
+namespace xtransmit
+{
+namespace metrics
+{
 
 static const ptrdiff_t PKT_SEQNO_BYTE_OFFSET     =  0;
 static const ptrdiff_t SYS_TIMESTAMP_BYTE_OFFSET =  8;
@@ -90,13 +92,16 @@ std:: string validator::stats()
 	std::stringstream ss;
 	
 	ss << "Latency, us (min/max/avg): " << m_latency.get_latency_min() << "/" << m_latency.get_latency_max() << "/" << m_latency.get_latency_avg();
-	ss << ". Jitter: " << m_jitter.jitter() << "us. ";
+	ss << ". Jitter: " << m_jitter.get_jitter() << "us. ";
+	ss << "Delay Factor: " << m_delay_factor.get_delay_factor() << "us. ";
 	const auto stats = m_reorder.get_stats();
 	ss << "Pkts: rcvd " << stats.pkts_processed << ", reordered " << stats.pkts_reordered;
 	ss << " (dist " << stats.reorder_dist;
 	ss << "), lost " << stats.pkts_lost;
 
 	m_latency.reset();
+	m_delay_factor.reset();
+
 	return ss.str();
 }
 
@@ -113,6 +118,7 @@ string validator::stats_csv(bool only_header)
 		ss << "usLatencyMax,";
 		ss << "usLatencyAvg,";
 		ss << "usJitter,";
+		ss << "usDelayFactor,";
 		ss << "pktReceived,";
 		ss << "pktLost,";
 		ss << "pktReordered,";
@@ -127,7 +133,8 @@ string validator::stats_csv(bool only_header)
 		ss << m_latency.get_latency_min() << ',';
 		ss << m_latency.get_latency_max() << ',';
 		ss << m_latency.get_latency_avg() << ',';
-		ss << m_jitter.jitter() << ',';
+		ss << m_jitter.get_jitter() << ',';
+		ss << m_delay_factor.get_delay_factor() << ',';
 		const auto stats = m_reorder.get_stats();
 		ss << stats.pkts_processed << ',';
 		ss << stats.pkts_lost << ',';
@@ -136,6 +143,7 @@ string validator::stats_csv(bool only_header)
 		ss << '\n';
 
 		m_latency.reset();
+		m_delay_factor.reset();
 	}
 
 	return ss.str();

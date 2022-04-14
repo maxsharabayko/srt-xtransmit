@@ -6,23 +6,24 @@ namespace xtransmit
 namespace metrics
 {
 
-class jitter_trace
+class jitter
 {
 	typedef std::chrono::steady_clock::time_point time_point;
 	typedef std::chrono::steady_clock::duration duration;
 
 public:
-	jitter_trace()
+	jitter()
 	{}
 
 public:
-	/// Submit new sample for jitter update.
-	/// @param [in] sample_time  the timestamp of the sample
-	/// @param [in] current_time current time to compare the timestamp with
-	void new_sample(const time_point& sample_time, const time_point& current_time);
+	/// Submit new sample for jitter metric (RFC 3550) update.
+	/// @param [in] timestamp  packet timestamp extracted from the payload (monotonic clock)
+	/// @param [in] arrival_time  the time packet is received by receiver (monotonic clock)
+	void submit_sample(const time_point& timestamp, const time_point& arrival_time);
 
-	/// Get curent jitter value.
-	uint64_t jitter() const { return (uint64_t) m_jitter; }
+	/// Get current jitter value, in microseconds. This is a smoothed average (as per RFC 3550)
+	/// which isn't reset at the start of the new measurement period.
+	uint64_t get_jitter() const { return (uint64_t) m_jitter; }
 
 private:
 	duration m_prev_delay = duration::zero();
