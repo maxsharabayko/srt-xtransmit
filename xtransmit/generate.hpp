@@ -21,6 +21,7 @@ struct config
 	bool        reconnect      = false;
 	bool        enable_metrics = false;
 	std::string stats_file;
+	bool        spin_wait      = false;
 	std::string playback_csv;
 };
 
