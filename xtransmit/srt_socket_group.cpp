@@ -257,7 +257,7 @@ void socket::srt_group::create_callers(const vector<UriParser>& uris, SRT_GROUP_
 
 	if (SRT_SUCCESS != configure_pre(m_bind_socket, 0))
 		throw socket::exception(srt_getlasterror_str());
-	
+
 	// Configure POST options before connecting to have them inherited by member sockets.
 	if (SRT_SUCCESS != configure_post(m_bind_socket, 0))
 		throw socket::exception(srt_getlasterror_str());
@@ -341,7 +341,7 @@ shared_srt_group socket::srt_group::accept()
 	}
 
 	spdlog::info(LOG_SRT_GROUP "Accepted connection sock 0x{:X}", accepted_sock);
-	const int res = configure_post(accepted_sock, 0);
+	const int res = configure_post(accepted_sock, 0); // TODO: are there POST options per link?
 	if (res == SRT_ERROR)
 		raise_exception("accept::configure_post");
 
@@ -393,7 +393,12 @@ int socket::srt_group::listen_callback_fn(void* opaq, SRTSOCKET sock, int hsvers
 	}
 
 	netaddr_any sa(peeraddr);
-	spdlog::trace(LOG_SRT_GROUP "Accepted member socket 0x{:X}, remote IP {}", sock, sa.str());
+
+	sockaddr host_sa = {};
+	int host_sa_len = sizeof host_sa;
+	srt_getsockname(sock, &host_sa, &host_sa_len);
+	netaddr_any host(&host_sa, host_sa_len);
+	spdlog::trace(LOG_SRT_GROUP "Accepted member socket 0x{:X}, host IP {}, remote IP {}", sock, host.str(), sa.str());
 
 	// TODO: this group may no longer exist. Use some global array to track valid groups.
 	socket::srt_group* group = reinterpret_cast<socket::srt_group*>(opaq);
@@ -639,7 +644,7 @@ size_t socket::srt_group::read(const mutable_buffer& buffer, int timeout_ms)
 		if (srt_getlasterror(nullptr) != SRT_EASYNCRCV)
 			raise_exception("read::recv");
 
-		spdlog::warn(LOG_SRT_GROUP "recvmsg returned error SRT_EASYNCRCV, try again");
+		spdlog::warn(LOG_SRT_GROUP "recvmsg returned error 6002: read error, try again");
 		return 0;
 	}
 
