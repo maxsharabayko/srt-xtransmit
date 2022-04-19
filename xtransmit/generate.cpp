@@ -48,7 +48,7 @@ void run_pipe(shared_sock dst, const config& cfg, const atomic_bool& force_break
 	int  prev_i    = 0;
 
 	unique_ptr<ipacer> ratepacer =
-		cfg.sendrate ? unique_ptr<ipacer>(new pacer(cfg.sendrate, cfg.message_size))
+		cfg.sendrate ? unique_ptr<ipacer>(new pacer(cfg.sendrate, cfg.message_size, cfg.spin_wait))
 					 : (!cfg.playback_csv.empty() ? unique_ptr<ipacer>(new csv_pacer(cfg.playback_csv)) : nullptr);
 
 	try
@@ -121,6 +121,7 @@ CLI::App* xtransmit::generate::add_subcommand(CLI::App& app, config& cfg, std::v
 	sc_generate->add_flag("--reconnect", cfg.reconnect, "Reconnect automatically");
 	sc_generate->add_flag("--enable-metrics", cfg.enable_metrics, "Enable all metrics: latency, loss, reordering, jitter, etc.");
 	sc_generate->add_option("--playback-csv", cfg.playback_csv, "Input CSV file with timestamp of every packet");
+	sc_generate->add_flag("--spin-wait", cfg.spin_wait, "Use CPU-expensive spin waiting for better sending accuracy");
 
 	return sc_generate;
 }
