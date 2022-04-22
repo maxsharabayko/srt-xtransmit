@@ -274,9 +274,41 @@ void socket::srt_group::create_callers(const vector<UriParser>& uris, SRT_GROUP_
 			raise_exception("connect::create_addr", e.what());
 		}
 
-		const sockaddr* bindsa = nullptr;
+		auto try_bind = [uri, sa]() {
+			if (uri.parameters().count("bind") == 0)
+				return netaddr_any();
 
-		SRT_SOCKGROUPCONFIG gd = srt_prepare_endpoint(bindsa, sa.get(), sa.size());
+			string bindipport = uri.parameters().at("bind");
+			transform(bindipport.begin(), bindipport.end(), bindipport.begin(), [](char c) { return tolower(c); });
+			const size_t idx = bindipport.find(":");
+			const string bindip = bindipport.substr(0, idx);
+			if (idx == string::npos)
+			{
+				spdlog::error(LOG_SRT_GROUP "Failed to bind to unknown port ({})", bindip);
+				return netaddr_any();
+			}
+
+			const int bindport = stoi(bindipport.substr(idx + 1, bindipport.size() - (idx + 1)));
+
+			netaddr_any sa_bind;
+			try
+			{
+				sa_bind = create_addr(bindip, bindport, sa.family());
+			}
+			catch (const std::invalid_argument&)
+			{
+				spdlog::error(LOG_SRT_GROUP "Failed to bind to {}:{}", bindip, bindport);
+				return netaddr_any();
+			}
+
+			return sa_bind;
+		};
+
+		const netaddr_any bindsa = try_bind();
+
+		SRT_SOCKGROUPCONFIG gd = srt_prepare_endpoint(
+			bindsa.empty() ? nullptr : reinterpret_cast<const sockaddr*>(bindsa.get()),
+			sa.get(), sa.size());
 
 		gd.weight = detect_link_weight(uri);
 		m_targets.push_back(gd);
