@@ -1,3 +1,4 @@
+#include <list>
 #include <thread>
 #include "misc.hpp"
 #include "socket_stats.hpp"
@@ -84,8 +85,8 @@ shared_sock_t create_connection(const vector<UriParser>& parsed_urls, shared_soc
 
 
 // Use std::bind to pass the run_pipe function, and bind arguments to it.
-void common_run(const vector<string>& urls, const stats_config& cfg, bool reconnect, bool close_listener, const atomic_bool& force_break,
-	processing_fn_t& processing_fn)
+void common_run(const vector<string>& urls, const stats_config& cfg_stats, const conn_config& cfg_conn,
+	const atomic_bool& force_break, processing_fn_t& processing_fn)
 {
 	if (urls.empty())
 	{
@@ -93,7 +94,7 @@ void common_run(const vector<string>& urls, const stats_config& cfg, bool reconn
 		return;
 	}
 
-	const bool write_stats = cfg.stats_file != "" && cfg.stats_freq_ms > 0;
+	const bool write_stats = cfg_stats.stats_file != "" && cfg_stats.stats_freq_ms > 0;
 	unique_ptr<socket::stats_writer> stats;
 
 	if (write_stats)
@@ -101,7 +102,7 @@ void common_run(const vector<string>& urls, const stats_config& cfg, bool reconn
 		// make_unique is not supported by GCC 4.8, only starting from GCC 4.9 :(
 		try {
 			stats = unique_ptr<socket::stats_writer>(
-				new socket::stats_writer(cfg.stats_file, cfg.stats_format, milliseconds(cfg.stats_freq_ms)));
+				new socket::stats_writer(cfg_stats.stats_file, milliseconds(cfg_stats.stats_freq_ms)));
 		}
 		catch (const socket::exception& e)
 		{
@@ -118,6 +119,12 @@ void common_run(const vector<string>& urls, const stats_config& cfg, bool reconn
 
 	shared_sock_t listening_sock; // A shared pointer to store a listening socket for multiple connections.
 	steady_clock::time_point next_reconnect = steady_clock::now();
+
+	// future<void> route_bkwd = cfg.bidir
+	// 		? ::async(::launch::async, route, dst, src, cfg, "[DST->SRC]", ref(force_break))
+	// 		: future<void>();	
+	// TODO: Add connection lost event.
+	list<future<void>> processing_pipes;
 
 	do {
 		try
@@ -144,16 +151,30 @@ void common_run(const vector<string>& urls, const stats_config& cfg, bool reconn
 			if (stats)
 				stats->add_socket(conn);
 
-			processing_fn(conn, force_break);
+			processing_pipes.emplace_back(::async(::launch::async, processing_fn, conn, ref(force_break)));
 
-			if (stats)
-				stats->remove_socket(conn->id());
+			// Remove on connection lost
+			//if (stats)
+			//	stats->remove_socket(conn->id());
 		}
 		catch (const socket::exception& e)
 		{
 			spdlog::warn(LOG_SC_CONN "{}", e.what());
 		}
-	} while (reconnect && !force_break);
+	} while ((cfg_conn.reconnect || processing_pipes.size() < cfg_conn.client_conns) && !force_break);
+
+	while (processing_pipes.empty())
+	{
+		try
+		{
+			processing_pipes.front().get();
+			processing_pipes.pop_front();
+		}
+		catch (const socket::exception& e)
+		{
+			spdlog::warn(LOG_SC_CONN "{}", e.what());
+		}
+	}
 }
 
 netaddr_any create_addr(const string& name, unsigned short port, int pref_family)
