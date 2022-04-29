@@ -102,7 +102,7 @@ void common_run(const vector<string>& urls, const stats_config& cfg_stats, const
 		// make_unique is not supported by GCC 4.8, only starting from GCC 4.9 :(
 		try {
 			stats = unique_ptr<socket::stats_writer>(
-				new socket::stats_writer(cfg_stats.stats_file, milliseconds(cfg_stats.stats_freq_ms)));
+				new socket::stats_writer(cfg_stats.stats_file, cfg_stats.stats_format, milliseconds(cfg_stats.stats_freq_ms)));
 		}
 		catch (const socket::exception& e)
 		{
@@ -145,7 +145,7 @@ void common_run(const vector<string>& urls, const stats_config& cfg_stats, const
 			}
 
 			// Closing a listener socket (if any) will not allow further connections.
-			if (close_listener)
+			if (cfg_conn.close_listener)
 				listening_sock.reset();
 
 			if (stats)
@@ -163,7 +163,7 @@ void common_run(const vector<string>& urls, const stats_config& cfg_stats, const
 		}
 	} while ((cfg_conn.reconnect || processing_pipes.size() < cfg_conn.client_conns) && !force_break);
 
-	while (processing_pipes.empty())
+	while (!processing_pipes.empty())
 	{
 		try
 		{
