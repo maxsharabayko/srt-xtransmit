@@ -52,11 +52,18 @@ inline std::string print_timestamp_now()
 #endif // HAS_PUT_TIME
 
 
-
 struct stats_config
 {
 	int         stats_freq_ms = 0;
 	std::string stats_file;
+};
+
+/// Connection establishment config
+struct conn_config
+{
+	bool        reconnect = false; // Try to reconnect broken connections.
+	int         client_conns = 1;  // SRT Caller: the number of client connections to initiate.
+	                               // SRT Listener: the number of allowed clients to accept.
 };
 
 
@@ -84,12 +91,12 @@ inline shared_sock_t create_connection(const std::vector<UriParser>& uris)
 typedef std::function<void(shared_sock_t, const std::atomic_bool&)> processing_fn_t;
 
 /// @brief Creates stats writer if needed, establishes a connection, and runs `processing_fn`.
-/// @param urls a list of URLs to to establish a connection
-/// @param cfg 
-/// @param reconnect 
+/// @param dst_url 
+/// @param cfg_stats 
+/// @param cfg_conn
 /// @param force_break 
 /// @param processing_fn 
-void common_run(const std::vector<std::string>& urls, const stats_config& cfg, bool reconnect, const std::atomic_bool& force_break,
+void common_run(const std::vector<std::string>& dst_urls, const stats_config& cfg_stats, const conn_config& cfg_conn, const std::atomic_bool& force_break,
 	processing_fn_t& processing_fn);
 
 /// @brief Create netaddr_any from host and port values.
