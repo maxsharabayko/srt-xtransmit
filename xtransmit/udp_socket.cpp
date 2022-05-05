@@ -6,6 +6,7 @@
 #include "spdlog/spdlog.h"
 
 using namespace std;
+using namespace srt;
 using namespace xtransmit;
 using shared_udp = shared_ptr<socket::udp>;
 

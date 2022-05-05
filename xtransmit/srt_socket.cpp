@@ -15,6 +15,7 @@
 #include "apputil.hpp"
 
 using namespace std;
+using namespace srt;
 using namespace xtransmit;
 using shared_srt = shared_ptr<socket::srt>;
 
