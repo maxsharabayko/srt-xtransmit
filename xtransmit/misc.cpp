@@ -29,7 +29,7 @@ shared_sock_t create_connection(const vector<UriParser>& parsed_urls, shared_soc
 
 	if (parsed_urls.size() > 1)
 	{
-#if ENABLE_EXPERIMENTAL_BONDING
+#if ENABLE_BONDING
 		// Group SRT connection
 		const bool is_listening = !!listening_sock;
 		if (!is_listening)
@@ -47,8 +47,8 @@ shared_sock_t create_connection(const vector<UriParser>& parsed_urls, shared_soc
 
 		return connection;
 #else
-		throw socket::exception("Use -DENABLE_EXPERIMENTAL_BONDING=ON to enable socket groups!");
-#endif // ENABLE_EXPERIMENTAL_BONDING
+		throw socket::exception("Use -DENABLE_BONDING=ON to enable socket groups!");
+#endif // ENABLE_BONDING
 	}
 
 	const UriParser& uri = parsed_urls[0];
@@ -158,59 +158,59 @@ void common_run(const vector<string>& urls, const stats_config& cfg, bool reconn
 
 netaddr_any create_addr(const string& name, unsigned short port, int pref_family)
 {
-    // Handle empty name.
-    // If family is specified, empty string resolves to ANY of that family.
-    // If not, it resolves to IPv4 ANY (to specify IPv6 any, use [::]).
-    if (name == "")
-    {
-        netaddr_any result(pref_family == AF_INET6 ? pref_family : AF_INET);
-        result.hport(port);
-        return result;
-    }
+	// Handle empty name.
+	// If family is specified, empty string resolves to ANY of that family.
+	// If not, it resolves to IPv4 ANY (to specify IPv6 any, use [::]).
+	if (name == "")
+	{
+		netaddr_any result(pref_family == AF_INET6 ? pref_family : AF_INET);
+		result.hport(port);
+		return result;
+	}
 
-    bool first6 = pref_family != AF_INET;
-    int families[2] = {AF_INET6, AF_INET};
-    if (!first6)
-    {
-        families[0] = AF_INET;
-        families[1] = AF_INET6;
-    }
+	bool first6 = pref_family != AF_INET;
+	int families[2] = {AF_INET6, AF_INET};
+	if (!first6)
+	{
+		families[0] = AF_INET;
+		families[1] = AF_INET6;
+	}
 
-    for (int i = 0; i < 2; ++i)
-    {
-        int family = families[i];
-        netaddr_any result (family);
-        // Try to resolve the name by pton first
-        if (inet_pton(family, name.c_str(), result.get_addr()) == 1)
-        {
-            result.hport(port); // same addr location in ipv4 and ipv6
-            return result;
-        }
-    }
+	for (int i = 0; i < 2; ++i)
+	{
+		int family = families[i];
+		netaddr_any result (family);
+		// Try to resolve the name by pton first
+		if (inet_pton(family, name.c_str(), result.get_addr()) == 1)
+		{
+			result.hport(port); // same addr location in ipv4 and ipv6
+			return result;
+		}
+	}
 
-    // If not, try to resolve by getaddrinfo
-    // This time, use the exact value of pref_family
+	// If not, try to resolve by getaddrinfo
+	// This time, use the exact value of pref_family
 
-    netaddr_any result;
-    addrinfo fo = {
-        0,
-        pref_family,
-        0, 0,
-        0, 0,
-        NULL, NULL
-    };
+	netaddr_any result;
+	addrinfo fo = {
+		0,
+		pref_family,
+		0, 0,
+		0, 0,
+		NULL, NULL
+	};
 
-    addrinfo* val = nullptr;
-    int erc = getaddrinfo(name.c_str(), nullptr, &fo, &val);
-    if (erc == 0)
-    {
-        result.set(val->ai_addr);
-        result.len = result.size();
-        result.hport(port); // same addr location in ipv4 and ipv6
-    }
-    freeaddrinfo(val);
+	addrinfo* val = nullptr;
+	int erc = getaddrinfo(name.c_str(), nullptr, &fo, &val);
+	if (erc == 0)
+	{
+		result.set(val->ai_addr);
+		result.len = result.size();
+		result.hport(port); // same addr location in ipv4 and ipv6
+	}
+	freeaddrinfo(val);
 
-    return result;
+	return result;
 }
 
 } // namespace xtransmit

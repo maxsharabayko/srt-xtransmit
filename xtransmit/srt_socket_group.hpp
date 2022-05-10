@@ -1,5 +1,5 @@
 #pragma once
-#if ENABLE_EXPERIMENTAL_BONDING
+#if ENABLE_BONDING
 #include <memory>
 #include <exception>
 #include <future>
@@ -127,4 +127,4 @@ private:
 } // namespace socket
 } // namespace xtransmit
 
-#endif //ENABLE_EXPERIMENTAL_BONDING
+#endif //ENABLE_BONDING

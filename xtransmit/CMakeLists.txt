@@ -17,9 +17,10 @@ target_include_directories(srt-xtransmit PUBLIC
 	${PTHREAD_INCLUDE_DIR}
 	)
 
-if (ENABLE_EXPERIMENTAL_BONDING)
-	set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DENABLE_EXPERIMENTAL_BONDING=1")
-	set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DENABLE_EXPERIMENTAL_BONDING=1")
+if (ENABLE_BONDING)
+	target_compile_options(srt-xtransmit
+		PRIVATE "-DENABLE_BONDING=1"
+	)
 endif()
 
 if (ENABLE_CXX17)
@@ -41,6 +42,8 @@ target_link_libraries(srt-xtransmit
 	PRIVATE CLI11::CLI11
 	PRIVATE spdlog::spdlog
 	PRIVATE ${TARGET_srt}_static ${VIRTUAL_srtsupport} ${LINKSTDCPP_FS})
+
+
 
 set_target_properties(srt-xtransmit
 	PROPERTIES

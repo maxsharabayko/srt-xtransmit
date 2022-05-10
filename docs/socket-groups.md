@@ -3,13 +3,16 @@
 ## Build
 
 To build `srt-xtransmit` with support for SRT socket groups specify the
-`-DENABLE_EXPERIMENTAL_BONDING=ON` CMake option. See an example below.
+`-DENABLE_BONDING=ON` CMake option. See an example below.
 
 ```shell
 mkdir _build && cd _build
-cmake ../ -DENABLE_EXPERIMENTAL_BONDING=ON
+cmake ../ -DENABLE_BONDING=ON
 cmake --build ./
 ```
+
+**Note.** To enable bonding for SRT versions prior to v1.5.0
+the `-DENABLE_EXPERIMENTAL_BONDING=ON` needs to be specified additionally.
 
 ## Command-Line Syntax
 

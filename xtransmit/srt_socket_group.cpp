@@ -1,4 +1,4 @@
-#if ENABLE_EXPERIMENTAL_BONDING
+#if ENABLE_BONDING
 
 #include <thread>
 #include <iostream>
@@ -858,4 +858,4 @@ const string socket::srt_group::statistics_csv(bool print_header) const
 	return csv_stats;
 }
 
-#endif //ENABLE_EXPERIMENTAL_BONDING
+#endif //ENABLE_BONDING
