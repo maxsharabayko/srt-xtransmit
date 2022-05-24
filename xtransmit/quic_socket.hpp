@@ -85,6 +85,7 @@ private:
 	socket::udp  m_udp;
 	quiche_conn* m_conn;
 	quiche_config* m_quic_config;
+	std::future<void>   m_rcvth;
 };
 
 } // namespace socket

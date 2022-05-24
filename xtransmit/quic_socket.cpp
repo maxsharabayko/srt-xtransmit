@@ -71,8 +71,6 @@ socket::quic::quic(const UriParser &src_uri)
 		//const string logfile = src_uri.parameters().at(tlskeylog);
 		quiche_config_log_keys(m_quic_config);
 	}
-
-
 }
 
 socket::quic::~quic()
@@ -82,12 +80,12 @@ socket::quic::~quic()
 }
 
 
-static void th_receive(int fd, atomic_bool& closing, socket::quic* self)
+static void th_receive(socket::quic* self)
 {
 	array<uint8_t, 1500> buffer;
 	static bool req_sent = false;
 
-	while (!closing)
+	while (true)
 	{
 		const auto recv_res = self->recvfrom(mutable_buffer(buffer.data(), buffer.size()), -1);
 		const size_t read_len = recv_res.first;
@@ -144,9 +142,14 @@ static void th_receive(int fd, atomic_bool& closing, socket::quic* self)
 
 void socket::quic::listen()
 {
-	struct connections c;
-	c.sock = sock;
-	c.h = NULL;
+	//struct connections c;
+	//c.sock = sock;
+	//c.h = NULL;
+
+	//if (m_rcvth.valid())
+	//	return;
+	//spdlog::trace(LOG_SOCK_QUIC "listening.");
+	//m_rcvth = ::async(::launch::async, th_receive, &m_ctx, m_udp.id(), ref(m_closing), this);
 
 }
 
@@ -184,8 +187,10 @@ shared_quic socket::quic::connect()
 {
 	int socketid = detail::generate_socket_id();
 	m_conn = quiche_connect(m_udp.host().c_str(), (const uint8_t*)socketid, sizeof(socketid),
-		peer->ai_addr, peer->ai_addrlen, config);
-	raise_exception("connect not implemented");
+		m_udp.
+		peer->ai_addr, peer->ai_addrlen, m_quic_config);
+
+	m_rcvth = ::async(::launch::async, th_receive, this);
 
 	return shared_from_this();
 }

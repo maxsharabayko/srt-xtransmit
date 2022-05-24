@@ -2,6 +2,7 @@
 #include "misc.hpp"
 #include "socket_stats.hpp"
 #include "srt_socket_group.hpp"
+#include "quic_socket.hpp"
 
 // submodules
 #include "spdlog/spdlog.h"
@@ -80,6 +81,33 @@ shared_sock_t create_connection(const vector<UriParser>& parsed_urls, shared_soc
 
 		// Only save the shared pointer for a listener to re-accept a connection.
 		if (s->mode() != socket::srt::LISTENER)
+			listening_sock.reset();
+
+		return connection;
+	}
+
+	if (uri.proto() == "quic")
+	{
+		const bool is_listening = !!listening_sock;
+		if (!is_listening)
+			listening_sock = make_shared<socket::quic>(uri);
+		socket::quic* s = dynamic_cast<socket::quic*>(listening_sock.get());
+		const bool accept = !s->is_caller();
+		if (accept && !is_listening)
+			s->listen();
+		shared_sock_t connection;
+
+		try {
+			connection = accept ? s->accept() : s->connect();
+		}
+		catch (const socket::exception& e)
+		{
+			listening_sock.reset();
+			throw e;
+		}
+
+		// Only save the shared pointer for a listener to re-accept a connection.
+		if (s->is_caller())
 			listening_sock.reset();
 
 		return connection;

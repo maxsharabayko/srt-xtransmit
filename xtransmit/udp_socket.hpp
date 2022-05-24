@@ -36,6 +36,7 @@ public:
 
 	string host() const { return m_host; }
 	int port() const { return m_port; }
+	netaddr_any dstaddr() const { return m_dst_addr; }
 
 public:
 	/**
@@ -51,7 +52,7 @@ public:
 
 private:
 	SOCKET m_bind_socket = -1; // INVALID_SOCK;
-	sockaddr_in m_dst_addr = {};
+	netaddr_any m_dst_addr;
 
 	bool                     m_blocking_mode = false;
 	string                   m_host;
