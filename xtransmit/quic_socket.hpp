@@ -64,6 +64,15 @@ public:
 
 	bool is_caller() const final { return m_udp.is_caller(); }
 
+	auto recvfrom(const mutable_buffer& buffer, int timeout_ms = -1)
+	{
+		return m_udp.recvfrom(buffer, timeout_ms);
+	}
+
+	quiche_conn* conn() {
+		return m_conn;
+	}
+
 public:
 	SOCKET                   id() const final { return m_udp.id(); }
 	bool                     supports_statistics() const final { return false; }
@@ -73,7 +82,9 @@ private:
 	void raise_exception(const string&& place, const string&& reason) const;
 
 private:
-	socket::udp    m_udp;
+	socket::udp  m_udp;
+	quiche_conn* m_conn;
+	quiche_config* m_quic_config;
 };
 
 } // namespace socket

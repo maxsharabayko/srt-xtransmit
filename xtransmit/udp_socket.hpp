@@ -34,6 +34,9 @@ public:
 
 	SOCKET id() const final { return m_bind_socket; }
 
+	string host() const { return m_host; }
+	int port() const { return m_port; }
+
 public:
 	/**
 	 * @returns The number of bytes received.
@@ -42,6 +45,9 @@ public:
 	 */
 	size_t read(const mutable_buffer &buffer, int timeout_ms = -1) final;
 	int    write(const const_buffer &buffer, int timeout_ms = -1) final;
+
+	std::pair<size_t, netaddr_any>
+		recvfrom(const mutable_buffer& buffer, int timeout_ms = -1);
 
 private:
 	SOCKET m_bind_socket = -1; // INVALID_SOCK;

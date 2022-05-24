@@ -17,6 +17,8 @@
 #include "logsupport.hpp"
 #include "verbose.hpp"
 
+#include "quiche.h"
+
 #include "srt_socket.hpp"
 
 #include "forward.h"
@@ -56,6 +58,10 @@ struct NetworkInit
 		srt_cleanup();
 	}
 };
+
+static void quiche_debug_log(const char* line, void* argp) {
+	spdlog::debug("{}", line);
+}
 
 string create_srt_logfa_description()
 {
@@ -167,6 +173,7 @@ int main(int argc, char** argv)
 				break;
 			case srt_logging::LogLevel::debug:
 				spdlog::set_level(spdlog::level::trace);
+				quiche_enable_debug_logging(quiche_debug_log, NULL);
 				break;
 			default:
 				break;

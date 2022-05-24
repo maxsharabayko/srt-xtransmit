@@ -143,6 +143,56 @@ size_t socket::udp::read(const mutable_buffer &buffer, int timeout_ms)
 	return static_cast<size_t>(res);
 }
 
+std::pair<size_t, netaddr_any>
+socket::udp::recvfrom(const mutable_buffer& buffer, int timeout_ms)
+{
+	typedef std::pair<size_t, netaddr_any> return_pair;
+
+	while (!m_blocking_mode)
+	{
+		fd_set set;
+		timeval tv;
+		FD_ZERO(&set);
+		FD_SET(m_bind_socket, &set);
+		tv.tv_sec = 0;
+		tv.tv_usec = 10000;
+		const int select_ret = ::select((int)m_bind_socket + 1, &set, NULL, &set, &tv);
+
+		if (select_ret != 0)    // ready
+			break;
+
+		if (timeout_ms >= 0)   // timeout
+			return return_pair();
+	}
+
+
+	netaddr_any peer_addr;
+	socklen_t addrlen = (socklen_t)peer_addr.storage_size();
+
+	const int res =
+		::recvfrom(m_bind_socket, reinterpret_cast<char*>(buffer.data()), (int)buffer.size()
+			, 0, peer_addr.get(), &addrlen);
+
+	if (res == -1)
+	{
+		const int err = NET_ERROR;
+		if (err != EAGAIN && err != EINTR && err != ECONNREFUSED)
+		{
+			// TODO: Catch this error
+			// TODO: On Windows if UDP socket recv a ICMP(port unreachable) message after send a message,
+			// error 10054 will be stored, and next time call recvfrom() will return this error.
+			spdlog::error("UDP {} reading failed: error {}.", id(), err);
+			//throw runtime_error("udp::recv::recv");
+			return return_pair();
+		}
+
+		spdlog::info("UDP reading failed: error {0}. Again.", err);
+		return return_pair();
+	}
+
+	return return_pair(static_cast<size_t>(res), peer_addr);
+}
+
 int socket::udp::write(const const_buffer &buffer, int timeout_ms)
 {
 	while (!m_blocking_mode)
