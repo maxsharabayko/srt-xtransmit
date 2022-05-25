@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 #include <map>
+#include <mutex>
 #include <unordered_set>
 
 // xtransmit
@@ -82,6 +83,42 @@ public:
 
 	bool is_closing() const { return m_closing; }
 
+	enum class state
+	{
+		opened,
+		connecting,
+		connected,
+		broken,
+		closed
+	};
+
+	bool wait_state(state target_state, std::chrono::steady_clock::duration timeout)
+	{
+		std::unique_lock<std::mutex> lck(m_state_mtx);
+
+		if (target_state == m_state)
+			return true;
+
+		m_state_cv.wait_for(lck, timeout);
+		return target_state == m_state;
+	}
+
+	state get_state() const
+	{
+		std::lock_guard<std::mutex> lck(m_state_mtx);
+		return m_state;
+	}
+
+	void change_state(state new_state)
+	{
+		std::lock_guard<std::mutex> lck(m_state_mtx);
+		if (new_state == m_state)
+			return;
+
+		m_state = new_state;
+		m_state_cv.notify_all();
+	}
+
 public:
 	SOCKET                   id() const final { return m_udp.id(); }
 	bool                     supports_statistics() const final { return false; }
@@ -97,6 +134,11 @@ private:
 	std::future<void>   m_rcvth;
 	std::future<void>   m_sndth;
 	std::atomic_bool m_closing = false;
+
+	std::condition_variable m_state_cv;
+	mutable std::mutex m_state_mtx;
+	state m_state;
+
 };
 
 } // namespace socket

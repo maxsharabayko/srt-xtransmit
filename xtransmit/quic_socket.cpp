@@ -86,7 +86,6 @@ socket::quic::~quic()
 static void th_receive(socket::quic* self)
 {
 	array<uint8_t, 1500> buffer;
-	static bool req_sent = false;
 
 	while (!self->is_closing())
 	{
@@ -116,30 +115,17 @@ static void th_receive(socket::quic* self)
 			spdlog::warn(LOG_SOCK_QUIC "connection closedt");
 			return;
 		}
-	}
 
+		if (self->get_state() == socket::quic::state::connecting && quiche_conn_is_established(self->conn()))
+		{
+			const uint8_t* app_proto;
+			size_t app_proto_len;
+			quiche_conn_application_proto(self->conn(), &app_proto, &app_proto_len);
+			spdlog::info(LOG_SOCK_QUIC "connection established: {:<{}}.", app_proto, app_proto_len);
 
-	if (quiche_conn_is_established(self->conn()) && !req_sent)
-	{
-		const uint8_t* app_proto;
-		size_t app_proto_len;
-
-		quiche_conn_application_proto(self->conn(), &app_proto, &app_proto_len);
-
-		fprintf(stderr, "connection established: %.*s\n",
-			(int)app_proto_len, app_proto);
-
-		const static uint8_t r[] = "GET /index.html\r\n";
-		if (quiche_conn_stream_send(self->conn(), 4, r, sizeof(r), true) < 0) {
-			fprintf(stderr, "failed to send HTTP request\n");
-			return;
+			self->change_state(socket::quic::state::connected);
 		}
-
-		fprintf(stderr, "sent HTTP request\n");
-
-		req_sent = true;
 	}
-
 }
 
 static void th_send(socket::quic* self)
@@ -156,7 +142,7 @@ static void th_send(socket::quic* self)
 				&send_info);
 
 			if (written == QUICHE_ERR_DONE) {
-				spdlog::trace(LOG_SOCK_QUIC "done waiting");
+				//spdlog::trace(LOG_SOCK_QUIC "(SNDTH) done waiting");
 				break;
 			}
 
@@ -175,8 +161,9 @@ static void th_send(socket::quic* self)
 			spdlog::trace(LOG_SOCK_QUIC "send {} bytes.", sent);
 		}
 
-		const long long t = (long long) (quiche_conn_timeout_as_nanos(self->conn()) / 1e6);
-		this_thread::sleep_for(chrono::microseconds(t));
+		const uint64_t t =quiche_conn_timeout_as_nanos(self->conn());
+		spdlog::trace(LOG_SOCK_QUIC "(SNDTH) next send in {} ns", t);
+		this_thread::sleep_for(chrono::nanoseconds(t));
 	}
 }
 
@@ -231,8 +218,13 @@ shared_quic socket::quic::connect()
 		m_udp.dst_addr().get(), m_udp.dst_addr().size(),
 		m_quic_config);
 
+	change_state(state::connecting);
+
 	m_rcvth = ::async(::launch::async, th_receive, this);
 	m_sndth = ::async(::launch::async, th_send, this);
+
+	if (!wait_state(state::connected, 5s))
+		raise_exception("connection timeout");
 
 	return shared_from_this();
 }
