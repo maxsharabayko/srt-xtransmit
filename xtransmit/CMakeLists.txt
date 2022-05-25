@@ -49,6 +49,13 @@ target_link_libraries(srt-xtransmit
 	PRIVATE quiche
 )
 
+if (WIN32)
+	target_link_libraries(srt-xtransmit
+		PRIVATE crypt32 Userenv Bcrypt
+	)
+endif()
+
+
 target_link_directories(srt-xtransmit
 	PRIVATE ${QUICHE_LIB_DIR}
 )

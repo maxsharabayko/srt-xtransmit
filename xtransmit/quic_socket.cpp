@@ -186,9 +186,9 @@ namespace detail {
 shared_quic socket::quic::connect()
 {
 	int socketid = detail::generate_socket_id();
-	m_conn = quiche_connect(m_udp.host().c_str(), (const uint8_t*)socketid, sizeof(socketid),
-		m_udp.
-		peer->ai_addr, peer->ai_addrlen, m_quic_config);
+	m_conn = quiche_connect(m_udp.host().c_str(), (const uint8_t*) &socketid, sizeof(socketid),
+		m_udp.dst_addr().get(), m_udp.dst_addr().size(),
+		m_quic_config);
 
 	m_rcvth = ::async(::launch::async, th_receive, this);
 

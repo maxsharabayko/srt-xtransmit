@@ -6,6 +6,7 @@
 // xtransmit
 #include "buffer.hpp"
 #include "socket.hpp"
+#include "netaddr_any.hpp"
 
 // OpenSRT
 #include "uriparser.hpp"
@@ -36,7 +37,7 @@ public:
 
 	string host() const { return m_host; }
 	int port() const { return m_port; }
-	netaddr_any dstaddr() const { return m_dst_addr; }
+	const netaddr_any& dst_addr() const { return m_dst_addr; }
 
 public:
 	/**

@@ -56,8 +56,8 @@ socket::udp::udp(const UriParser &src_uri)
 		throw socket::exception("create_addr_inet failed");
 	}
 
-	const auto bind_me = [&](const sockaddr* sa) {
-		const int       bind_res = ::bind(m_bind_socket, sa, sizeof *sa);
+	const auto bind_me = [&](const netaddr_any& sa) {
+		const int       bind_res = ::bind(m_bind_socket, sa.get(), sa.size());
 		if (bind_res < 0)
 		{
 			throw socket::exception("UDP binding has failed");
@@ -86,7 +86,7 @@ socket::udp::udp(const UriParser &src_uri)
 			throw socket::exception("create_addr_inet failed");
 		}
 
-		bind_me(reinterpret_cast<const sockaddr*>(&sa_bind));
+		bind_me(sa_bind);
 		ip_bonded = true;
 		spdlog::info(LOG_SOCK_UDP "udp://{}:{:d}: bound to '{}:{}'.",
 			m_host, m_port, bindip, bindport);
@@ -94,11 +94,11 @@ socket::udp::udp(const UriParser &src_uri)
 
 	if (m_host != "" || ip_bonded)
 	{
-		m_dst_addr = sa_requested.sin;
+		m_dst_addr = sa_requested;
 	}
 	else
 	{
-		bind_me(reinterpret_cast<const sockaddr*>(&sa_requested));
+		bind_me(sa_requested);
 	}
 }
 
