@@ -64,14 +64,23 @@ public:
 
 	bool is_caller() const final { return m_udp.is_caller(); }
 
-	auto recvfrom(const mutable_buffer& buffer, int timeout_ms = -1)
+	auto udp_recvfrom(const mutable_buffer& buffer, int timeout_ms = -1)
 	{
 		return m_udp.recvfrom(buffer, timeout_ms);
 	}
 
+	int udp_sendto(const netaddr_any& dst_addr, const const_buffer& buffer, int timeout_ms = -1)
+	{
+		return m_udp.sendto(dst_addr, buffer, timeout_ms);
+	}
+
+	socket::udp& udp_sock() { return m_udp; }
+
 	quiche_conn* conn() {
 		return m_conn;
 	}
+
+	bool is_closing() const { return m_closing; }
 
 public:
 	SOCKET                   id() const final { return m_udp.id(); }
@@ -86,6 +95,8 @@ private:
 	quiche_conn* m_conn;
 	quiche_config* m_quic_config;
 	std::future<void>   m_rcvth;
+	std::future<void>   m_sndth;
+	std::atomic_bool m_closing = false;
 };
 
 } // namespace socket

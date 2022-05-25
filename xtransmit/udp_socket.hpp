@@ -51,6 +51,8 @@ public:
 	std::pair<size_t, netaddr_any>
 		recvfrom(const mutable_buffer& buffer, int timeout_ms = -1);
 
+	int sendto(const netaddr_any& dst_addr, const const_buffer& buffer, int timeout_ms = -1);
+
 private:
 	SOCKET m_bind_socket = -1; // INVALID_SOCK;
 	netaddr_any m_dst_addr;

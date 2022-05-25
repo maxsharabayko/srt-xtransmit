@@ -193,6 +193,41 @@ socket::udp::recvfrom(const mutable_buffer& buffer, int timeout_ms)
 	return return_pair(static_cast<size_t>(res), peer_addr);
 }
 
+int socket::udp::sendto(const netaddr_any& dst_addr, const const_buffer& buffer, int timeout_ms)
+{
+	while (!m_blocking_mode)
+	{
+		fd_set set;
+		timeval tv;
+		FD_ZERO(&set);
+		FD_SET(m_bind_socket, &set);
+		tv.tv_sec = 0;
+		tv.tv_usec = 10000;
+		const int select_ret = ::select((int)m_bind_socket + 1, nullptr, &set, &set, &tv);
+
+		if (select_ret != 0)    // ready
+			break;
+
+		if (timeout_ms >= 0)   // timeout
+			return 0;
+	}
+
+	const int res = ::sendto(m_bind_socket,
+		reinterpret_cast<const char*>(buffer.data()),
+		(int)buffer.size(),
+		0,
+		dst_addr.get(),
+		dst_addr.size());
+	if (res == -1)
+	{
+		const int err = NET_ERROR;
+		spdlog::error("UDP sendto {0} failed: error {1}.", dst_addr.str(), err);
+		throw runtime_error("udp::send::send");
+	}
+
+	return res;
+}
+
 int socket::udp::write(const const_buffer &buffer, int timeout_ms)
 {
 	while (!m_blocking_mode)

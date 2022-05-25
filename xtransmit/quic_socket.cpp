@@ -75,6 +75,9 @@ socket::quic::quic(const UriParser &src_uri)
 
 socket::quic::~quic()
 {
+	m_closing = true;
+	m_rcvth.wait();
+	m_sndth.wait();
 	quiche_conn_free(m_conn);
 	quiche_config_free(m_quic_config);
 }
@@ -85,9 +88,9 @@ static void th_receive(socket::quic* self)
 	array<uint8_t, 1500> buffer;
 	static bool req_sent = false;
 
-	while (true)
+	while (!self->is_closing())
 	{
-		const auto recv_res = self->recvfrom(mutable_buffer(buffer.data(), buffer.size()), -1);
+		const auto recv_res = self->udp_recvfrom(mutable_buffer(buffer.data(), buffer.size()), -1);
 		const size_t read_len = recv_res.first;
 
 		// bites read
@@ -137,6 +140,44 @@ static void th_receive(socket::quic* self)
 		req_sent = true;
 	}
 
+}
+
+static void th_send(socket::quic* self)
+{
+	array<uint8_t, MAX_DATAGRAM_SIZE> buffer;
+
+	quiche_send_info send_info;
+
+	while (!self->is_closing())
+	{
+		while (!self->is_closing()) {
+
+			const ssize_t written = quiche_conn_send(self->conn(), buffer.data(), buffer.size(),
+				&send_info);
+
+			if (written == QUICHE_ERR_DONE) {
+				spdlog::trace(LOG_SOCK_QUIC "done waiting");
+				break;
+			}
+
+			if (written < 0) {
+				spdlog::error(LOG_SOCK_QUIC "failed to create packet : {}", written);
+				return;
+			}
+
+			netaddr_any dst_addr((sockaddr*)&send_info.to, send_info.to_len);
+			ssize_t sent = self->udp_sock().sendto(dst_addr, const_buffer(buffer.data(), written));
+			if (sent != written) {
+				spdlog::error(LOG_SOCK_QUIC "failed to send");
+				return;
+			}
+
+			spdlog::trace(LOG_SOCK_QUIC "send {} bytes.", sent);
+		}
+
+		const long long t = (long long) (quiche_conn_timeout_as_nanos(self->conn()) / 1e6);
+		this_thread::sleep_for(chrono::microseconds(t));
+	}
 }
 
 
@@ -191,6 +232,7 @@ shared_quic socket::quic::connect()
 		m_quic_config);
 
 	m_rcvth = ::async(::launch::async, th_receive, this);
+	m_sndth = ::async(::launch::async, th_send, this);
 
 	return shared_from_this();
 }
