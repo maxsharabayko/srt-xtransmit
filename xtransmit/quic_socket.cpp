@@ -24,6 +24,8 @@ using shared_quic = shared_ptr<socket::quic>;
 #define LOG_SOCK_QUIC "SOCKET::QUIC "
 
 constexpr size_t MAX_DATAGRAM_SIZE = 1350;
+constexpr size_t MAX_TOKEN_LEN = sizeof("quiche") - 1 + sizeof(struct sockaddr_storage) + QUICHE_MAX_CONN_ID_LEN;
+constexpr size_t LOCAL_CONN_ID_LEN = 16;
 
 
 socket::quic::quic(const UriParser &src_uri)
@@ -75,11 +77,12 @@ socket::quic::quic(const UriParser &src_uri)
 
 socket::quic::~quic()
 {
-	m_closing = true;
+	change_state(state::closing);
 	m_rcvth.wait();
 	m_sndth.wait();
 	quiche_conn_free(m_conn);
 	quiche_config_free(m_quic_config);
+	change_state(state::closed);
 }
 
 
@@ -103,6 +106,29 @@ static void th_receive(socket::quic* self)
 			(struct sockaddr*) recv_res.second.get(),
 			recv_res.second.size()
 		};
+
+		if (self->is_listening())
+		{
+			// Process possible incoming connections.
+			uint8_t type;
+			uint32_t version;
+
+			uint8_t scid[QUICHE_MAX_CONN_ID_LEN];
+			size_t scid_len = sizeof(scid);
+
+			uint8_t dcid[QUICHE_MAX_CONN_ID_LEN];
+			size_t dcid_len = sizeof(dcid);
+
+			uint8_t odcid[QUICHE_MAX_CONN_ID_LEN];
+			size_t odcid_len = sizeof(odcid);
+
+			uint8_t token[MAX_TOKEN_LEN];
+			size_t token_len = sizeof(token);
+
+			int rc = quiche_header_info(buffer.data(), read_len, LOCAL_CONN_ID_LEN, &version,
+				&type, scid, &scid_len, dcid, &dcid_len,
+				token, &token_len);
+		}
 
 		const ssize_t done = quiche_conn_recv(self->conn(), buffer.data(), read_len, &recv_info);
 		if (done < 0) {
@@ -179,6 +205,11 @@ void socket::quic::listen()
 	//spdlog::trace(LOG_SOCK_QUIC "listening.");
 	//m_rcvth = ::async(::launch::async, th_receive, &m_ctx, m_udp.id(), ref(m_closing), this);
 
+
+	change_state(state::listening);
+
+	m_rcvth = ::async(::launch::async, th_receive, this);
+	m_sndth = ::async(::launch::async, th_send, this);
 }
 
 shared_quic socket::quic::accept()

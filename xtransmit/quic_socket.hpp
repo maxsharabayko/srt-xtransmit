@@ -81,16 +81,28 @@ public:
 		return m_conn;
 	}
 
-	bool is_closing() const { return m_closing; }
 
 	enum class state
 	{
 		opened,
+		listening,
 		connecting,
 		connected,
-		broken,
+		closing, // broken or regular close
 		closed
 	};
+
+	bool is_closing() const
+	{
+		std::lock_guard<std::mutex> lck(m_state_mtx);
+		return m_state == state::closing;
+	}
+
+	bool is_listening() const
+	{
+		std::lock_guard<std::mutex> lck(m_state_mtx);
+		return m_state == state::listening;
+	}
 
 	bool wait_state(state target_state, std::chrono::steady_clock::duration timeout)
 	{
@@ -133,7 +145,6 @@ private:
 	quiche_config* m_quic_config;
 	std::future<void>   m_rcvth;
 	std::future<void>   m_sndth;
-	std::atomic_bool m_closing = false;
 
 	std::condition_variable m_state_cv;
 	mutable std::mutex m_state_mtx;
