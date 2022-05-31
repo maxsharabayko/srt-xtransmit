@@ -6,7 +6,9 @@
 #include <vector>
 #include <map>
 #include <mutex>
+#include <unordered_map>
 #include <unordered_set>
+#include <queue>
 
 // xtransmit
 #include "buffer.hpp"
@@ -34,11 +36,29 @@ class quic
 public:
 	explicit quic(const UriParser& src_uri);
 
+	// Constructor for accepted socket connections.
+	// Accepted sockets don't have receiving thread.
+	quic(quic& other, quiche_conn* conn);
+
 	virtual ~quic();
 
 public:
 	shared_quic connect();
 	shared_quic accept();
+
+	static constexpr size_t LOCAL_CONN_ID_LEN = 16;
+
+	struct conn_io {
+		uint8_t cid[LOCAL_CONN_ID_LEN];
+		quiche_conn* conn;
+		netaddr_any peer_addr;
+	};
+
+	quiche_conn* create_accepted_conn(uint8_t* scid, size_t scid_len,
+		uint8_t* odcid, size_t odcid_len,
+		const netaddr_any& peer_addr);
+
+	void queue_accepted_conn(quiche_conn* conn);
 
 	/**
 	 * Start listening on the incomming connection requests.
@@ -81,6 +101,9 @@ public:
 		return m_conn;
 	}
 
+	bool has_conn(const string& cid);
+
+	quiche_conn* find_conn(const string& cid);
 
 	enum class state
 	{
@@ -131,6 +154,8 @@ public:
 		m_state_cv.notify_all();
 	}
 
+	const quiche_config* config() const { return m_quic_config; }
+
 public:
 	SOCKET                   id() const final { return m_udp.id(); }
 	bool                     supports_statistics() const final { return false; }
@@ -142,6 +167,11 @@ private:
 private:
 	socket::udp  m_udp;
 	quiche_conn* m_conn;
+
+	mutable std::mutex m_conn_mtx;
+	std::condition_variable m_conn_cv;
+	std::unordered_map<std::string, conn_io> m_accepted_conns; // In the case of server.
+	std::queue<quiche_conn*> m_queued_connections; // Accepted connections queued to be accepted by the app.
 	quiche_config* m_quic_config;
 	std::future<void>   m_rcvth;
 	std::future<void>   m_sndth;

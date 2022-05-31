@@ -25,13 +25,12 @@ using shared_quic = shared_ptr<socket::quic>;
 
 constexpr size_t MAX_DATAGRAM_SIZE = 1350;
 constexpr size_t MAX_TOKEN_LEN = sizeof("quiche") - 1 + sizeof(struct sockaddr_storage) + QUICHE_MAX_CONN_ID_LEN;
-constexpr size_t LOCAL_CONN_ID_LEN = 16;
 
 
 socket::quic::quic(const UriParser &src_uri)
 	: m_udp(src_uri)
 {
-	m_quic_config = quiche_config_new(QUICHE_PROTOCOL_VERSION);
+	m_quic_config = quiche_config_new(is_caller() ? 0xbabababa : QUICHE_PROTOCOL_VERSION);
 	if (m_quic_config == NULL) {
 		raise_exception("failed to create config");
 	}
@@ -81,8 +80,63 @@ socket::quic::~quic()
 	m_rcvth.wait();
 	m_sndth.wait();
 	quiche_conn_free(m_conn);
+	while (!m_queued_connections.empty())
+	{
+		quiche_conn* conn = m_queued_connections.front();
+		quiche_conn_free(conn);
+		m_queued_connections.pop();
+	}
+
 	quiche_config_free(m_quic_config);
+
 	change_state(state::closed);
+}
+
+namespace detail {
+	void mint_token(const uint8_t* dcid, size_t dcid_len,
+		const netaddr_any& addr,
+		uint8_t* token, size_t* token_len) {
+		memcpy(token, "quiche", sizeof("quiche") - 1);
+		memcpy(token + sizeof("quiche") - 1, addr.get(), addr.size());
+		memcpy(token + sizeof("quiche") - 1 + addr.size(), dcid, dcid_len);
+
+		*token_len = sizeof("quiche") - 1 + addr.size() + dcid_len;
+	}
+
+	bool validate_token(const uint8_t* token, size_t token_len,
+		const netaddr_any& addr, uint8_t* odcid, size_t* odcid_len) {
+		if ((token_len < sizeof("quiche") - 1) ||
+			memcmp(token, "quiche", sizeof("quiche") - 1)) {
+			return false;
+		}
+
+		token += sizeof("quiche") - 1;
+		token_len -= sizeof("quiche") - 1;
+
+		if ((token_len < addr.size()) || memcmp(token, addr.get(), addr.size())) {
+			return false;
+		}
+
+		token += addr.size();
+		token_len -= addr.size();
+
+		if (*odcid_len < token_len) {
+			return false;
+		}
+
+		memcpy(odcid, token, token_len);
+		*odcid_len = token_len;
+
+		return true;
+	}
+
+	int generate_socket_id()
+	{
+		random_device              rd;                // Will be used to obtain a seed for the random number engine
+		mt19937                    gen(rd());         // Standard mersenne_twister_engine seeded with rd()
+		uniform_int_distribution<> dis(1, INT32_MAX); // Same distribution as before, but explicit and without bias
+		return dis(gen);
+	}
 }
 
 
@@ -102,11 +156,13 @@ static void th_receive(socket::quic* self)
 			continue;
 		}
 
+		const netaddr_any& peer_addr = recv_res.second;
 		quiche_recv_info recv_info = {
-			(struct sockaddr*) recv_res.second.get(),
+			(struct sockaddr*) peer_addr.get(),
 			recv_res.second.size()
 		};
 
+		quiche_conn* conn = nullptr;
 		if (self->is_listening())
 		{
 			// Process possible incoming connections.
@@ -125,31 +181,117 @@ static void th_receive(socket::quic* self)
 			uint8_t token[MAX_TOKEN_LEN];
 			size_t token_len = sizeof(token);
 
-			int rc = quiche_header_info(buffer.data(), read_len, LOCAL_CONN_ID_LEN, &version,
+			int rc = quiche_header_info(buffer.data(), read_len, socket::quic::LOCAL_CONN_ID_LEN, &version,
 				&type, scid, &scid_len, dcid, &dcid_len,
 				token, &token_len);
+
+			conn = self->find_conn(string((char*)scid, scid_len));
+
+			if (conn == nullptr)
+			{
+				if (!quiche_version_is_supported(version))
+				{
+					spdlog::info(LOG_SOCK_QUIC "version negotiation");
+
+					uint8_t out[MAX_DATAGRAM_SIZE];
+					ssize_t written = quiche_negotiate_version(scid, scid_len,
+						dcid, dcid_len,
+						out, sizeof(out));
+
+					if (written < 0)
+					{
+						spdlog::error(LOG_SOCK_QUIC "Failed to create vneg packet: {}.", written);
+						continue;
+					}
+
+					ssize_t sent = self->udp_sock().sendto(peer_addr, const_buffer(out, written));
+					if (sent != written) {
+						spdlog::error(LOG_SOCK_QUIC "Failed to send vneg packet.");
+						continue;
+					}
+
+					continue;
+				}
+				else
+				{
+					spdlog::info(LOG_SOCK_QUIC "Negotiated version {}", version);
+				}
+
+				if (token_len == 0)
+				{
+					spdlog::info(LOG_SOCK_QUIC "stateless retry");
+
+					detail::mint_token(dcid, dcid_len, peer_addr, token, &token_len);
+
+					uint8_t scid[socket::quic::LOCAL_CONN_ID_LEN];
+					for (int i = 0; i < 4; ++i)
+					{
+						*reinterpret_cast<int*>(scid + 4 * i) = detail::generate_socket_id();
+					}
+
+					uint8_t out[MAX_DATAGRAM_SIZE];
+					ssize_t written = quiche_retry(scid, scid_len,
+						dcid, dcid_len,
+						scid, sizeof(scid),
+						token, token_len,
+						version, out, sizeof(out));
+
+					if (written < 0) {
+						spdlog::error(LOG_SOCK_QUIC "Failed to create retry packet: %zd\n",
+							written);
+						continue;
+					}
+
+					ssize_t sent = self->udp_sock().sendto(peer_addr, const_buffer(out, written));
+					if (sent != written) {
+						spdlog::error(LOG_SOCK_QUIC "Failed to send retry packet.");
+						continue;
+					}
+
+					continue;
+				}
+
+				if (!detail::validate_token(token, token_len, peer_addr, odcid, &odcid_len))
+				{
+					fprintf(stderr, "invalid address validation token\n");
+					continue;
+				}
+
+				conn = self->create_accepted_conn(scid, scid_len, odcid, odcid_len, peer_addr);
+
+				if (conn == NULL)
+					continue;
+			}
+		}
+		else
+		{
+			conn = self->conn();
 		}
 
-		const ssize_t done = quiche_conn_recv(self->conn(), buffer.data(), read_len, &recv_info);
+		const ssize_t done = quiche_conn_recv(conn, buffer.data(), read_len, &recv_info);
 		if (done < 0) {
 			spdlog::error(LOG_SOCK_QUIC "failed to process packet");
 			continue;
 		}
 
-		if (quiche_conn_is_closed(self->conn()))
+		if (quiche_conn_is_closed(conn))
 		{
 			spdlog::warn(LOG_SOCK_QUIC "connection closedt");
 			return;
 		}
 
-		if (self->get_state() == socket::quic::state::connecting && quiche_conn_is_established(self->conn()))
+		if (self->get_state() == socket::quic::state::connecting && quiche_conn_is_established(conn))
 		{
 			const uint8_t* app_proto;
 			size_t app_proto_len;
-			quiche_conn_application_proto(self->conn(), &app_proto, &app_proto_len);
+			quiche_conn_application_proto(conn, &app_proto, &app_proto_len);
 			spdlog::info(LOG_SOCK_QUIC "connection established: {:<{}}.", app_proto, app_proto_len);
 
 			self->change_state(socket::quic::state::connected);
+		}
+		else if (self->get_state() == socket::quic::state::listening && quiche_conn_is_established(conn))
+		{
+			self->queue_accepted_conn(conn);
 		}
 	}
 }
@@ -173,7 +315,7 @@ static void th_send(socket::quic* self)
 			}
 
 			if (written < 0) {
-				spdlog::error(LOG_SOCK_QUIC "failed to create packet : {}", written);
+				spdlog::error(LOG_SOCK_QUIC "Failed to create packet: {}", written);
 				return;
 			}
 
@@ -194,36 +336,99 @@ static void th_send(socket::quic* self)
 }
 
 
+socket::quic::quic(quic& other, quiche_conn* conn)
+	: m_udp(other.m_udp)
+	, m_conn(conn)
+{
+	m_state = state::connected;
+	m_sndth = ::async(::launch::async, th_send, this);
+}
+
+quiche_conn* socket::quic::create_accepted_conn(uint8_t*           scid,
+									   size_t             scid_len,
+									   uint8_t*           odcid,
+									   size_t             odcid_len,
+									   const netaddr_any& peer_addr)
+{
+	if (scid_len != LOCAL_CONN_ID_LEN)
+	{
+		spdlog::error(LOG_SOCK_QUIC "Failed to create a connection: SCID length too short.");
+	}
+
+	quiche_conn* conn = quiche_accept(
+		scid, scid_len, odcid, odcid_len, peer_addr.get(), peer_addr.size(), m_quic_config);
+
+	if (conn == nullptr)
+	{
+		spdlog::error(LOG_SOCK_QUIC "Failed to accept connection.");
+		return nullptr;
+	}
+
+	conn_io new_conn_io;
+	new_conn_io.peer_addr = peer_addr;
+	new_conn_io.conn = conn;
+	memcpy(new_conn_io.cid, scid, scid_len);
+
+	lock_guard<mutex> lck(m_conn_mtx);
+	spdlog::info(LOG_SOCK_QUIC "Accepted connection.");
+	m_accepted_conns.emplace(string((char*)scid, scid_len), new_conn_io);
+
+	m_conn_cv.notify_one();
+
+	return conn;
+}
+
+void socket::quic::queue_accepted_conn(quiche_conn* conn)
+{
+	lock_guard<mutex> lck(m_conn_mtx);
+	m_queued_connections.push(conn);
+	m_conn_cv.notify_one();
+}
+
+bool socket::quic::has_conn(const string& cid)
+{
+	return m_accepted_conns.find(cid) != m_accepted_conns.end();
+}
+
+quiche_conn* socket::quic::find_conn(const string& cid)
+{
+	auto f = m_accepted_conns.find(cid);
+	if (f == m_accepted_conns.end())
+		return nullptr;
+
+	return f->second.conn;
+}
+
 void socket::quic::listen()
 {
-	//struct connections c;
-	//c.sock = sock;
-	//c.h = NULL;
-
-	//if (m_rcvth.valid())
-	//	return;
-	//spdlog::trace(LOG_SOCK_QUIC "listening.");
-	//m_rcvth = ::async(::launch::async, th_receive, &m_ctx, m_udp.id(), ref(m_closing), this);
-
-
 	change_state(state::listening);
 
 	m_rcvth = ::async(::launch::async, th_receive, this);
-	m_sndth = ::async(::launch::async, th_send, this);
 }
 
 shared_quic socket::quic::accept()
 {
-	raise_exception("accept not implemented");
-	return shared_from_this();
+	unique_lock<mutex> lck(m_conn_mtx);
+
+	while (!is_closing() && m_queued_connections.empty())
+	{
+		m_conn_cv.wait(lck);
+	}
+	
+	if (!is_closing())
+	{
+		quiche_conn* conn = m_queued_connections.front();
+		m_queued_connections.pop();
+		return make_shared<quic>(*this, conn);
+	}
+
+	raise_exception("accept()");
 }
 
 void socket::quic::raise_exception(const string &&place) const
 {
-	const int    udt_result = srt_getlasterror(nullptr);
-	const string message = srt_getlasterror_str();
-	spdlog::debug(LOG_SOCK_QUIC "0x{:X} {} ERROR {} {}", id(), place, udt_result, message);
-	throw socket::exception(place + ": " + message);
+	spdlog::debug(LOG_SOCK_QUIC "0x{:X} {} ERROR {} {}", id(), place);
+	throw socket::exception(string(place));
 }
 
 void socket::quic::raise_exception(const string &&place, const string &&reason) const
@@ -232,20 +437,14 @@ void socket::quic::raise_exception(const string &&place, const string &&reason) 
 	throw socket::exception(place + ": " + reason);
 }
 
-namespace detail {
-	int generate_socket_id()
-	{
-		random_device              rd;                // Will be used to obtain a seed for the random number engine
-		mt19937                    gen(rd());         // Standard mersenne_twister_engine seeded with rd()
-		uniform_int_distribution<> dis(1, INT32_MAX); // Same distribution as before, but explicit and without bias
-		return dis(gen);
-	}
-}
-
 shared_quic socket::quic::connect()
 {
-	int socketid = detail::generate_socket_id();
-	m_conn = quiche_connect(m_udp.host().c_str(), (const uint8_t*) &socketid, sizeof(socketid),
+	uint8_t scid[socket::quic::LOCAL_CONN_ID_LEN];
+	for (int i = 0; i < 4; ++i)
+	{
+		*reinterpret_cast<int*>(scid + 4 * i) = detail::generate_socket_id();
+	}
+	m_conn = quiche_connect(m_udp.host().c_str(), scid, sizeof(scid),
 		m_udp.dst_addr().get(), m_udp.dst_addr().size(),
 		m_quic_config);
 
@@ -263,7 +462,7 @@ shared_quic socket::quic::connect()
 size_t socket::quic::read(const mutable_buffer &buffer, int timeout_ms)
 {
 	if (!quiche_conn_is_established(conn()))
-		raise_exception("not connected");
+		raise_exception("read", "not connected");
 
 	uint64_t s = 0;
 	quiche_stream_iter* readable = quiche_conn_readable(conn());
@@ -294,23 +493,11 @@ size_t socket::quic::read(const mutable_buffer &buffer, int timeout_ms)
 int socket::quic::write(const const_buffer &buffer, int timeout_ms)
 {
 	if (!quiche_conn_is_established(conn()))
-		raise_exception("not connected");
+		raise_exception("write: not connected.");
 
-	//const uint8_t* app_proto;
-	//size_t app_proto_len;
-
-	//quiche_conn_application_proto(conn(), &app_proto, &app_proto_len);
-
-	//fprintf(stderr, "connection established: %.*s\n",
-	//	(int)app_proto_len, app_proto);
-
-	//const static uint8_t r[] = "GET /index.html\r\n";
-	//if (quiche_conn_stream_send(conn_io->conn, 4, r, sizeof(r), true) < 0) {
-	//	fprintf(stderr, "failed to send HTTP request\n");
-	//	return;
-	//}
-
-	//fprintf(stderr, "sent HTTP request\n");
+	if (quiche_conn_stream_send(conn(), 4, (uint8_t*) buffer.data(), buffer.size(), true) < 0) {
+		raise_exception("write: failed to send a stream.");
+	}
 
 	return 0;
 }
