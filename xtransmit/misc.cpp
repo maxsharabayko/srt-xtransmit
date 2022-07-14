@@ -94,7 +94,14 @@ shared_sock_t create_connection(const vector<UriParser>& parsed_urls, shared_soc
 		socket::quic* s = dynamic_cast<socket::quic*>(listening_sock.get());
 		const bool accept = !s->is_caller();
 		if (accept && !is_listening)
+		{
+			spdlog::warn(LOG_SC_CONN "Listening for incoming connections.");
 			s->listen();
+		}
+		else
+		{
+			spdlog::warn(LOG_SC_CONN "Connecting to remote {}.", accept);
+		}
 		shared_sock_t connection;
 
 		try {
@@ -102,6 +109,7 @@ shared_sock_t create_connection(const vector<UriParser>& parsed_urls, shared_soc
 		}
 		catch (const socket::exception& e)
 		{
+			spdlog::error(LOG_SC_CONN "{}.", e.what());
 			listening_sock.reset();
 			throw e;
 		}

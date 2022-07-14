@@ -440,18 +440,24 @@ void socket::quic::raise_exception(const string &&place, const string &&reason) 
 
 shared_quic socket::quic::connect()
 {
+	spdlog::warn(LOG_SOCK_QUIC "0x{:X} Forming scid.", id());
 	uint8_t scid[socket::quic::LOCAL_CONN_ID_LEN];
 	for (int i = 0; i < 4; ++i)
 	{
 		*reinterpret_cast<int*>(scid + 4 * i) = detail::generate_socket_id();
 	}
 
+	spdlog::warn(LOG_SOCK_QUIC "0x{:X} Retrieving local address.", id());
 	const netaddr_any local_addr = m_udp.src_addr();
+
+	spdlog::warn(LOG_SOCK_QUIC "0x{:X} Calling quiche_connect.", id());
 
 	m_conn = quiche_connect(m_udp.host().c_str(), scid, sizeof(scid),
 		local_addr.get(), local_addr.size(),
 		m_udp.dst_addr().get(), m_udp.dst_addr().size(),
 		m_quic_config);
+
+	spdlog::warn(LOG_SOCK_QUIC "0x{:X} quiche_connect returned smth.", id());
 
 	change_state(state::connecting);
 
@@ -460,6 +466,8 @@ shared_quic socket::quic::connect()
 
 	if (!wait_state(state::connected, 5s))
 		raise_exception("connection timeout");
+
+	spdlog::warn(LOG_SOCK_QUIC "0x{:X} connect state {}.", id(), get_state());
 
 	return shared_from_this();
 }

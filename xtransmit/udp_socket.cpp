@@ -55,6 +55,8 @@ socket::udp::udp(const UriParser &src_uri)
 	{
 		throw socket::exception("create_addr_inet failed");
 	}
+	spdlog::info(LOG_SOCK_UDP "SA requested '{}'.",
+		sa_requested.str());
 
 	const auto bind_me = [&](const netaddr_any& sa) {
 		const int       bind_res = ::bind(m_bind_socket, sa.get(), sa.size());
@@ -62,6 +64,8 @@ socket::udp::udp(const UriParser &src_uri)
 		{
 			throw socket::exception("UDP binding has failed");
 		}
+		spdlog::info(LOG_SOCK_UDP "udp://{}:{:d}: bound to '{}'.",
+			m_host, m_port, src_addr().str());
 	};
 
 	bool ip_bonded = false;
@@ -95,6 +99,7 @@ socket::udp::udp(const UriParser &src_uri)
 	if (m_host != "" || ip_bonded)
 	{
 		m_dst_addr = sa_requested;
+		bind_me(netaddr_any(sa_requested.family())); // default-bind
 	}
 	else
 	{
@@ -110,8 +115,11 @@ const netaddr_any socket::udp::src_addr() const
 	int sz = (int) sizeof ss;
 	if (getsockname(m_bind_socket, (sockaddr*) &ss, &sz) != 0)
 	{
+		spdlog::warn(LOG_SOCK_UDP "failed to get local address of socket.");
 		throw socket::exception("failed to get local address of socket");
 	};
+
+	spdlog::info(LOG_SOCK_UDP "getsockname returned {} bytes.", sz);
 
 	return netaddr_any((sockaddr*)&ss, sz);
 }
