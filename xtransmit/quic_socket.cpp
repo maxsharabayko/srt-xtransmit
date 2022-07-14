@@ -139,10 +139,10 @@ namespace detail {
 	}
 }
 
-
-static void th_receive(socket::quic* self)
+static void th_rcv_client(socket::quic* self)
 {
 	array<uint8_t, 1500> buffer;
+	const netaddr_any local_addr = self->udp_sock().src_addr();
 
 	while (!self->is_closing())
 	{
@@ -156,10 +156,68 @@ static void th_receive(socket::quic* self)
 			continue;
 		}
 
+		spdlog::debug(LOG_SOCK_QUIC "udp::read() received {} bytes.", read_len);
+
+		const netaddr_any& peer_addr = recv_res.second;
+		quiche_recv_info recv_info = {
+			(struct sockaddr*)peer_addr.get(),
+			recv_res.second.size(),
+			(struct sockaddr*) local_addr.get(),
+			local_addr.size()
+		};
+
+		quiche_conn* conn = self->conn();
+
+		const ssize_t done = quiche_conn_recv(conn, buffer.data(), read_len, &recv_info);
+		if (done < 0) {
+			spdlog::error(LOG_SOCK_QUIC "failed to process packet");
+			continue;
+		}
+
+		if (quiche_conn_is_closed(conn))
+		{
+			spdlog::warn(LOG_SOCK_QUIC "connection closed");
+			return;
+		}
+
+		if (self->get_state() == socket::quic::state::connecting && quiche_conn_is_established(conn))
+		{
+			const uint8_t* app_proto;
+			size_t app_proto_len;
+			quiche_conn_application_proto(conn, &app_proto, &app_proto_len);
+			spdlog::info(LOG_SOCK_QUIC "connection established: {:<{}}.", app_proto, app_proto_len);
+
+			self->change_state(socket::quic::state::connected);
+		}
+	}
+}
+
+
+static void th_receive(socket::quic* self)
+{
+	array<uint8_t, 1500> buffer;
+	const netaddr_any local_addr = self->udp_sock().src_addr();
+
+	while (!self->is_closing())
+	{
+		const auto recv_res = self->udp_recvfrom(mutable_buffer(buffer.data(), buffer.size()), -1);
+		const size_t read_len = recv_res.first;
+
+		// bites read
+		if (read_len == 0)
+		{
+			spdlog::debug(LOG_SOCK_QUIC "udp::read() returned 0 bytes (spurious read ready?). Retrying.");
+			continue;
+		}
+
+		spdlog::debug(LOG_SOCK_QUIC "udp::read() received {} bytes.", read_len);
+
 		const netaddr_any& peer_addr = recv_res.second;
 		quiche_recv_info recv_info = {
 			(struct sockaddr*) peer_addr.get(),
-			recv_res.second.size()
+			recv_res.second.size(),
+			(struct sockaddr*)local_addr.get(),
+			local_addr.size()
 		};
 
 		quiche_conn* conn = nullptr;
@@ -266,6 +324,7 @@ static void th_receive(socket::quic* self)
 		else
 		{
 			conn = self->conn();
+			spdlog::info(LOG_SOCK_QUIC "th_receive: got connection struct");
 		}
 
 		const ssize_t done = quiche_conn_recv(conn, buffer.data(), read_len, &recv_info);
@@ -309,8 +368,10 @@ static void th_send(socket::quic* self)
 			const ssize_t written = quiche_conn_send(self->conn(), buffer.data(), buffer.size(),
 				&send_info);
 
+			spdlog::info(LOG_SOCK_QUIC "th_send: quiche_conn_send return {}", written);
+
 			if (written == QUICHE_ERR_DONE) {
-				//spdlog::trace(LOG_SOCK_QUIC "(SNDTH) done waiting");
+				spdlog::trace(LOG_SOCK_QUIC "(SNDTH) done waiting");
 				break;
 			}
 

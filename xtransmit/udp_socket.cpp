@@ -153,6 +153,7 @@ size_t socket::udp::read(const mutable_buffer &buffer, int timeout_ms)
 #define NET_ERROR WSAGetLastError()
 #endif
 		const int err = NET_ERROR;
+		// 10054 WSAECONNRESET: Connection reset by peer (no remote peer).
 		if (err != EAGAIN && err != EINTR && err != ECONNREFUSED)
 			throw socket::exception("udp::read::recv");
 
