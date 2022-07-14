@@ -86,7 +86,7 @@ void run_pipe(shared_sock src, const config &cfg, const atomic_bool &force_break
 
 			if (bytes == 0)
 			{
-				spdlog::debug(LOG_SC_RECEIVE "sock::read() returned 0 bytes (spurious read ready?). Retrying.");
+				//spdlog::debug(LOG_SC_RECEIVE "sock::read() returned 0 bytes (spurious read ready?). Retrying.");
 				continue;
 			}
 

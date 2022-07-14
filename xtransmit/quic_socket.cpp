@@ -58,13 +58,17 @@ socket::quic::quic(const UriParser &src_uri)
 	if (src_uri.parameters().count(tlskeyopt))
 	{
 		const string keyfile = src_uri.parameters().at(tlskeyopt);
-		quiche_config_load_cert_chain_from_pem_file(m_quic_config, keyfile.c_str());
+		const int r = quiche_config_load_priv_key_from_pem_file(m_quic_config, keyfile.c_str());
+		if (r != 0)
+			raise_exception(tlskeyopt, fmt::format("failed with {}.", r));
 	}
 
 	if (src_uri.parameters().count(tlscertopt))
 	{
 		const string certfile = src_uri.parameters().at(tlscertopt);
-		quiche_config_load_priv_key_from_pem_file(m_quic_config, certfile.c_str());
+		const int r = quiche_config_load_cert_chain_from_pem_file(m_quic_config, certfile.c_str());
+		if (r != 0)
+			raise_exception(tlscertopt, fmt::format("failed with {}.", r));
 	}
 
 	if (src_uri.parameters().count(tlskeylog))
@@ -206,7 +210,7 @@ static void th_receive(socket::quic* self)
 		// bites read
 		if (read_len == 0)
 		{
-			spdlog::debug(LOG_SOCK_QUIC "udp::read() returned 0 bytes (spurious read ready?). Retrying.");
+			//spdlog::debug(LOG_SOCK_QUIC "udp::read() returned 0 bytes (spurious read ready?). Retrying.");
 			continue;
 		}
 
