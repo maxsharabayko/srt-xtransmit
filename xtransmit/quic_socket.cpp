@@ -196,6 +196,189 @@ static void th_rcv_client(socket::quic* self)
 	}
 }
 
+static void th_rcv_server(socket::quic* self)
+{
+	array<uint8_t, 1500> buffer;
+	const netaddr_any local_addr = self->udp_sock().src_addr();
+
+	while (!self->is_closing())
+	{
+		const auto recv_res = self->udp_recvfrom(mutable_buffer(buffer.data(), buffer.size()), -1);
+		const size_t read_len = recv_res.first;
+
+		// bites read
+		if (read_len == 0)
+		{
+			//spdlog::debug(LOG_SOCK_QUIC "udp::read() returned 0 bytes (spurious read ready?). Retrying.");
+			continue;
+		}
+
+		spdlog::debug(LOG_SOCK_QUIC "udp::read() received {} bytes.", read_len);
+
+		const netaddr_any& peer_addr = recv_res.second;
+		quiche_recv_info recv_info = {
+			(struct sockaddr*)peer_addr.get(),
+			recv_res.second.size(),
+			(struct sockaddr*)local_addr.get(),
+			local_addr.size()
+		};
+
+		quiche_conn* conn = nullptr;
+
+
+		// Process possible incoming connections.
+		uint8_t type;
+		uint32_t version;
+
+		uint8_t scid[QUICHE_MAX_CONN_ID_LEN];
+		size_t scid_len = sizeof(scid);
+
+		uint8_t dcid[QUICHE_MAX_CONN_ID_LEN];
+		size_t dcid_len = sizeof(dcid);
+
+		uint8_t odcid[QUICHE_MAX_CONN_ID_LEN];
+		size_t odcid_len = sizeof(odcid);
+
+		uint8_t token[MAX_TOKEN_LEN];
+		size_t token_len = sizeof(token);
+
+		int rc = quiche_header_info(buffer.data(), read_len, socket::quic::LOCAL_CONN_ID_LEN, &version,
+			&type, scid, &scid_len, dcid, &dcid_len,
+			token, &token_len);
+
+		conn = self->find_conn(string((char*)scid, scid_len));
+
+		if (conn == nullptr)
+		{
+			if (!quiche_version_is_supported(version))
+			{
+				spdlog::info(LOG_SOCK_QUIC "version negotiation");
+
+				uint8_t out[MAX_DATAGRAM_SIZE];
+				ssize_t written = quiche_negotiate_version(scid, scid_len,
+					dcid, dcid_len,
+					out, sizeof(out));
+
+				if (written < 0)
+				{
+					spdlog::error(LOG_SOCK_QUIC "Failed to create vneg packet: {}.", written);
+					continue;
+				}
+
+				ssize_t sent = self->udp_sock().sendto(peer_addr, const_buffer(out, written));
+				if (sent != written) {
+					spdlog::error(LOG_SOCK_QUIC "Failed to send vneg packet.");
+					continue;
+				}
+
+				continue;
+			}
+			else
+			{
+				spdlog::info(LOG_SOCK_QUIC "Negotiated version {}", version);
+			}
+
+			if (token_len == 0)
+			{
+				spdlog::info(LOG_SOCK_QUIC "stateless retry");
+
+				detail::mint_token(dcid, dcid_len, peer_addr, token, &token_len);
+
+				uint8_t scid[socket::quic::LOCAL_CONN_ID_LEN];
+				for (int i = 0; i < 4; ++i)
+				{
+					*reinterpret_cast<int*>(scid + 4 * i) = detail::generate_socket_id();
+				}
+
+				uint8_t out[MAX_DATAGRAM_SIZE];
+				ssize_t written = quiche_retry(scid, scid_len,
+					dcid, dcid_len,
+					scid, sizeof(scid),
+					token, token_len,
+					version, out, sizeof(out));
+
+				if (written < 0) {
+					spdlog::error(LOG_SOCK_QUIC "Failed to create retry packet: %zd\n",
+						written);
+					continue;
+				}
+
+				ssize_t sent = self->udp_sock().sendto(peer_addr, const_buffer(out, written));
+				if (sent != written) {
+					spdlog::error(LOG_SOCK_QUIC "Failed to send retry packet.");
+					continue;
+				}
+
+				continue;
+			}
+
+			if (!detail::validate_token(token, token_len, peer_addr, odcid, &odcid_len))
+			{
+				spdlog::error(LOG_SOCK_QUIC "invalid address validation token");
+				continue;
+			}
+
+			conn = self->create_accepted_conn(scid, scid_len, odcid, odcid_len, peer_addr);
+
+			if (conn == NULL) {
+				spdlog::error(LOG_SOCK_QUIC "Failed to create_accepted_conn().");
+				continue;
+			}
+		}
+		else
+		{
+			spdlog::trace(LOG_SOCK_QUIC "Found existing connection.");
+		}
+
+		spdlog::debug(LOG_SOCK_QUIC "Passing to quiche_conn_recv");
+		const ssize_t done = quiche_conn_recv(conn, buffer.data(), read_len, &recv_info);
+		if (done < 0) {
+			spdlog::error(LOG_SOCK_QUIC "failed to process packet");
+			continue;
+		}
+
+		while (true)
+		{
+			quiche_send_info send_info;
+			const ssize_t written = quiche_conn_send(conn, buffer.data(), buffer.size(),
+				&send_info);
+
+			spdlog::info(LOG_SOCK_QUIC "th_send: quiche_conn_send return {}", written);
+
+			if (written == QUICHE_ERR_DONE) {
+				spdlog::trace(LOG_SOCK_QUIC "(SNDTH) done waiting");
+				break;
+			}
+
+			if (written < 0) {
+				spdlog::error(LOG_SOCK_QUIC "Failed to create packet: {}", written);
+				return;
+			}
+
+			netaddr_any dst_addr((sockaddr*)&send_info.to, send_info.to_len);
+			ssize_t sent = self->udp_sock().sendto(dst_addr, const_buffer(buffer.data(), written));
+			if (sent != written) {
+				spdlog::error(LOG_SOCK_QUIC "failed to send");
+				return;
+			}
+
+			spdlog::trace(LOG_SOCK_QUIC "sent {} bytes.", sent);
+		}
+
+		if (quiche_conn_is_closed(conn))
+		{
+			spdlog::warn(LOG_SOCK_QUIC "connection closedt");
+			return;
+		}
+
+		if (/*self->get_state() == socket::quic::state::listening &&*/ quiche_conn_is_established(conn))
+		{
+			self->queue_accepted_conn(conn);
+		}
+	}
+
+	spdlog::debug(LOG_SOCK_QUIC "th_rcv_server done.");
+}
 
 static void th_receive(socket::quic* self)
 {
@@ -398,6 +581,8 @@ static void th_send(socket::quic* self)
 		spdlog::trace(LOG_SOCK_QUIC "(SNDTH) next send in {} ns", t);
 		this_thread::sleep_for(chrono::nanoseconds(t));
 	}
+
+	spdlog::debug(LOG_SOCK_QUIC "th_send done.");
 }
 
 
@@ -448,6 +633,7 @@ void socket::quic::queue_accepted_conn(quiche_conn* conn)
 {
 	lock_guard<mutex> lck(m_conn_mtx);
 	m_queued_connections.push(conn);
+	spdlog::info(LOG_SOCK_QUIC "Queued accepted connection.");
 	m_conn_cv.notify_one();
 }
 
@@ -469,7 +655,8 @@ void socket::quic::listen()
 {
 	change_state(state::listening);
 
-	m_rcvth = ::async(::launch::async, th_receive, this);
+	//m_rcvth = ::async(::launch::async, th_receive, this);
+	m_rcvth = ::async(::launch::async, th_rcv_server, this);
 }
 
 shared_quic socket::quic::accept()
@@ -526,7 +713,7 @@ shared_quic socket::quic::connect()
 
 	change_state(state::connecting);
 
-	m_rcvth = ::async(::launch::async, th_receive, this);
+	m_rcvth = ::async(::launch::async, th_rcv_client, this);
 	m_sndth = ::async(::launch::async, th_send, this);
 
 	if (!wait_state(state::connected, 5s))
