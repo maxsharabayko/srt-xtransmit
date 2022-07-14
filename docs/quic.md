@@ -2,6 +2,19 @@
 
 ## Build
 
+The Quiche project profides C API and library.
+The official readme section on building: [link](https://github.com/cloudflare/quiche#building).
+
+```shell
+cargo build --examples --features ffi
+```
+
+List all supported targets for RUST.
+```shell
+rustc --print target-list
+rustc --print target-features
+```
+
 
 ## Command-Line Syntax
 
