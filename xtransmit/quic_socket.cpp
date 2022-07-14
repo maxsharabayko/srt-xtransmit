@@ -344,7 +344,7 @@ socket::quic::quic(quic& other, quiche_conn* conn)
 	m_sndth = ::async(::launch::async, th_send, this);
 }
 
-quiche_conn* socket::quic::create_accepted_conn(uint8_t*           scid,
+quiche_conn* socket::quic::create_accepted_conn(uint8_t*  scid,
 									   size_t             scid_len,
 									   uint8_t*           odcid,
 									   size_t             odcid_len,
@@ -355,8 +355,9 @@ quiche_conn* socket::quic::create_accepted_conn(uint8_t*           scid,
 		spdlog::error(LOG_SOCK_QUIC "Failed to create a connection: SCID length too short.");
 	}
 
+	const netaddr_any local_addr = m_udp.src_addr();
 	quiche_conn* conn = quiche_accept(
-		scid, scid_len, odcid, odcid_len, peer_addr.get(), peer_addr.size(), m_quic_config);
+		scid, scid_len, odcid, odcid_len, local_addr.get(), local_addr.size(), peer_addr.get(), peer_addr.size(), m_quic_config);
 
 	if (conn == nullptr)
 	{
@@ -444,7 +445,11 @@ shared_quic socket::quic::connect()
 	{
 		*reinterpret_cast<int*>(scid + 4 * i) = detail::generate_socket_id();
 	}
+
+	const netaddr_any local_addr = m_udp.src_addr();
+
 	m_conn = quiche_connect(m_udp.host().c_str(), scid, sizeof(scid),
+		local_addr.get(), local_addr.size(),
 		m_udp.dst_addr().get(), m_udp.dst_addr().size(),
 		m_quic_config);
 

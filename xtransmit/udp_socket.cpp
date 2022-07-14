@@ -104,6 +104,18 @@ socket::udp::udp(const UriParser &src_uri)
 
 socket::udp::~udp() { closesocket(m_bind_socket); }
 
+const netaddr_any socket::udp::src_addr() const
+{
+	sockaddr_storage ss;
+	int sz = (int) sizeof ss;
+	if (getsockname(m_bind_socket, (sockaddr*) &ss, &sz) != 0)
+	{
+		throw socket::exception("failed to get local address of socket");
+	};
+
+	return netaddr_any((sockaddr*)&ss, sz);
+}
+
 size_t socket::udp::read(const mutable_buffer &buffer, int timeout_ms)
 {
 	while (!m_blocking_mode)

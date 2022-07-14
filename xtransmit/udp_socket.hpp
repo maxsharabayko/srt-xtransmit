@@ -39,6 +39,8 @@ public:
 	int port() const { return m_port; }
 	const netaddr_any& dst_addr() const { return m_dst_addr; }
 
+	const netaddr_any src_addr() const;
+
 public:
 	/**
 	 * @returns The number of bytes received.
