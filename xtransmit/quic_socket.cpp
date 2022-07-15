@@ -184,6 +184,7 @@ static void th_rcv_client(socket::quic* self)
 			return;
 		}
 
+		spdlog::debug(LOG_SOCK_QUIC "connection established? {}.",	quiche_conn_is_established(conn));
 		if (self->get_state() == socket::quic::state::connecting && quiche_conn_is_established(conn))
 		{
 			const uint8_t* app_proto;
@@ -555,10 +556,10 @@ static void th_send(socket::quic* self)
 			const ssize_t written = quiche_conn_send(self->conn(), buffer.data(), buffer.size(),
 				&send_info);
 
-			spdlog::info(LOG_SOCK_QUIC "th_send: quiche_conn_send return {}", written);
+			//spdlog::info(LOG_SOCK_QUIC "th_send: quiche_conn_send return {}", written);
 
 			if (written == QUICHE_ERR_DONE) {
-				spdlog::trace(LOG_SOCK_QUIC "(SNDTH) done waiting");
+				//spdlog::trace(LOG_SOCK_QUIC "(SNDTH) done waiting");
 				break;
 			}
 
@@ -574,7 +575,7 @@ static void th_send(socket::quic* self)
 				return;
 			}
 
-			spdlog::trace(LOG_SOCK_QUIC "send {} bytes.", sent);
+			spdlog::trace(LOG_SOCK_QUIC "sent {} bytes.", sent);
 		}
 
 		const uint64_t t =quiche_conn_timeout_as_nanos(self->conn());
@@ -680,7 +681,7 @@ shared_quic socket::quic::accept()
 
 void socket::quic::raise_exception(const string &&place) const
 {
-	spdlog::debug(LOG_SOCK_QUIC "0x{:X} {} ERROR {} {}", id(), place);
+	spdlog::debug(LOG_SOCK_QUIC "0x{:X} {} ERROR", id(), place);
 	throw socket::exception(string(place));
 }
 
@@ -760,8 +761,9 @@ int socket::quic::write(const const_buffer &buffer, int timeout_ms)
 	if (!quiche_conn_is_established(conn()))
 		raise_exception("write: not connected.");
 
-	if (quiche_conn_stream_send(conn(), 4, (uint8_t*) buffer.data(), buffer.size(), true) < 0) {
-		raise_exception("write: failed to send a stream.");
+	const ssize_t r = quiche_conn_stream_send(conn(), 4, (uint8_t*) buffer.data(), buffer.size(), true);
+	if (r < 0) {
+		raise_exception(fmt::format("write: failed to send a stream. Error {}.", r));
 	}
 
 	return 0;
