@@ -112,7 +112,7 @@ socket::udp::~udp() { closesocket(m_bind_socket); }
 const netaddr_any socket::udp::src_addr() const
 {
 	sockaddr_storage ss;
-	int sz = (int) sizeof ss;
+	socklen_t sz = (int) sizeof ss;
 	if (getsockname(m_bind_socket, (sockaddr*) &ss, &sz) != 0)
 	{
 		spdlog::warn(LOG_SOCK_UDP "failed to get local address of socket.");

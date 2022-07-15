@@ -165,9 +165,9 @@ static void th_rcv_client(socket::quic* self)
 		const netaddr_any& peer_addr = recv_res.second;
 		quiche_recv_info recv_info = {
 			(struct sockaddr*)peer_addr.get(),
-			recv_res.second.size(),
+			(socklen_t) recv_res.second.size(),
 			(struct sockaddr*) local_addr.get(),
-			local_addr.size()
+			(socklen_t) local_addr.size()
 		};
 
 		quiche_conn* conn = self->conn();
@@ -218,9 +218,9 @@ static void th_rcv_server(socket::quic* self)
 		const netaddr_any& peer_addr = recv_res.second;
 		quiche_recv_info recv_info = {
 			(struct sockaddr*)peer_addr.get(),
-			recv_res.second.size(),
+			(socklen_t) recv_res.second.size(),
 			(struct sockaddr*)local_addr.get(),
-			local_addr.size()
+			(socklen_t) local_addr.size()
 		};
 
 		quiche_conn* conn = nullptr;
@@ -402,9 +402,9 @@ static void th_receive(socket::quic* self)
 		const netaddr_any& peer_addr = recv_res.second;
 		quiche_recv_info recv_info = {
 			(struct sockaddr*) peer_addr.get(),
-			recv_res.second.size(),
+			(socklen_t) recv_res.second.size(),
 			(struct sockaddr*)local_addr.get(),
-			local_addr.size()
+			(socklen_t) local_addr.size()
 		};
 
 		quiche_conn* conn = nullptr;
