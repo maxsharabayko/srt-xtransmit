@@ -761,8 +761,8 @@ int socket::quic::write(const const_buffer &buffer, int timeout_ms)
 	if (!quiche_conn_is_established(conn()))
 		raise_exception("write: not connected.");
 
-	const ssize_t r = quiche_conn_stream_send(conn(), 4, (uint8_t*) buffer.data(), buffer.size(), true);
-	if (r < 0) {
+	const ssize_t r = quiche_conn_stream_send(conn(), 4, (uint8_t*) buffer.data(), buffer.size(), false);
+	if (r < 0 && r != QUICHE_ERR_DONE) {
 		raise_exception(fmt::format("write: failed to send a stream. Error {}.", r));
 	}
 
