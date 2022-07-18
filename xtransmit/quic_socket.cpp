@@ -84,10 +84,11 @@ socket::quic::~quic()
 	m_rcvth.wait();
 	m_sndth.wait();
 	quiche_conn_free(m_conn);
+	
 	while (!m_queued_connections.empty())
 	{
-		quiche_conn* conn = m_queued_connections.front();
-		quiche_conn_free(conn);
+	// 	quiche_conn* conn = m_queued_connections.front();
+	// 	quiche_conn_free(conn);
 		m_queued_connections.pop();
 	}
 
@@ -625,9 +626,27 @@ quiche_conn* socket::quic::create_accepted_conn(uint8_t*  scid,
 	spdlog::info(LOG_SOCK_QUIC "Accepted connection.");
 	m_accepted_conns.emplace(string((char*)scid, scid_len), new_conn_io);
 
-	m_conn_cv.notify_one();
+	m_pending_connections.emplace_back(make_shared<quic>(*this, conn));
+	spdlog::info(LOG_SOCK_QUIC "Queued pending connection.");
 
 	return conn;
+}
+
+void socket::quic::check_pending_conn()
+{
+	lock_guard<mutex> lck(m_conn_mtx);
+	if (m_pending_connections.empty())
+		return;
+
+	for (const auto& conn : m_pending_connections)
+	{
+		if (conn->get_state() == state::connected)
+		{
+			spdlog::info(LOG_SOCK_QUIC "Connection established.");
+			m_queued_connections.push(conn);
+			m_pending_connections.erase(conn);
+		}
+	}
 }
 
 void socket::quic::queue_accepted_conn(quiche_conn* conn)

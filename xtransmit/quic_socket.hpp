@@ -4,6 +4,7 @@
 #include <future>
 #include <string>
 #include <vector>
+#include <list>
 #include <map>
 #include <mutex>
 #include <unordered_map>
@@ -57,6 +58,8 @@ public:
 	quiche_conn* create_accepted_conn(uint8_t* scid, size_t scid_len,
 		uint8_t* odcid, size_t odcid_len,
 		const netaddr_any& peer_addr);
+
+	void check_pending_conn();
 
 	void queue_accepted_conn(quiche_conn* conn);
 
@@ -171,7 +174,8 @@ private:
 	mutable std::mutex m_conn_mtx;
 	std::condition_variable m_conn_cv;
 	std::unordered_map<std::string, conn_io> m_accepted_conns; // In the case of server.
-	std::queue<quiche_conn*> m_queued_connections; // Accepted connections queued to be accepted by the app.
+	std::list<std::shared_ptr<quic>> m_pending_connections; // Connections pending to be queued to be accepted by the app.
+	std::queue<std::shared_ptr<quic>> m_queued_connections; // Accepted connections queued to be accepted by the app.
 	quiche_config* m_quic_config;
 	std::future<void>   m_rcvth;
 	std::future<void>   m_sndth;
