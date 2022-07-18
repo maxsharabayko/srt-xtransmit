@@ -59,7 +59,7 @@ public:
 		uint8_t* odcid, size_t odcid_len,
 		const netaddr_any& peer_addr);
 
-	void check_pending_conn();
+	void check_pending_conns();
 
 	void queue_accepted_conn(quiche_conn* conn);
 

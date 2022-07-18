@@ -320,8 +320,8 @@ static void th_rcv_server(socket::quic* self)
 				continue;
 			}
 
+			// Create and put in m_pending_connections a new connection.
 			conn = self->create_accepted_conn(scid, scid_len, odcid, odcid_len, peer_addr);
-
 			if (conn == NULL) {
 				spdlog::error(LOG_SOCK_QUIC "Failed to create_accepted_conn().");
 				continue;
@@ -339,44 +339,13 @@ static void th_rcv_server(socket::quic* self)
 			continue;
 		}
 
-		while (true)
-		{
-			quiche_send_info send_info;
-			const ssize_t written = quiche_conn_send(conn, buffer.data(), buffer.size(),
-				&send_info);
-
-			spdlog::info(LOG_SOCK_QUIC "th_send: quiche_conn_send return {}", written);
-
-			if (written == QUICHE_ERR_DONE) {
-				spdlog::trace(LOG_SOCK_QUIC "(SNDTH) done waiting");
-				break;
-			}
-
-			if (written < 0) {
-				spdlog::error(LOG_SOCK_QUIC "Failed to create packet: {}", written);
-				return;
-			}
-
-			netaddr_any dst_addr((sockaddr*)&send_info.to, send_info.to_len);
-			ssize_t sent = self->udp_sock().sendto(dst_addr, const_buffer(buffer.data(), written));
-			if (sent != written) {
-				spdlog::error(LOG_SOCK_QUIC "failed to send");
-				return;
-			}
-
-			spdlog::trace(LOG_SOCK_QUIC "sent {} bytes.", sent);
-		}
-
 		if (quiche_conn_is_closed(conn))
 		{
 			spdlog::warn(LOG_SOCK_QUIC "connection closedt");
 			return;
 		}
 
-		if (/*self->get_state() == socket::quic::state::listening &&*/ quiche_conn_is_established(conn))
-		{
-			self->queue_accepted_conn(conn);
-		}
+		self->check_pending_conns();
 	}
 
 	spdlog::debug(LOG_SOCK_QUIC "th_rcv_server done.");
@@ -581,7 +550,7 @@ static void th_send(socket::quic* self)
 
 		const uint64_t t =quiche_conn_timeout_as_nanos(self->conn());
 		spdlog::trace(LOG_SOCK_QUIC "(SNDTH) next send in {} ns", t);
-		this_thread::sleep_for(chrono::nanoseconds(t));
+		this_thread::sleep_for(chrono::nanoseconds(std::min(t, 100000000ull))); // sleep no longer than 100ms
 	}
 
 	spdlog::debug(LOG_SOCK_QUIC "th_send done.");
@@ -592,7 +561,6 @@ socket::quic::quic(quic& other, quiche_conn* conn)
 	: m_udp(other.m_udp)
 	, m_conn(conn)
 {
-	m_state = state::connected;
 	m_sndth = ::async(::launch::async, th_send, this);
 }
 
@@ -623,7 +591,7 @@ quiche_conn* socket::quic::create_accepted_conn(uint8_t*  scid,
 	memcpy(new_conn_io.cid, scid, scid_len);
 
 	lock_guard<mutex> lck(m_conn_mtx);
-	spdlog::info(LOG_SOCK_QUIC "Accepted connection.");
+	spdlog::info(LOG_SOCK_QUIC "Accepted connection (quiche).");
 	m_accepted_conns.emplace(string((char*)scid, scid_len), new_conn_io);
 
 	m_pending_connections.emplace_back(make_shared<quic>(*this, conn));
@@ -632,29 +600,32 @@ quiche_conn* socket::quic::create_accepted_conn(uint8_t*  scid,
 	return conn;
 }
 
-void socket::quic::check_pending_conn()
+void socket::quic::check_pending_conns()
 {
 	lock_guard<mutex> lck(m_conn_mtx);
 	if (m_pending_connections.empty())
 		return;
 
-	for (const auto& conn : m_pending_connections)
-	{
-		if (conn->get_state() == state::connected)
+	auto it = m_pending_connections.cbegin();
+	while (it != m_pending_connections.cend())
+    {
+		auto& conn = *it;
+		if (!quiche_conn_is_established(conn->m_conn))
 		{
-			spdlog::info(LOG_SOCK_QUIC "Connection established.");
-			m_queued_connections.push(conn);
-			m_pending_connections.erase(conn);
+			++it;
+			continue;
 		}
-	}
-}
 
-void socket::quic::queue_accepted_conn(quiche_conn* conn)
-{
-	lock_guard<mutex> lck(m_conn_mtx);
-	m_queued_connections.push(conn);
-	spdlog::info(LOG_SOCK_QUIC "Queued accepted connection.");
-	m_conn_cv.notify_one();
+		const uint8_t* app_proto;
+		size_t app_proto_len;
+		quiche_conn_application_proto(conn->m_conn, &app_proto, &app_proto_len);
+		spdlog::info(LOG_SOCK_QUIC "connection established: {:<{}}.", app_proto, app_proto_len);
+
+		conn->change_state(socket::quic::state::connected);
+		spdlog::info(LOG_SOCK_QUIC "Connection established.");
+		m_queued_connections.push(conn);
+		it = m_pending_connections.erase(it);
+    }
 }
 
 bool socket::quic::has_conn(const string& cid)
@@ -690,9 +661,9 @@ shared_quic socket::quic::accept()
 	
 	if (!is_closing())
 	{
-		quiche_conn* conn = m_queued_connections.front();
+		auto conn = m_queued_connections.front();
 		m_queued_connections.pop();
-		return make_shared<quic>(*this, conn);
+		return conn;
 	}
 
 	raise_exception("accept()");
