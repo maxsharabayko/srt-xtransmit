@@ -126,7 +126,7 @@ private:
 		if (!std::getline(m_srccsv, line))
 			return steady_clock::time_point();
 		const double val = stod(line);
-		return m_start + microseconds(long long(val * 1000000));
+		return m_start + microseconds(static_cast<long long>(val * 1000000));
 	}
 
 private:
