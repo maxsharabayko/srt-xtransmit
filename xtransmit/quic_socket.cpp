@@ -71,11 +71,16 @@ socket::quic::quic(const UriParser &src_uri)
 			raise_exception(tlscertopt, fmt::format("failed with {}.", r));
 	}
 
-	if (src_uri.parameters().count(tlskeylog))
+	if (getenv("SSLKEYLOGFILE"))
 	{
-		//const string logfile = src_uri.parameters().at(tlskeylog);
 		quiche_config_log_keys(m_quic_config);
 	}
+
+	/*if (src_uri.parameters().count(tlskeylog))
+	{
+		const string logfile = src_uri.parameters().at(tlskeylog);
+		quiche_config_log_keys(m_quic_config);
+	}*/
 }
 
 socket::quic::~quic()
@@ -248,7 +253,7 @@ static void th_rcv_server(socket::quic* self)
 			&type, scid, &scid_len, dcid, &dcid_len,
 			token, &token_len);
 
-		conn = self->find_conn(string((char*)scid, scid_len));
+		conn = self->find_conn(string((char*)dcid, dcid_len));
 
 		if (conn == nullptr)
 		{
@@ -321,7 +326,7 @@ static void th_rcv_server(socket::quic* self)
 			}
 
 			// Create and put in m_pending_connections a new connection.
-			conn = self->create_accepted_conn(scid, scid_len, odcid, odcid_len, peer_addr);
+			conn = self->create_accepted_conn(dcid, dcid_len, odcid, odcid_len, peer_addr);
 			if (conn == NULL) {
 				spdlog::error(LOG_SOCK_QUIC "Failed to create_accepted_conn().");
 				continue;
@@ -608,7 +613,7 @@ void socket::quic::check_pending_conns()
 
 	auto it = m_pending_connections.cbegin();
 	while (it != m_pending_connections.cend())
-    {
+	{
 		auto& conn = *it;
 		if (!quiche_conn_is_established(conn->m_conn))
 		{
@@ -625,7 +630,7 @@ void socket::quic::check_pending_conns()
 		spdlog::info(LOG_SOCK_QUIC "Connection established.");
 		m_queued_connections.push(conn);
 		it = m_pending_connections.erase(it);
-    }
+	}
 }
 
 bool socket::quic::has_conn(const string& cid)
