@@ -70,8 +70,10 @@ socket::quic::quic(const UriParser &src_uri)
 		if (r != 0)
 			raise_exception(tlscertopt, fmt::format("failed with {}.", r));
 	}
-
-	if (getenv("SSLKEYLOGFILE"))
+	
+	const char* klog = getenv("SSLKEYLOGFILE");
+	spdlog::debug(LOG_SOCK_QUIC "SSL Key Logging {}.", klog ? klog : "NULL");
+	if (klog)
 	{
 		quiche_config_log_keys(m_quic_config);
 	}
@@ -630,6 +632,8 @@ void socket::quic::check_pending_conns()
 		spdlog::info(LOG_SOCK_QUIC "Connection established.");
 		m_queued_connections.push(conn);
 		it = m_pending_connections.erase(it);
+		
+		m_conn_cv.notify_one();
 	}
 }
 
