@@ -50,7 +50,6 @@ public:
 	static constexpr size_t LOCAL_CONN_ID_LEN = 16;
 
 	struct conn_io {
-		uint8_t cid[LOCAL_CONN_ID_LEN];
 		quiche_conn* conn;
 		netaddr_any peer_addr;
 	};
@@ -177,9 +176,10 @@ private:
 	std::list<std::shared_ptr<quic>> m_pending_connections; // Connections pending to be queued to be accepted by the app.
 	std::queue<std::shared_ptr<quic>> m_queued_connections; // Accepted connections queued to be accepted by the app.
 	quiche_config* m_quic_config;
-	std::future<void>   m_rcvth;
+	std::shared_future<void> m_rcvth;
 	std::future<void>   m_sndth;
 
+	std::string m_tls_logpath;
 	std::condition_variable m_state_cv;
 	mutable std::mutex m_state_mtx;
 	state m_state;

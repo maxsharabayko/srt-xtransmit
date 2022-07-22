@@ -19,6 +19,7 @@
 using namespace std;
 using namespace xtransmit;
 using shared_quic = shared_ptr<socket::quic>;
+using shared_udp = shared_ptr<socket::udp>;
 
 
 #define LOG_SOCK_QUIC "SOCKET::QUIC "
@@ -78,17 +79,17 @@ socket::quic::quic(const UriParser &src_uri)
 		quiche_config_log_keys(m_quic_config);
 	}
 
-	/*if (src_uri.parameters().count(tlskeylog))
+	if (src_uri.parameters().count(tlskeylog))
 	{
-		const string logfile = src_uri.parameters().at(tlskeylog);
+		m_tls_logpath = src_uri.parameters().at(tlskeylog);
 		quiche_config_log_keys(m_quic_config);
-	}*/
+	}
 }
 
 socket::quic::~quic()
 {
 	change_state(state::closing);
-	m_rcvth.wait();
+	//m_rcvth.wait();
 	m_sndth.wait();
 	quiche_conn_free(m_conn);
 	
@@ -149,70 +150,68 @@ namespace detail {
 		uniform_int_distribution<> dis(1, INT32_MAX); // Same distribution as before, but explicit and without bias
 		return dis(gen);
 	}
+
+	class shared_udp_rcv
+	{
+	public:
+		shared_udp_rcv()
+		{
+
+		}
+
+		~shared_udp_rcv()
+		{
+			m_is_closing = true;
+			m_rcvth.wait();
+		}
+
+		quiche_conn* find_conn(const string& cid) const
+		{
+			auto f = m_conns.find(cid);
+			if (f == m_conns.end())
+				return nullptr;
+
+			return f->second.conn;
+		}
+
+		bool has_conn(const string& cid) const
+		{
+			return m_conns.find(cid) != m_conns.end();
+		}
+
+		void add_conn(const string cid, socket::quic::conn_io conn)
+		{
+			assert(!has_conn(cid));
+			m_conns[cid] = conn;
+		}
+
+		socket::udp& udp_sock()
+		{
+			return *m_udp;
+		}
+
+		bool is_closing() const
+		{
+			return m_is_closing;
+		}
+
+	private:
+		future<void> m_rcvth;
+		shared_udp m_udp;
+		atomic_bool m_is_closing = false;
+		std::unordered_map<string, socket::quic::conn_io> m_conns; // A list of known connections.
+	};
 }
 
-static void th_rcv_client(socket::quic* self)
+static void th_rcv_server(detail::shared_udp_rcv* self)
 {
 	array<uint8_t, 1500> buffer;
-	const netaddr_any local_addr = self->udp_sock().src_addr();
+	socket::udp& udp = self->udp_sock();
+	const netaddr_any local_addr = udp.src_addr();
 
 	while (!self->is_closing())
 	{
-		const auto recv_res = self->udp_recvfrom(mutable_buffer(buffer.data(), buffer.size()), -1);
-		const size_t read_len = recv_res.first;
-
-		// bites read
-		if (read_len == 0)
-		{
-			spdlog::debug(LOG_SOCK_QUIC "udp::read() returned 0 bytes (spurious read ready?). Retrying.");
-			continue;
-		}
-
-		spdlog::debug(LOG_SOCK_QUIC "udp::read() received {} bytes.", read_len);
-
-		const netaddr_any& peer_addr = recv_res.second;
-		quiche_recv_info recv_info = {
-			(struct sockaddr*)peer_addr.get(),
-			(socklen_t) recv_res.second.size(),
-			(struct sockaddr*) local_addr.get(),
-			(socklen_t) local_addr.size()
-		};
-
-		quiche_conn* conn = self->conn();
-
-		const ssize_t done = quiche_conn_recv(conn, buffer.data(), read_len, &recv_info);
-		if (done < 0) {
-			spdlog::error(LOG_SOCK_QUIC "failed to process packet");
-			continue;
-		}
-
-		if (quiche_conn_is_closed(conn))
-		{
-			spdlog::warn(LOG_SOCK_QUIC "connection closed");
-			return;
-		}
-
-		spdlog::debug(LOG_SOCK_QUIC "connection established? {}.",	quiche_conn_is_established(conn));
-		if (self->get_state() == socket::quic::state::connecting && quiche_conn_is_established(conn))
-		{
-			const uint8_t* app_proto;
-			size_t app_proto_len;
-			quiche_conn_application_proto(conn, &app_proto, &app_proto_len);
-			spdlog::info(LOG_SOCK_QUIC "connection established: {:<{}}.", app_proto, app_proto_len);
-
-			self->change_state(socket::quic::state::connected);
-		}
-	}
-}
-
-static void th_rcv_server(socket::quic* self)
-{
-	array<uint8_t, 1500> buffer;
-	const netaddr_any local_addr = self->udp_sock().src_addr();
-
-	while (!self->is_closing())
-	{
-		const auto recv_res = self->udp_recvfrom(mutable_buffer(buffer.data(), buffer.size()), -1);
+		const auto recv_res = udp.recvfrom(mutable_buffer(buffer.data(), buffer.size()), -1);
 		const size_t read_len = recv_res.first;
 
 		// bites read
@@ -234,7 +233,6 @@ static void th_rcv_server(socket::quic* self)
 
 		quiche_conn* conn = nullptr;
 
-
 		// Process possible incoming connections.
 		uint8_t type;
 		uint32_t version;
@@ -251,10 +249,16 @@ static void th_rcv_server(socket::quic* self)
 		uint8_t token[MAX_TOKEN_LEN];
 		size_t token_len = sizeof(token);
 
-		int rc = quiche_header_info(buffer.data(), read_len, socket::quic::LOCAL_CONN_ID_LEN, &version,
+		const int rc = quiche_header_info(buffer.data(), read_len, socket::quic::LOCAL_CONN_ID_LEN, &version,
 			&type, scid, &scid_len, dcid, &dcid_len,
 			token, &token_len);
+		if (rc != 0)
+		{
+			spdlog::error(LOG_SOCK_QUIC "quiche_header_info() failed: {}", rc);
+			continue;
+		}
 
+		// TODO: avoid unnecessary copy of the dcid.
 		conn = self->find_conn(string((char*)dcid, dcid_len));
 
 		if (conn == nullptr)
@@ -356,6 +360,60 @@ static void th_rcv_server(socket::quic* self)
 	}
 
 	spdlog::debug(LOG_SOCK_QUIC "th_rcv_server done.");
+}
+
+static void th_rcv_client(socket::quic* self)
+{
+	array<uint8_t, 1500> buffer;
+	const netaddr_any local_addr = self->udp_sock().src_addr();
+
+	while (!self->is_closing())
+	{
+		const auto recv_res = self->udp_recvfrom(mutable_buffer(buffer.data(), buffer.size()), -1);
+		const size_t read_len = recv_res.first;
+
+		// bites read
+		if (read_len == 0)
+		{
+			spdlog::debug(LOG_SOCK_QUIC "udp::read() returned 0 bytes (spurious read ready?). Retrying.");
+			continue;
+		}
+
+		spdlog::debug(LOG_SOCK_QUIC "udp::read() received {} bytes.", read_len);
+
+		const netaddr_any& peer_addr = recv_res.second;
+		quiche_recv_info recv_info = {
+			(struct sockaddr*)peer_addr.get(),
+			(socklen_t) recv_res.second.size(),
+			(struct sockaddr*) local_addr.get(),
+			(socklen_t) local_addr.size()
+		};
+
+		quiche_conn* conn = self->conn();
+
+		const ssize_t done = quiche_conn_recv(conn, buffer.data(), read_len, &recv_info);
+		if (done < 0) {
+			spdlog::error(LOG_SOCK_QUIC "failed to process packet");
+			continue;
+		}
+
+		if (quiche_conn_is_closed(conn))
+		{
+			spdlog::warn(LOG_SOCK_QUIC "connection closed");
+			return;
+		}
+
+		spdlog::debug(LOG_SOCK_QUIC "connection established? {}.",	quiche_conn_is_established(conn));
+		if (self->get_state() == socket::quic::state::connecting && quiche_conn_is_established(conn))
+		{
+			const uint8_t* app_proto;
+			size_t app_proto_len;
+			quiche_conn_application_proto(conn, &app_proto, &app_proto_len);
+			spdlog::info(LOG_SOCK_QUIC "connection established: {:<{}}.", app_proto, app_proto_len);
+
+			self->change_state(socket::quic::state::connected);
+		}
+	}
 }
 
 static void th_receive(socket::quic* self)
@@ -558,6 +616,8 @@ static void th_send(socket::quic* self)
 		const uint64_t t =quiche_conn_timeout_as_nanos(self->conn());
 		spdlog::trace(LOG_SOCK_QUIC "(SNDTH) next send in {} ns", t);
 		this_thread::sleep_for(chrono::nanoseconds(std::min(t, 100000000ull))); // sleep no longer than 100ms
+
+		quiche_conn_on_timeout(self->conn());
 	}
 
 	spdlog::debug(LOG_SOCK_QUIC "th_send done.");
@@ -569,6 +629,7 @@ socket::quic::quic(quic& other, quiche_conn* conn)
 	, m_conn(conn)
 {
 	m_sndth = ::async(::launch::async, th_send, this);
+	m_rcvth = other.m_rcvth; // Share the same UDP receiving thread among all accepted QUIC connections.
 }
 
 quiche_conn* socket::quic::create_accepted_conn(uint8_t*  scid,
@@ -595,7 +656,6 @@ quiche_conn* socket::quic::create_accepted_conn(uint8_t*  scid,
 	conn_io new_conn_io;
 	new_conn_io.peer_addr = peer_addr;
 	new_conn_io.conn = conn;
-	memcpy(new_conn_io.cid, scid, scid_len);
 
 	lock_guard<mutex> lck(m_conn_mtx);
 	spdlog::info(LOG_SOCK_QUIC "Accepted connection (quiche).");
@@ -709,7 +769,15 @@ shared_quic socket::quic::connect()
 		m_udp.dst_addr().get(), m_udp.dst_addr().size(),
 		m_quic_config);
 
+	if (m_conn == nullptr)
+	{
+		spdlog::error(LOG_SOCK_QUIC "0x{:X} Failed to create a connection (quiche_connect).", id());
+		return shared_from_this();
+	}
+
 	spdlog::warn(LOG_SOCK_QUIC "0x{:X} quiche_connect returned smth.", id());
+	if (!m_tls_logpath.empty() && !quiche_conn_set_keylog_path(m_conn, m_tls_logpath.c_str()))
+		spdlog::error(LOG_SOCK_QUIC "Failed to set keylog path.");
 
 	change_state(state::connecting);
 
