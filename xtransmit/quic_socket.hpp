@@ -129,7 +129,7 @@ public:
 		return m_state == state::listening;
 	}
 
-	bool wait_state(state target_state, std::chrono::steady_clock::duration timeout)
+	bool wait_state(state target_state, const std::chrono::steady_clock::duration& timeout)
 	{
 		std::unique_lock<std::mutex> lck(m_state_mtx);
 
@@ -156,6 +156,12 @@ public:
 		m_state_cv.notify_all();
 	}
 
+	void wait_udp_send(const std::chrono::steady_clock::duration& timeout)
+	{
+		std::unique_lock<std::mutex> lck(m_rw_mtx);
+		m_quic_write.wait_for(lck, timeout);
+	}
+
 	const quiche_config* config() const { return m_quic_config; }
 
 public:
@@ -168,6 +174,7 @@ private:
 
 private:
 	socket::udp  m_udp;
+	shared_quic  m_parent; // An accepted socket as to keep the reference to the parent listener to maintain the UDP receiving thread.
 	quiche_conn* m_conn;
 
 	mutable std::mutex m_conn_mtx;
@@ -183,6 +190,10 @@ private:
 	std::condition_variable m_state_cv;
 	mutable std::mutex m_state_mtx;
 	state m_state;
+
+	mutable std::mutex m_rw_mtx;
+	std::condition_variable m_conn_read; // There is something to read from this socket.
+	std::condition_variable m_quic_write; // New data has been submitted. Wake up the UDP sending thread.
 
 };
 

@@ -38,7 +38,7 @@ socket::quic::quic(const UriParser &src_uri)
 
 	quiche_config_set_application_protos(m_quic_config,
 		(uint8_t*)"\x0ahq-interop\x05hq-29\x05hq-28\x05hq-27\x08http/0.9", 38);
-
+	//quiche_config_set_max_stream_window
 	// TODO: Enable setting these via URI query.
 	quiche_config_set_max_idle_timeout(m_quic_config, 5000);
 	quiche_config_set_max_recv_udp_payload_size(m_quic_config, MAX_DATAGRAM_SIZE);
@@ -46,9 +46,10 @@ socket::quic::quic(const UriParser &src_uri)
 	quiche_config_set_initial_max_data(m_quic_config, 10000000);
 	quiche_config_set_initial_max_stream_data_bidi_local(m_quic_config, 1000000);
 	quiche_config_set_initial_max_stream_data_uni(m_quic_config, 1000000);
-	quiche_config_set_initial_max_streams_bidi(m_quic_config, 100);
-	quiche_config_set_initial_max_streams_uni(m_quic_config, 100);
-	quiche_config_set_disable_active_migration(m_quic_config, true);
+	quiche_config_set_initial_max_streams_bidi(m_quic_config, 5000);
+	quiche_config_set_initial_max_streams_uni(m_quic_config, 5000);
+	// Client-side config
+	//quiche_config_set_disable_active_migration(m_quic_config, true);
 
 	quiche_config_set_cc_algorithm(m_quic_config, QUICHE_CC_RENO);
 
@@ -70,13 +71,6 @@ socket::quic::quic(const UriParser &src_uri)
 		const int r = quiche_config_load_cert_chain_from_pem_file(m_quic_config, certfile.c_str());
 		if (r != 0)
 			raise_exception(tlscertopt, fmt::format("failed with {}.", r));
-	}
-	
-	const char* klog = getenv("SSLKEYLOGFILE");
-	spdlog::debug(LOG_SOCK_QUIC "SSL Key Logging {}.", klog ? klog : "NULL");
-	if (klog)
-	{
-		quiche_config_log_keys(m_quic_config);
 	}
 
 	if (src_uri.parameters().count(tlskeylog))
@@ -155,6 +149,7 @@ namespace detail {
 	{
 	public:
 		shared_udp_rcv()
+			: m_is_closing(false)
 		{
 
 		}
@@ -198,12 +193,12 @@ namespace detail {
 	private:
 		future<void> m_rcvth;
 		shared_udp m_udp;
-		atomic_bool m_is_closing = false;
+		atomic_bool m_is_closing;
 		std::unordered_map<string, socket::quic::conn_io> m_conns; // A list of known connections.
 	};
 }
 
-static void th_rcv_server(detail::shared_udp_rcv* self)
+static void th_rcv_server(socket::quic* self)
 {
 	array<uint8_t, 1500> buffer;
 	socket::udp& udp = self->udp_sock();
@@ -594,7 +589,7 @@ static void th_send(socket::quic* self)
 			//spdlog::info(LOG_SOCK_QUIC "th_send: quiche_conn_send return {}", written);
 
 			if (written == QUICHE_ERR_DONE) {
-				//spdlog::trace(LOG_SOCK_QUIC "(SNDTH) done waiting");
+				spdlog::trace(LOG_SOCK_QUIC "(SNDTH) done waiting, nothing to send.");
 				break;
 			}
 
@@ -617,7 +612,8 @@ static void th_send(socket::quic* self)
 		spdlog::trace(LOG_SOCK_QUIC "(SNDTH) next send in {} ns", t);
 		this_thread::sleep_for(chrono::nanoseconds(std::min(t, 100000000ull))); // sleep no longer than 100ms
 
-		quiche_conn_on_timeout(self->conn());
+		self->wait_udp_send(chrono::nanoseconds(std::min(t, 100000000ull)));
+		//quiche_conn_on_timeout(self->conn());
 	}
 
 	spdlog::debug(LOG_SOCK_QUIC "th_send done.");
@@ -828,10 +824,34 @@ int socket::quic::write(const const_buffer &buffer, int timeout_ms)
 	if (!quiche_conn_is_established(conn()))
 		raise_exception("write: not connected.");
 
+	// The least significant bit (0x01) of the stream ID identifies the
+	// initiator of the stream (0 - client, 1 - server).
+
+	// The second least significant bit (0x02) of the stream ID
+	// distinguishes between bidirectional streams (with the bit set to 0)
+	// and unidirectional streams (with the bit set to 1).
+
+	// +======+==================================+
+	// | Bits | Stream Type                      |
+	// +======+==================================+
+	// | 0x00 | Client-Initiated, Bidirectional  |
+	// +------+----------------------------------+
+	// | 0x01 | Server-Initiated, Bidirectional  |
+	// +------+----------------------------------+
+	// | 0x02 | Client-Initiated, Unidirectional |
+	// +------+----------------------------------+
+	// | 0x03 | Server-Initiated, Unidirectional |
+	// +------+----------------------------------+
+
 	const ssize_t r = quiche_conn_stream_send(conn(), 4, (uint8_t*) buffer.data(), buffer.size(), false);
-	if (r < 0 && r != QUICHE_ERR_DONE) {
-		raise_exception(fmt::format("write: failed to send a stream. Error {}.", r));
+	if (r < 0) {
+		const auto cap = quiche_conn_stream_capacity(conn(), 4);
+		raise_exception(fmt::format("write: failed to send {} bytes. Stream cap {}. Error {}.", buffer.size(), cap, r));
 	}
+
+	spdlog::debug(LOG_SOCK_QUIC "Submitted {} bytes to quiche", r);
+	lock_guard<mutex> lck(m_rw_mtx);
+	m_quic_write.notify_one();
 
 	return 0;
 }
