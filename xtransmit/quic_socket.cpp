@@ -292,16 +292,16 @@ static void th_rcv_server(socket::quic* self)
 
 				detail::mint_token(dcid, dcid_len, peer_addr, token, &token_len);
 
-				uint8_t scid[socket::quic::LOCAL_CONN_ID_LEN];
+				uint8_t new_scid[socket::quic::LOCAL_CONN_ID_LEN];
 				for (int i = 0; i < 4; ++i)
 				{
-					*reinterpret_cast<int*>(scid + 4 * i) = detail::generate_socket_id();
+					*reinterpret_cast<int*>(new_scid + 4 * i) = detail::generate_socket_id();
 				}
 
 				uint8_t out[MAX_DATAGRAM_SIZE];
 				ssize_t written = quiche_retry(scid, scid_len,
 					dcid, dcid_len,
-					scid, sizeof(scid),
+					new_scid, sizeof(new_scid),
 					token, token_len,
 					version, out, sizeof(out));
 
