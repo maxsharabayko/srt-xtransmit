@@ -843,13 +843,13 @@ int socket::quic::write(const const_buffer &buffer, int timeout_ms)
 	// | 0x03 | Server-Initiated, Unidirectional |
 	// +------+----------------------------------+
 
+	const auto cap = quiche_conn_stream_capacity(conn(), 4);
 	const ssize_t r = quiche_conn_stream_send(conn(), 4, (uint8_t*) buffer.data(), buffer.size(), false);
 	if (r < 0) {
-		const auto cap = quiche_conn_stream_capacity(conn(), 4);
 		raise_exception(fmt::format("write: failed to send {} bytes. Stream cap {}. Error {}.", buffer.size(), cap, r));
 	}
 
-	spdlog::debug(LOG_SOCK_QUIC "Submitted {} bytes to quiche", r);
+	spdlog::debug(LOG_SOCK_QUIC "Submitted {} bytes to quiche. Stream cap {} bytes.", r, cap);
 	lock_guard<mutex> lck(m_rw_mtx);
 	m_quic_write.notify_one();
 
