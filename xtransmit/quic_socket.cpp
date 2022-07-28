@@ -82,6 +82,8 @@ socket::quic::quic(const UriParser &src_uri)
 	
 	quiche_config_set_initial_max_stream_data_uni(m_quic_config, 1000000);
 	quiche_config_set_initial_max_streams_bidi(m_quic_config, 5000);
+
+	quiche_config_enable_dgram(m_quic_config, true, 5000, 5000);
 	
 	//quiche_config_set_initial_max_streams_uni(m_quic_config, 5000);
 	// Client-side config
@@ -385,7 +387,6 @@ static void th_rcv_client(socket::quic* self)
 			return;
 		}
 
-		spdlog::debug(LOG_SOCK_QUIC "connection established? {}.",	quiche_conn_is_established(conn));
 		if (self->get_state() == socket::quic::state::connecting && quiche_conn_is_established(conn))
 		{
 			const uint8_t* app_proto;
@@ -775,6 +776,24 @@ size_t socket::quic::read(const mutable_buffer &buffer, int timeout_ms)
 	if (!quiche_conn_is_established(conn()))
 		raise_exception("read", "not connected");
 
+
+	unique_lock<mutex> lck(m_rw_mtx);
+	while (!is_closing())
+	{
+		const ssize_t bread = quiche_conn_dgram_recv(conn(), (uint8_t*)buffer.data(), buffer.size());
+		if (bread <= 0)
+		{
+			// TODO: Notify read-ready.
+			m_conn_read.wait_for(lck, chrono::milliseconds(20));
+			continue;
+		}
+
+		return bread;
+	}
+
+	return 0;
+
+#if 0
 	uint64_t s = 0;
 	quiche_stream_iter* readable = quiche_conn_readable(conn());
 
@@ -799,6 +818,7 @@ size_t socket::quic::read(const mutable_buffer &buffer, int timeout_ms)
 	quiche_stream_iter_free(readable);
 
 	return 0;
+#endif
 }
 
 int socket::quic::write(const const_buffer &buffer, int timeout_ms)
@@ -825,6 +845,12 @@ int socket::quic::write(const const_buffer &buffer, int timeout_ms)
 	// | 0x03 | Server-Initiated, Unidirectional |
 	// +------+----------------------------------+
 
+	const ssize_t bsent = quiche_conn_dgram_send(conn(), (uint8_t*)buffer.data(), buffer.size());
+	if (bsent < buffer.size()) {
+		raise_exception(fmt::format("write: failed to send {} bytes, send result {}.", buffer.size(), bsent));
+	}
+
+#if 0
 	const auto cap = quiche_conn_stream_capacity(conn(), 4);
 	const ssize_t r = quiche_conn_stream_send(conn(), 4, (uint8_t*) buffer.data(), buffer.size(), false);
 	if (r < 0) {
@@ -832,6 +858,7 @@ int socket::quic::write(const const_buffer &buffer, int timeout_ms)
 	}
 
 	spdlog::debug(LOG_SOCK_QUIC "Submitted {} bytes to quiche. Stream cap {} bytes.", r, cap);
+#endif
 	lock_guard<mutex> lck(m_rw_mtx);
 	flush_egress(conn(), udp_sock());
 

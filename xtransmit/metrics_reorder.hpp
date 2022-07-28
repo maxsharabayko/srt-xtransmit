@@ -49,7 +49,7 @@ public:
 			const uint64_t reorder_dist = m_stats.expected_seqno - pkt_seqno;
 			m_stats.reorder_dist = std::max(m_stats.reorder_dist, reorder_dist);
 
-			spdlog::warn("[METRICS] Detected reordered packet, seqno {}, expected {} (dist {})", pkt_seqno, m_stats.expected_seqno, reorder_dist);
+			spdlog::warn("[METRICS] Detected reordered packet: seqno {}, expected {} (dist {})", pkt_seqno, m_stats.expected_seqno, reorder_dist);
 		}
 	}
 
