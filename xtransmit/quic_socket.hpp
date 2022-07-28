@@ -184,7 +184,7 @@ private:
 	std::queue<std::shared_ptr<quic>> m_queued_connections; // Accepted connections queued to be accepted by the app.
 	quiche_config* m_quic_config;
 	std::shared_future<void> m_rcvth;
-	std::future<void>   m_sndth;
+	std::future<void>   m_th_timeout;
 
 	std::string m_tls_logpath;
 	std::condition_variable m_state_cv;

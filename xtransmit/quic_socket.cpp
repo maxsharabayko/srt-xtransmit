@@ -27,6 +27,38 @@ using shared_udp = shared_ptr<socket::udp>;
 constexpr size_t MAX_DATAGRAM_SIZE = 1350;
 constexpr size_t MAX_TOKEN_LEN = sizeof("quiche") - 1 + sizeof(struct sockaddr_storage) + QUICHE_MAX_CONN_ID_LEN;
 
+void flush_egress(quiche_conn* conn, socket::udp& udpsock) {
+	quiche_send_info send_info;
+	spdlog::trace("Flushing egress.");
+	array<uint8_t, MAX_DATAGRAM_SIZE> buffer;
+
+	while (1) {
+		const ssize_t written = quiche_conn_send(conn, buffer.data(), buffer.size(),
+			&send_info);
+
+		if (written == QUICHE_ERR_DONE) {
+			spdlog::trace(LOG_SOCK_QUIC "flush_egress done, nothing to send.");
+			break;
+		}
+
+		if (written < 0) {
+			spdlog::error(LOG_SOCK_QUIC "flush_egress: failed to create packet: {}", written);
+			return;
+		}
+
+		netaddr_any dst_addr((sockaddr*)&send_info.to, send_info.to_len);
+		ssize_t sent = udpsock.sendto(dst_addr, const_buffer(buffer.data(), written));
+		if (sent != written) {
+			spdlog::error(LOG_SOCK_QUIC "failed to send");
+			return;
+		}
+
+		spdlog::trace(LOG_SOCK_QUIC "sent {} bytes.", sent);
+	}
+
+	spdlog::trace("flush_egress done");
+}
+
 
 socket::quic::quic(const UriParser &src_uri)
 	: m_udp(src_uri)
@@ -45,9 +77,13 @@ socket::quic::quic(const UriParser &src_uri)
 	quiche_config_set_max_send_udp_payload_size(m_quic_config, MAX_DATAGRAM_SIZE);
 	quiche_config_set_initial_max_data(m_quic_config, 10000000);
 	quiche_config_set_initial_max_stream_data_bidi_local(m_quic_config, 1000000);
+	// Alloes receiving bidirectional streams from a remote peer:
+	quiche_config_set_initial_max_stream_data_bidi_remote(m_quic_config, 1000000);
+	
 	quiche_config_set_initial_max_stream_data_uni(m_quic_config, 1000000);
 	quiche_config_set_initial_max_streams_bidi(m_quic_config, 5000);
-	quiche_config_set_initial_max_streams_uni(m_quic_config, 5000);
+	
+	//quiche_config_set_initial_max_streams_uni(m_quic_config, 5000);
 	// Client-side config
 	//quiche_config_set_disable_active_migration(m_quic_config, true);
 
@@ -84,7 +120,8 @@ socket::quic::~quic()
 {
 	change_state(state::closing);
 	//m_rcvth.wait();
-	m_sndth.wait();
+	if (m_th_timeout.valid())
+		m_th_timeout.wait();
 	quiche_conn_free(m_conn);
 	
 	while (!m_queued_connections.empty())
@@ -144,58 +181,6 @@ namespace detail {
 		uniform_int_distribution<> dis(1, INT32_MAX); // Same distribution as before, but explicit and without bias
 		return dis(gen);
 	}
-
-	class shared_udp_rcv
-	{
-	public:
-		shared_udp_rcv()
-			: m_is_closing(false)
-		{
-
-		}
-
-		~shared_udp_rcv()
-		{
-			m_is_closing = true;
-			m_rcvth.wait();
-		}
-
-		quiche_conn* find_conn(const string& cid) const
-		{
-			auto f = m_conns.find(cid);
-			if (f == m_conns.end())
-				return nullptr;
-
-			return f->second.conn;
-		}
-
-		bool has_conn(const string& cid) const
-		{
-			return m_conns.find(cid) != m_conns.end();
-		}
-
-		void add_conn(const string cid, socket::quic::conn_io conn)
-		{
-			assert(!has_conn(cid));
-			m_conns[cid] = conn;
-		}
-
-		socket::udp& udp_sock()
-		{
-			return *m_udp;
-		}
-
-		bool is_closing() const
-		{
-			return m_is_closing;
-		}
-
-	private:
-		future<void> m_rcvth;
-		shared_udp m_udp;
-		atomic_bool m_is_closing;
-		std::unordered_map<string, socket::quic::conn_io> m_conns; // A list of known connections.
-	};
 }
 
 static void th_rcv_server(socket::quic* self)
@@ -347,9 +332,11 @@ static void th_rcv_server(socket::quic* self)
 
 		if (quiche_conn_is_closed(conn))
 		{
-			spdlog::warn(LOG_SOCK_QUIC "connection closedt");
+			spdlog::warn(LOG_SOCK_QUIC "connection closed.");
 			return;
 		}
+
+		flush_egress(conn, self->udp_sock());
 
 		self->check_pending_conns();
 	}
@@ -408,6 +395,8 @@ static void th_rcv_client(socket::quic* self)
 
 			self->change_state(socket::quic::state::connected);
 		}
+
+		flush_egress(conn, self->udp_sock());
 	}
 }
 
@@ -573,50 +562,39 @@ static void th_receive(socket::quic* self)
 	}
 }
 
-static void th_send(socket::quic* self)
+static void th_timeout(socket::quic* self)
 {
-	array<uint8_t, MAX_DATAGRAM_SIZE> buffer;
-
-	quiche_send_info send_info;
-
 	while (!self->is_closing())
 	{
-		while (!self->is_closing()) {
+		const uint64_t t_ms =quiche_conn_timeout_as_millis(self->conn());
+		//spdlog::trace(LOG_SOCK_QUIC "Conn timeout in {} ms", t_ms);
 
-			const ssize_t written = quiche_conn_send(self->conn(), buffer.data(), buffer.size(),
-				&send_info);
-
-			//spdlog::info(LOG_SOCK_QUIC "th_send: quiche_conn_send return {}", written);
-
-			if (written == QUICHE_ERR_DONE) {
-				spdlog::trace(LOG_SOCK_QUIC "(SNDTH) done waiting, nothing to send.");
-				break;
-			}
-
-			if (written < 0) {
-				spdlog::error(LOG_SOCK_QUIC "Failed to create packet: {}", written);
-				return;
-			}
-
-			netaddr_any dst_addr((sockaddr*)&send_info.to, send_info.to_len);
-			ssize_t sent = self->udp_sock().sendto(dst_addr, const_buffer(buffer.data(), written));
-			if (sent != written) {
-				spdlog::error(LOG_SOCK_QUIC "failed to send");
-				return;
-			}
-
-			spdlog::trace(LOG_SOCK_QUIC "sent {} bytes.", sent);
+		if (t_ms != 0)
+		{
+			self->wait_udp_send(chrono::milliseconds(t_ms));
+			continue;
 		}
 
-		const uint64_t t =quiche_conn_timeout_as_nanos(self->conn());
-		spdlog::trace(LOG_SOCK_QUIC "(SNDTH) next send in {} ns", t);
-		this_thread::sleep_for(chrono::nanoseconds(std::min(t, 100000000ull))); // sleep no longer than 100ms
+		self->change_state(socket::quic::state::closing);
+		quiche_conn_on_timeout(self->conn());
+		flush_egress(self->conn(), self->udp_sock());
 
-		self->wait_udp_send(chrono::nanoseconds(std::min(t, 100000000ull)));
-		//quiche_conn_on_timeout(self->conn());
+		if (quiche_conn_is_closed(self->conn()))
+		{
+			quiche_stats stats;
+
+			quiche_conn_stats(self->conn(), &stats);
+			spdlog::info("Connection closed, recv={} sent={} lost={} rtt={} ns cwnd={}",
+				stats.recv, stats.sent, stats.lost, stats.paths[0].rtt, stats.paths[0].cwnd);
+
+			self->change_state(socket::quic::state::closed);
+
+			spdlog::debug(LOG_SOCK_QUIC "th_timeout returns on closing.");
+			return;
+		}
 	}
 
-	spdlog::debug(LOG_SOCK_QUIC "th_send done.");
+	spdlog::debug(LOG_SOCK_QUIC "th_timeout done.");
 }
 
 
@@ -624,7 +602,7 @@ socket::quic::quic(quic& other, quiche_conn* conn)
 	: m_udp(other.m_udp)
 	, m_conn(conn)
 {
-	m_sndth = ::async(::launch::async, th_send, this);
+	m_th_timeout = ::async(::launch::async, th_timeout, this);
 	m_rcvth = other.m_rcvth; // Share the same UDP receiving thread among all accepted QUIC connections.
 }
 
@@ -778,10 +756,14 @@ shared_quic socket::quic::connect()
 	change_state(state::connecting);
 
 	m_rcvth = ::async(::launch::async, th_rcv_client, this);
-	m_sndth = ::async(::launch::async, th_send, this);
+
+	flush_egress(m_conn, m_udp);
+	m_th_timeout = ::async(::launch::async, th_timeout, this);
 
 	if (!wait_state(state::connected, 5s))
 		raise_exception("connection timeout");
+
+	// Start connection idle timeout thread.
 
 	spdlog::warn(LOG_SOCK_QUIC "0x{:X} connect state {}.", id(), get_state());
 
@@ -851,7 +833,7 @@ int socket::quic::write(const const_buffer &buffer, int timeout_ms)
 
 	spdlog::debug(LOG_SOCK_QUIC "Submitted {} bytes to quiche. Stream cap {} bytes.", r, cap);
 	lock_guard<mutex> lck(m_rw_mtx);
-	m_quic_write.notify_one();
+	flush_egress(conn(), udp_sock());
 
 	return 0;
 }
