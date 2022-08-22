@@ -6,7 +6,7 @@ jobs:
     strategy:
       matrix:
         compiler: [g++, g++-4.8]
-        os: [ubuntu-18.04]
+        os: [ubuntu-20.04]
 
     runs-on: ${{ matrix.os }}
 
