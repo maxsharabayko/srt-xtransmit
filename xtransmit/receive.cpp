@@ -57,6 +57,40 @@ void trace_message(const size_t bytes, const vector<char> &buffer, SOCKET conn_i
 }
 
 
+/// @brief 
+/// @param metrics_file 
+/// @param validator 
+/// @param mtx mutex to protect access to validator
+/// @param freq 
+/// @param force_break 
+void metrics_writing_loop(ofstream& metrics_file, metrics::validator& validator, mutex& mtx, const chrono::milliseconds& freq, const atomic_bool& force_break)
+{
+	metrics_file << validator.stats_csv(true);
+
+	auto stat_time = steady_clock::now();
+	while (!force_break)
+	{
+		const auto tnow = steady_clock::now();
+		if (tnow >= stat_time)
+		{
+			if (metrics_file)
+			{
+				lock_guard<mutex> lck(mtx);
+				metrics_file << validator.stats_csv(false);
+			}
+			else
+			{
+				lock_guard<mutex> lck(mtx);
+				const auto stats_str = validator.stats();
+				spdlog::info(LOG_SC_RECEIVE "{}", stats_str);
+			}
+			stat_time += freq;
+		}
+
+		std::this_thread::sleep_until(stat_time);
+	}
+}
+
 void run_pipe(shared_sock src, const config &cfg, const atomic_bool &force_break)
 {
 	socket::isocket &sock = *src.get();
@@ -64,7 +98,9 @@ void run_pipe(shared_sock src, const config &cfg, const atomic_bool &force_break
 	vector<char> buffer(cfg.message_size);
 	metrics::validator validator;
 
-	auto stat_time = steady_clock::now();
+	atomic_bool metrics_stop = false;
+	mutex metrics_mtx;
+	future<void> metrics_th;
 	ofstream metrics_file;
 	if (cfg.enable_metrics && !cfg.metrics_file.empty() && cfg.metrics_freq_ms > 0)
 	{
@@ -75,7 +111,7 @@ void run_pipe(shared_sock src, const config &cfg, const atomic_bool &force_break
 			return;
 		}
 
-		metrics_file << validator.stats_csv(true);
+		metrics_th = async(::launch::async, metrics_writing_loop, ref(metrics_file), ref(validator), ref(metrics_mtx), chrono::milliseconds(cfg.metrics_freq_ms), ref(metrics_stop));
 	}
 
 	try
@@ -93,7 +129,10 @@ void run_pipe(shared_sock src, const config &cfg, const atomic_bool &force_break
 			if (cfg.print_notifications)
 				trace_message(bytes, buffer, sock.id());
 			if (cfg.enable_metrics)
+			{
+				lock_guard<mutex> lck(metrics_mtx);
 				validator.validate_packet(buffer);
+			}
 
 			if (cfg.send_reply)
 			{
@@ -106,27 +145,16 @@ void run_pipe(shared_sock src, const config &cfg, const atomic_bool &force_break
 
 			if (!cfg.enable_metrics)
 				continue;
-
-			const auto tnow = steady_clock::now();
-			if (tnow > (stat_time + chrono::milliseconds(cfg.metrics_freq_ms)))
-			{
-				if (metrics_file)
-				{
-					metrics_file << validator.stats_csv(false);
-				}
-				else
-				{
-					const auto stats_str = validator.stats();
-					spdlog::info(LOG_SC_RECEIVE "{}", stats_str);
-				}
-				stat_time = tnow;
-			}
 		}
 	}
 	catch (const socket::exception &e)
 	{
 		spdlog::warn(LOG_SC_RECEIVE "{}", e.what());
 	}
+
+	metrics_stop = true;
+	if (metrics_th.valid())
+		metrics_th.get();
 
 	if (force_break)
 	{
