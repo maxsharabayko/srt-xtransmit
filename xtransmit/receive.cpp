@@ -98,7 +98,7 @@ void run_pipe(shared_sock src, const config &cfg, const atomic_bool &force_break
 	vector<char> buffer(cfg.message_size);
 	metrics::validator validator;
 
-	atomic_bool metrics_stop = false;
+	atomic_bool metrics_stop(false);
 	mutex metrics_mtx;
 	future<void> metrics_th;
 	ofstream metrics_file;
