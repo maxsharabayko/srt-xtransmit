@@ -74,7 +74,7 @@ void metrics_writing_loop(ofstream&                   metrics_file,
 		const auto tnow = steady_clock::now();
 		if (tnow >= stat_time)
 		{
-			if (metrics_file)
+			if (metrics_file.is_open())
 			{
 				lock_guard<mutex> lck(mtx);
 				metrics_file << validator.stats_csv(false);
