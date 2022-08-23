@@ -31,7 +31,7 @@ using shared_sock = std::shared_ptr<socket::isocket>;
 
 #define LOG_SC_RECEIVE "RECEIVE "
 
-void trace_message(const size_t bytes, const vector<char> &buffer, SOCKET conn_id)
+void trace_message(const size_t bytes, const vector<char>& buffer, SOCKET conn_id)
 {
 	::cout << "RECEIVED MESSAGE length " << bytes << " on conn ID " << conn_id;
 
@@ -49,24 +49,25 @@ void trace_message(const size_t bytes, const vector<char> &buffer, SOCKET conn_i
 #endif
 	::cout << endl;
 
-	//CHandShake hs;
-	//if (hs.load_from(buffer.data(), buffer.size()) < 0)
+	// CHandShake hs;
+	// if (hs.load_from(buffer.data(), buffer.size()) < 0)
 	//	return;
 	//
 	//::cout << "SRT HS: " << hs.show() << endl;
 }
 
-
-/// @brief 
-/// @param metrics_file 
-/// @param validator 
+/// @brief
+/// @param metrics_file
+/// @param validator
 /// @param mtx mutex to protect access to validator
-/// @param freq 
-/// @param force_break 
-void metrics_writing_loop(ofstream& metrics_file, metrics::validator& validator, mutex& mtx, const chrono::milliseconds& freq, const atomic_bool& force_break)
+/// @param freq
+/// @param force_break
+void metrics_writing_loop(ofstream&                   metrics_file,
+						  metrics::validator&         validator,
+						  mutex&                      mtx,
+						  const chrono::milliseconds& freq,
+						  const atomic_bool&          force_break)
 {
-	metrics_file << validator.stats_csv(true);
-
 	auto stat_time = steady_clock::now();
 	while (!force_break)
 	{
@@ -81,7 +82,7 @@ void metrics_writing_loop(ofstream& metrics_file, metrics::validator& validator,
 			else
 			{
 				lock_guard<mutex> lck(mtx);
-				const auto stats_str = validator.stats();
+				const auto        stats_str = validator.stats();
 				spdlog::info(LOG_SC_RECEIVE "{}", stats_str);
 			}
 			stat_time += freq;
@@ -91,27 +92,37 @@ void metrics_writing_loop(ofstream& metrics_file, metrics::validator& validator,
 	}
 }
 
-void run_pipe(shared_sock src, const config &cfg, const atomic_bool &force_break)
+void run_pipe(shared_sock src, const config& cfg, const atomic_bool& force_break)
 {
-	socket::isocket &sock = *src.get();
+	socket::isocket& sock = *src.get();
 
-	vector<char> buffer(cfg.message_size);
+	vector<char>       buffer(cfg.message_size);
 	metrics::validator validator;
 
-	atomic_bool metrics_stop(false);
-	mutex metrics_mtx;
+	atomic_bool  metrics_stop(false);
+	mutex        metrics_mtx;
 	future<void> metrics_th;
-	ofstream metrics_file;
-	if (cfg.enable_metrics && !cfg.metrics_file.empty() && cfg.metrics_freq_ms > 0)
+	ofstream     metrics_file;
+	if (cfg.enable_metrics && cfg.metrics_freq_ms > 0)
 	{
-		metrics_file.open(cfg.metrics_file, std::ofstream::out);
-		if (!metrics_file)
+		if (!cfg.metrics_file.empty())
 		{
-			spdlog::error(LOG_SC_RECEIVE "Failed to open metrics file {} for output", cfg.metrics_file);
-			return;
+			metrics_file.open(cfg.metrics_file, std::ofstream::out);
+			if (!metrics_file)
+			{
+				spdlog::error(LOG_SC_RECEIVE "Failed to open metrics file {} for output", cfg.metrics_file);
+				return;
+			}
+			metrics_file << validator.stats_csv(true);
 		}
 
-		metrics_th = async(::launch::async, metrics_writing_loop, ref(metrics_file), ref(validator), ref(metrics_mtx), chrono::milliseconds(cfg.metrics_freq_ms), ref(metrics_stop));
+		metrics_th = async(::launch::async,
+						   metrics_writing_loop,
+						   ref(metrics_file),
+						   ref(validator),
+						   ref(metrics_mtx),
+						   chrono::milliseconds(cfg.metrics_freq_ms),
+						   ref(metrics_stop));
 	}
 
 	try
@@ -147,7 +158,7 @@ void run_pipe(shared_sock src, const config &cfg, const atomic_bool &force_break
 				continue;
 		}
 	}
-	catch (const socket::exception &e)
+	catch (const socket::exception& e)
 	{
 		spdlog::warn(LOG_SC_RECEIVE "{}", e.what());
 	}
@@ -162,7 +173,9 @@ void run_pipe(shared_sock src, const config &cfg, const atomic_bool &force_break
 	}
 }
 
-void xtransmit::receive::run(const std::vector<std::string>& src_urls, const config &cfg, const atomic_bool &force_break)
+void xtransmit::receive::run(const std::vector<std::string>& src_urls,
+							 const config&                   cfg,
+							 const atomic_bool&              force_break)
 {
 	using namespace std::placeholders;
 	processing_fn_t process_fn = std::bind(run_pipe, _1, cfg, _2);
@@ -171,7 +184,7 @@ void xtransmit::receive::run(const std::vector<std::string>& src_urls, const con
 
 CLI::App* xtransmit::receive::add_subcommand(CLI::App& app, config& cfg, std::vector<std::string>& src_urls)
 {
-	const map<string, int> to_ms{ {"s", 1000}, {"ms", 1} };
+	const map<string, int> to_ms{{"s", 1000}, {"ms", 1}};
 
 	CLI::App* sc_receive = app.add_subcommand("receive", "Receive data (SRT, UDP)")->fallthrough();
 	sc_receive->add_option("-i,--input,src", src_urls, "Source URI");
@@ -189,6 +202,3 @@ CLI::App* xtransmit::receive::add_subcommand(CLI::App& app, config& cfg, std::ve
 
 	return sc_receive;
 }
-
-
-
