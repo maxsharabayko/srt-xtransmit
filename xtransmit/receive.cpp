@@ -31,7 +31,7 @@ using shared_sock = std::shared_ptr<socket::isocket>;
 
 #define LOG_SC_RECEIVE "RECEIVE "
 
-void trace_message(const size_t bytes, const vector<char> &buffer, SOCKET conn_id)
+void trace_message(const size_t bytes, const vector<char>& buffer, SOCKET conn_id)
 {
 	::cout << "RECEIVED MESSAGE length " << bytes << " on conn ID " << conn_id;
 
@@ -49,33 +49,80 @@ void trace_message(const size_t bytes, const vector<char> &buffer, SOCKET conn_i
 #endif
 	::cout << endl;
 
-	//CHandShake hs;
-	//if (hs.load_from(buffer.data(), buffer.size()) < 0)
+	// CHandShake hs;
+	// if (hs.load_from(buffer.data(), buffer.size()) < 0)
 	//	return;
 	//
 	//::cout << "SRT HS: " << hs.show() << endl;
 }
 
-
-void run_pipe(shared_sock src, const config &cfg, const atomic_bool &force_break)
+/// @brief
+/// @param metrics_file
+/// @param validator
+/// @param mtx mutex to protect access to validator
+/// @param freq
+/// @param force_break
+void metrics_writing_loop(ofstream&                   metrics_file,
+						  metrics::validator&         validator,
+						  mutex&                      mtx,
+						  const chrono::milliseconds& freq,
+						  const atomic_bool&          force_break)
 {
-	socket::isocket &sock = *src.get();
-
-	vector<char> buffer(cfg.message_size);
-	metrics::validator validator;
-
 	auto stat_time = steady_clock::now();
-	ofstream metrics_file;
-	if (cfg.enable_metrics && !cfg.metrics_file.empty() && cfg.metrics_freq_ms > 0)
+	while (!force_break)
 	{
-		metrics_file.open(cfg.metrics_file, std::ofstream::out);
-		if (!metrics_file)
+		const auto tnow = steady_clock::now();
+		if (tnow >= stat_time)
 		{
-			spdlog::error(LOG_SC_RECEIVE "Failed to open metrics file {} for output", cfg.metrics_file);
-			return;
+			if (metrics_file.is_open())
+			{
+				lock_guard<mutex> lck(mtx);
+				metrics_file << validator.stats_csv(false);
+			}
+			else
+			{
+				lock_guard<mutex> lck(mtx);
+				const auto        stats_str = validator.stats();
+				spdlog::info(LOG_SC_RECEIVE "{}", stats_str);
+			}
+			stat_time += freq;
 		}
 
-		metrics_file << validator.stats_csv(true);
+		std::this_thread::sleep_until(stat_time);
+	}
+}
+
+void run_pipe(shared_sock src, const config& cfg, const atomic_bool& force_break)
+{
+	socket::isocket& sock = *src.get();
+
+	vector<char>       buffer(cfg.message_size);
+	metrics::validator validator;
+
+	atomic_bool  metrics_stop(false);
+	mutex        metrics_mtx;
+	future<void> metrics_th;
+	ofstream     metrics_file;
+	if (cfg.enable_metrics && cfg.metrics_freq_ms > 0)
+	{
+		if (!cfg.metrics_file.empty())
+		{
+			metrics_file.open(cfg.metrics_file, std::ofstream::out);
+			if (!metrics_file)
+			{
+				spdlog::error(LOG_SC_RECEIVE "Failed to open metrics file {} for output", cfg.metrics_file);
+				return;
+			}
+			metrics_file << validator.stats_csv(true);
+		}
+
+		metrics_th = async(::launch::async,
+						   metrics_writing_loop,
+						   ref(metrics_file),
+						   ref(validator),
+						   ref(metrics_mtx),
+						   chrono::milliseconds(cfg.metrics_freq_ms),
+						   ref(metrics_stop));
 	}
 
 	try
@@ -93,7 +140,10 @@ void run_pipe(shared_sock src, const config &cfg, const atomic_bool &force_break
 			if (cfg.print_notifications)
 				trace_message(bytes, buffer, sock.id());
 			if (cfg.enable_metrics)
+			{
+				lock_guard<mutex> lck(metrics_mtx);
 				validator.validate_packet(buffer);
+			}
 
 			if (cfg.send_reply)
 			{
@@ -106,27 +156,16 @@ void run_pipe(shared_sock src, const config &cfg, const atomic_bool &force_break
 
 			if (!cfg.enable_metrics)
 				continue;
-
-			const auto tnow = steady_clock::now();
-			if (tnow > (stat_time + chrono::milliseconds(cfg.metrics_freq_ms)))
-			{
-				if (metrics_file)
-				{
-					metrics_file << validator.stats_csv(false);
-				}
-				else
-				{
-					const auto stats_str = validator.stats();
-					spdlog::info(LOG_SC_RECEIVE "{}", stats_str);
-				}
-				stat_time = tnow;
-			}
 		}
 	}
-	catch (const socket::exception &e)
+	catch (const socket::exception& e)
 	{
 		spdlog::warn(LOG_SC_RECEIVE "{}", e.what());
 	}
+
+	metrics_stop = true;
+	if (metrics_th.valid())
+		metrics_th.get();
 
 	if (force_break)
 	{
@@ -134,7 +173,9 @@ void run_pipe(shared_sock src, const config &cfg, const atomic_bool &force_break
 	}
 }
 
-void xtransmit::receive::run(const std::vector<std::string>& src_urls, const config &cfg, const atomic_bool &force_break)
+void xtransmit::receive::run(const std::vector<std::string>& src_urls,
+							 const config&                   cfg,
+							 const atomic_bool&              force_break)
 {
 	using namespace std::placeholders;
 	processing_fn_t process_fn = std::bind(run_pipe, _1, cfg, _2);
@@ -143,7 +184,7 @@ void xtransmit::receive::run(const std::vector<std::string>& src_urls, const con
 
 CLI::App* xtransmit::receive::add_subcommand(CLI::App& app, config& cfg, std::vector<std::string>& src_urls)
 {
-	const map<string, int> to_ms{ {"s", 1000}, {"ms", 1} };
+	const map<string, int> to_ms{{"s", 1000}, {"ms", 1}};
 
 	CLI::App* sc_receive = app.add_subcommand("receive", "Receive data (SRT, UDP)")->fallthrough();
 	sc_receive->add_option("-i,--input,src", src_urls, "Source URI");
@@ -161,6 +202,3 @@ CLI::App* xtransmit::receive::add_subcommand(CLI::App& app, config& cfg, std::ve
 
 	return sc_receive;
 }
-
-
-
