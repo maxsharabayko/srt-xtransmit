@@ -130,8 +130,11 @@ string validator::stats_csv(bool only_header)
 #ifdef HAS_PUT_TIME
 		ss << print_timestamp_now() << ',';
 #endif
-		ss << m_latency.get_latency_min() << ',';
-		ss << m_latency.get_latency_max() << ',';
+		// Print an empty value (N/A) on default-initialized latency min and max values.
+		const auto latency_min = m_latency.get_latency_min();
+		ss << (latency_min != numeric_limits<long long>::max() ? latency_min : ' ') << ',';
+		const auto latency_max = m_latency.get_latency_max();
+		ss << (latency_max != numeric_limits<long long>::min() ? latency_max : ' ') << ',';
 		ss << m_latency.get_latency_avg() << ',';
 		ss << m_jitter.get_jitter() << ',';
 		ss << m_delay_factor.get_delay_factor() << ',';
