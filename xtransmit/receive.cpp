@@ -153,9 +153,6 @@ void run_pipe(shared_sock src, const config& cfg, const atomic_bool& force_break
 				if (cfg.print_notifications)
 					spdlog::error(LOG_SC_RECEIVE "Reply sent on conn ID {}", sock.id());
 			}
-
-			if (!cfg.enable_metrics)
-				continue;
 		}
 	}
 	catch (const socket::exception& e)
