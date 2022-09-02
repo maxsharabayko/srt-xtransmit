@@ -49,6 +49,7 @@ namespace route
 		while (!force_break)
 		{
 			const size_t bytes_read = sock_src.read(mutable_buffer(buffer.data(), buffer.size()), -1);
+			// spdlog::info("{} recv {} bytes", desc, bytes_read);
 
 			if (bytes_read == 0)
 			{
@@ -58,6 +59,7 @@ namespace route
 
 			// SRT can return 0 on SRT_EASYNCSND. Rare for sending. However might be worth to retry.
 			const int bytes_sent = sock_dst.write(const_buffer(buffer.data(), bytes_read));
+			// spdlog::info("{} sent {} bytes", desc, bytes_sent);
 
 			if (bytes_sent != bytes_read)
 			{

@@ -11,6 +11,13 @@ using shared_udp = shared_ptr<socket::udp>;
 
 #define LOG_SOCK_UDP "SOCKET::UDP "
 
+static inline bool IsMulticast(in_addr adr)
+{
+    unsigned char* abytes = (unsigned char*)&adr.s_addr;
+    unsigned char c = abytes[0];
+    return c >= 224 && c <= 239;
+}
+
 socket::udp::udp(const UriParser &src_uri)
 	: m_host(src_uri.host())
 	, m_port(src_uri.portno())
@@ -65,6 +72,17 @@ socket::udp::udp(const UriParser &src_uri)
 	};
 
 	bool ip_bonded = false;
+	bool is_multicast = IsMulticast(sa_requested.sin.sin_addr);
+	bool is_listener = false;
+
+	if (m_options.count("mode")) {
+		string mode_str = m_options.at("mode");
+		if (mode_str.compare("listener") == 0) {
+			is_listener = true;
+		}
+	}
+	m_options.erase("mode");
+
 	if (m_options.count("bind"))
 	{
 		string bindipport = m_options.at("bind");
@@ -85,11 +103,36 @@ socket::udp::udp(const UriParser &src_uri)
 		{
 			throw socket::exception("create_addr_inet failed");
 		}
-
-		bind_me(reinterpret_cast<const sockaddr*>(&sa_bind));
+		if (!is_multicast) {
+			bind_me(reinterpret_cast<const sockaddr*>(&sa_bind));
+		}
+		//Handle Multicast
+		if (is_multicast) {
+			bind_me(reinterpret_cast<const sockaddr*>(&sa_requested));
+			spdlog::info("INFO " "We got Multicast!");
+			if (is_listener) {
+				// Multicast Receiver
+				spdlog::info("INFO " "Multicast Receiver");
+				ip_mreq mreq;
+				mreq.imr_multiaddr.s_addr = sa_requested.sin.sin_addr.s_addr;
+				mreq.imr_interface.s_addr = sa_bind.sin.sin_addr.s_addr;
+				const int res_mc_mem = ::setsockopt(m_bind_socket, IPPROTO_IP, IP_ADD_MEMBERSHIP, reinterpret_cast<const char*>(&mreq), sizeof(mreq));
+				if (res_mc_mem == -1) {
+					throw socket::exception("Adding to multicast membership failed");
+				}
+			}
+			else {
+				// Multicast Sender
+				spdlog::info("INFO " "Multicast Sender");
+				in_addr addr = sa_bind.sin.sin_addr;
+				const int res_mc_if = ::setsockopt(m_bind_socket, IPPROTO_IP, IP_MULTICAST_IF, reinterpret_cast<const char*>(&addr), sizeof(addr));
+				if (res_mc_if == -1) {
+					throw socket::exception("setsockopt/IP_MULTICAST_IF: " + bindipport);
+				}
+			}
+		}
 		ip_bonded = true;
-		spdlog::info(LOG_SOCK_UDP "udp://{}:{:d}: bound to '{}:{}'.",
-			m_host, m_port, bindip, bindport);
+		spdlog::info(LOG_SOCK_UDP "udp://{}:{:d}: bound to '{}:{}'.", m_host, m_port, bindip, bindport);
 	}
 
 	if (m_host != "" || ip_bonded)
