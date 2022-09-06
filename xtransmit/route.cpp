@@ -94,27 +94,54 @@ void xtransmit::route::run(const vector<string>& src_urls, const vector<string>&
 			? unique_ptr<socket::stats_writer>(new socket::stats_writer(cfg.stats_file, cfg.stats_format, milliseconds(cfg.stats_freq_ms)))
 			: nullptr;
 
-		shared_sock dst = create_connection(parsed_dst_urls);
-		shared_sock src = create_connection(parsed_src_urls);
+	shared_sock_t src_sock; // A shared pointer to store a listening socket for multiple connections.
+	shared_sock_t dst_sock; // A shared pointer to store a listening socket for multiple connections.
+	steady_clock::time_point next_reconnect = steady_clock::now();
 
-		if (stats)
-		{
-			stats->add_socket(src);
-			stats->add_socket(dst);
+	do {
+		try {
+			const auto tnow = steady_clock::now();
+			if (tnow < next_reconnect)
+				this_thread::sleep_until(next_reconnect);
+
+			next_reconnect = tnow + seconds(1);
+
+			const bool write_stats = cfg.stats_file != "" && cfg.stats_freq_ms > 0;
+			// make_unique is not supported by GCC 4.8, only starting from GCC 4.9 :(
+			unique_ptr<socket::stats_writer> stats = write_stats
+				? unique_ptr<socket::stats_writer>(new socket::stats_writer(cfg.stats_file, milliseconds(cfg.stats_freq_ms)))
+				: nullptr;
+
+			shared_sock dst = create_connection(parsed_dst_urls, dst_sock);
+			shared_sock src = create_connection(parsed_src_urls, src_sock);
+
+			// Closing a listener socket (if any) will not allow further connections.
+			if (!cfg.reconnect)
+				src_sock.reset();
+				dst_sock.reset();
+
+			if (stats)
+			{
+				stats->add_socket(src);
+				stats->add_socket(dst);
+			}
+
+			future<void> route_bkwd = cfg.bidir
+				? ::async(::launch::async, route, dst, src, cfg, "[DST->SRC]", ref(force_break))
+				: future<void>();
+
+			route(src, dst, cfg, "[SRC->DST]", force_break);
+			route_bkwd.wait();
+
+			if (stats)
+				stats->remove_socket(src->id());
+				stats->remove_socket(dst->id());
 		}
-
-		future<void> route_bkwd = cfg.bidir
-			? ::async(::launch::async, route, dst, src, cfg, "[DST->SRC]", ref(force_break))
-			: future<void>();	
-
-		route(src, dst, cfg, "[SRC->DST]", force_break);
-
-		route_bkwd.wait();
-	}
-	catch (const socket::exception & e)
-	{
-		spdlog::error(LOG_SC_ROUTE "{}", e.what());
-	}
+		catch (const socket::exception & e)
+		{
+			spdlog::error(LOG_SC_ROUTE "{}", e.what());
+		}
+	} while (cfg.reconnect && !force_break);
 }
 
 CLI::App* xtransmit::route::add_subcommand(CLI::App& app, config& cfg, vector<string>& src_urls, vector<string>& dst_urls)
@@ -126,6 +153,7 @@ CLI::App* xtransmit::route::add_subcommand(CLI::App& app, config& cfg, vector<st
 	sc_route->add_option("-o,--output", dst_urls, "Destination URIs");
 	sc_route->add_option("--msgsize", cfg.message_size, "Size of a buffer to receive message payload");
 	sc_route->add_flag("--bidir", cfg.bidir, "Enable bidirectional transmission");
+	sc_route->add_flag("--reconnect", cfg.reconnect, "Reconnect automatically");
 	sc_route->add_option("--statsfile", cfg.stats_file, "output stats report filename");
 	sc_route->add_option("--statsformat", cfg.stats_format, "output stats report format (json, csv)");
 	sc_route->add_option("--statsfreq", cfg.stats_freq_ms, "output stats report frequency (ms)")
