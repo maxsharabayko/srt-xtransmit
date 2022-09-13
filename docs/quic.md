@@ -31,6 +31,18 @@ srt-xtransmit receive "quic://:4433?tlskey=cert.key&tlscert=cert.crt" -v --logle
 
 Example certificates can be taken from `quiche\apps\src\bin\` or generated using OpenSSL.
 
+Note that to send a datagram the payload size should be set to some value around 1100 bytes.
+
+```shell
+(client server)
+srt-xtransmit.exe generate "quic://127.0.0.1:4200" --sendrate 1Mbps --duration 10s --msgsize 1000 --enable-metrics
+
+(server receiver)
+srt-xtransmit receive "quic://:4433?tlskey=cert.key&tlscert=cert.crt" -v
+```
+
+
+
 ## QUICHE CC Tests
 
 ### FAQ

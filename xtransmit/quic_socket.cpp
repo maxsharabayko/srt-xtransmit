@@ -77,7 +77,7 @@ socket::quic::quic(const UriParser &src_uri)
 	quiche_config_set_max_send_udp_payload_size(m_quic_config, MAX_DATAGRAM_SIZE);
 	quiche_config_set_initial_max_data(m_quic_config, 10000000);
 	quiche_config_set_initial_max_stream_data_bidi_local(m_quic_config, 1000000);
-	// Alloes receiving bidirectional streams from a remote peer:
+	// Allows receiving bidirectional streams from a remote peer:
 	quiche_config_set_initial_max_stream_data_bidi_remote(m_quic_config, 1000000);
 	
 	quiche_config_set_initial_max_stream_data_uni(m_quic_config, 1000000);
