@@ -7,12 +7,12 @@
 [submodule "submodule/CLI11"]
 	path = submodule/CLI11
 	url = https://github.com/CLIUtils/CLI11.git
-[submodule "submodule/srt"]
-	path = submodule/srt
-	url = https://github.com/maxsharabayko/srt.git
 [submodule "submodule/spdlog"]
 	path = submodule/spdlog
 	url = https://github.com/gabime/spdlog.git
 [submodule "submodule/nlohmann_json"]
 	path = submodule/nlohmann_json
 	url = https://github.com/nlohmann/json.git
+[submodule "submodule/srt"]
+	path = submodule/srt
+	url = https://github.com/swxtchio/srt.git

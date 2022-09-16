@@ -38,7 +38,7 @@ socket::udp::udp(const UriParser &src_uri)
 	}
 
 	int yes = 1;
-	::setsockopt(m_bind_socket, SOL_SOCKET, SO_REUSEADDR, (const char *)&yes, sizeof yes);
+	::setsockopt(m_bind_socket, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, (const char *)&yes, sizeof yes);
 
 	if (!m_blocking_mode)
 	{ // set non-blocking mode
