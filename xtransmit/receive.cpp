@@ -56,12 +56,12 @@ void trace_message(const size_t bytes, const vector<char>& buffer, SOCKET conn_i
 	//::cout << "SRT HS: " << hs.show() << endl;
 }
 
-/// @brief
-/// @param metrics_file
-/// @param validator
+/// @brief Output metrics in a loop until @a force_break is true.
+/// @param metrics_file the output file handle; print to stdout if not open.
+/// @param validator the source of the metrics.
 /// @param mtx mutex to protect access to validator
-/// @param freq
-/// @param force_break
+/// @param freq output frequency.
+/// @param force_break break the loop and return from the function once set to true.
 void metrics_writing_loop(ofstream&                   metrics_file,
 						  metrics::validator&         validator,
 						  mutex&                      mtx,
@@ -153,9 +153,6 @@ void run_pipe(shared_sock src, const config& cfg, const atomic_bool& force_break
 				if (cfg.print_notifications)
 					spdlog::error(LOG_SC_RECEIVE "Reply sent on conn ID {}", sock.id());
 			}
-
-			if (!cfg.enable_metrics)
-				continue;
 		}
 	}
 	catch (const socket::exception& e)

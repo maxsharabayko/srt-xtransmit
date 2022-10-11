@@ -90,8 +90,20 @@ uint64_t read_packet_seqno(const vector<char>& payload)
 std:: string validator::stats()
 {
 	std::stringstream ss;
+
+	auto latency_str = [](long long val, long long na_val) -> string {
+		if (val == na_val)
+			return "n/a";
+		return to_string(val);
+	};
+
+	const auto latency_min = m_latency.get_latency_min();
+	const auto latency_max = m_latency.get_latency_max();
 	
-	ss << "Latency, us (min/max/avg): " << m_latency.get_latency_min() << "/" << m_latency.get_latency_max() << "/" << m_latency.get_latency_avg();
+	ss << "Latency, us: avg ";
+	ss << latency_str(m_latency.get_latency_avg(), -1) << ", min ";
+	ss << latency_str(latency_min, numeric_limits<long long>::max()) << ", max ";
+	ss << latency_str(latency_max, numeric_limits<long long>::min());
 	ss << ". Jitter: " << m_jitter.get_jitter() << "us. ";
 	ss << "Delay Factor: " << m_delay_factor.get_delay_factor() << "us. ";
 	const auto stats = m_reorder.get_stats();
@@ -130,9 +142,19 @@ string validator::stats_csv(bool only_header)
 #ifdef HAS_PUT_TIME
 		ss << print_timestamp_now() << ',';
 #endif
-		ss << m_latency.get_latency_min() << ',';
-		ss << m_latency.get_latency_max() << ',';
-		ss << m_latency.get_latency_avg() << ',';
+
+		// Empty string (N/A) on default-initialized latency min and max values.
+		auto latency_str = [](long long val, long long na_val) -> string {
+			if (val == na_val)
+				return "";
+			return to_string(val);
+		};
+
+		const auto latency_min = m_latency.get_latency_min();
+		ss << latency_str(latency_min, numeric_limits<long long>::max()) << ',';
+		const auto latency_max = m_latency.get_latency_max();
+		ss << latency_str(latency_max, numeric_limits<long long>::min()) << ',';
+		ss << latency_str(m_latency.get_latency_avg(), -1) << ',';
 		ss << m_jitter.get_jitter() << ',';
 		ss << m_delay_factor.get_delay_factor() << ',';
 		const auto stats = m_reorder.get_stats();
