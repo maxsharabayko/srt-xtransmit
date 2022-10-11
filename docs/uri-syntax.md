@@ -20,7 +20,7 @@ SCHEME://HOST:PORT?PARAM1=VALUE1&PARAM2=VALUE2&...
 srt://<host>:port?field1=value1&field2=value2&...
 ```
 
-### SRT Specific Fields
+### Specific Fields (`srt-xtransmit`)
 
 There are some query fields that do not map into SRT socket options. They are handled by the application.
 
@@ -34,6 +34,7 @@ There are some query fields that do not map into SRT socket options. They are ha
 
 | Query Field          | Values           | SRT Socket Option         | Description                 |
 | -------------------- | ---------------- | ------------------------- | --------------------------- |
+| `bindtodevice`       | `string`         | `SRTO_BINDTODEVICE`       | Bind to a specific device (Linux only). |
 | `congestion`         | {`live`, `file`} | `SRTO_CONGESTION`         | Type of congestion control. |
 | `conntimeo`          | `ms`             | `SRTO_CONNTIMEO`          | Connection timeout. |
 | `drifttracer`        | `bool`           | `SRTO_DRIFTTRACER`        | Enable drift tracer. |
