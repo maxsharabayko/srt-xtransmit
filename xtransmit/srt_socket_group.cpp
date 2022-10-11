@@ -179,8 +179,8 @@ socket::srt_group::srt_group(const vector<UriParser>& uris)
 
 socket::srt_group::srt_group(srt_group& group, int group_id)
 	: m_bind_socket(group_id)
-	, m_blocking_mode(group.m_blocking_mode)
 	, m_mode(group.m_mode)
+	, m_blocking_mode(group.m_blocking_mode)
 {
 	if (!m_blocking_mode)
 	{
@@ -307,7 +307,7 @@ void socket::srt_group::create_callers(const vector<UriParser>& uris, SRT_GROUP_
 		const netaddr_any bindsa = try_bind();
 
 		SRT_SOCKGROUPCONFIG gd = srt_prepare_endpoint(
-			bindsa.empty() ? nullptr : reinterpret_cast<const sockaddr*>(bindsa.get()),
+			bindsa.empty() ? nullptr : bindsa.get(),
 			sa.get(), sa.size());
 
 		gd.weight = detect_link_weight(uri);
