@@ -16,11 +16,18 @@
 #include "verbose.hpp"
 #include "socketoptions.hpp"
 #include "apputil.hpp"
-#include "common.h" // SRT library's SockStatusStr(..)
 
 using namespace std;
 using namespace xtransmit;
 using shared_srt_group = shared_ptr<socket::srt_group>;
+
+
+namespace srt_logging
+{
+	// Defined in srtcore/common.h. Don't use directly because it includes sync.h.
+	// Otherwise xtransmit has to inherit ENABLE_STDCXX_SYNC and related preprocessir definitions.
+	std::string SockStatusStr(SRT_SOCKSTATUS);
+}
 
 #define LOG_SRT_GROUP "SOCKET::SRT_GROUP "
 
@@ -585,7 +592,7 @@ shared_srt_group socket::srt_group::connect()
 
 int socket::srt_group::configure_pre(SRTSOCKET sock, int link_index)
 {
-	SRT_ASSERT(link_index < m_opts_link.size());
+	assert(link_index < m_opts_link.size());
 	int       maybe  = m_blocking_mode ? 1 : 0;
 	const int result = srt_setsockopt(sock, 0, SRTO_RCVSYN, &maybe, sizeof maybe);
 	if (result == -1)
@@ -624,7 +631,7 @@ int socket::srt_group::configure_pre(SRTSOCKET sock, int link_index)
 
 int socket::srt_group::configure_post(SRTSOCKET sock, int link_index)
 {
-	SRT_ASSERT(link_index < m_opts_link.size());
+	assert(link_index < m_opts_link.size());
 	int is_blocking = m_blocking_mode ? 1 : 0;
 
 	int result = srt_setsockopt(sock, 0, SRTO_SNDSYN, &is_blocking, sizeof is_blocking);
