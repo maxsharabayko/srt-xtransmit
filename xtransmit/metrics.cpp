@@ -1,8 +1,11 @@
+#include <array>
 #include <sstream>
 #include <iomanip> // put_time
 #include <iostream> //cerr
 #include "metrics.hpp"
 #include "misc.hpp"
+
+#include "md5.h" // srtcore
 
 using namespace xtransmit::metrics;
 using namespace std;
@@ -21,7 +24,12 @@ using namespace std::chrono;
 ///    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 /// 16 |                     Monotonic Clock Timestamp                 |
 ///    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-/// 32 |                         Remaining payload                     |
+/// 32 |                              Length                           |
+///    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// 40 |                           MD5 Checksum                        |
+///    |                                                               |
+///    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// 56 |                         Remaining payload                     |
 ///
 ///    |<-------------------------- 64 bits -------------------------->|
 ///
@@ -36,6 +44,9 @@ namespace metrics
 static const ptrdiff_t PKT_SEQNO_BYTE_OFFSET     =  0;
 static const ptrdiff_t SYS_TIMESTAMP_BYTE_OFFSET =  8;
 static const ptrdiff_t STD_TIMESTAMP_BYTE_OFFSET = 16;
+static const ptrdiff_t PKT_LENGTH_BYTE_OFFSET    = 32;
+static const ptrdiff_t PKT_MD5_BYTE_OFFSET       = 40;
+static const ptrdiff_t PKT_MD5_BYTE_LEN          = 16;
 
 void write_sysclock_timestamp(vector<char>& payload)
 {
@@ -85,6 +96,49 @@ uint64_t read_packet_seqno(const vector<char>& payload)
 {
 	const uint64_t seqno = *reinterpret_cast<const uint64_t*>(payload.data() + PKT_SEQNO_BYTE_OFFSET);
 	return seqno;
+}
+
+void write_packet_length(vector<char>& payload, uint64_t length)
+{
+	uint64_t* ptr = reinterpret_cast<uint64_t*>(payload.data() + PKT_LENGTH_BYTE_OFFSET);
+	*ptr = length;
+}
+
+uint64_t read_packet_length(const vector<char>& payload)
+{
+	const uint64_t length = *reinterpret_cast<const uint64_t*>(payload.data() + PKT_LENGTH_BYTE_OFFSET);
+	return length;
+}
+
+void write_packet_checksum(vector<char>& payload)
+{
+	srt::md5_state_t s;
+	srt::md5_init(&s);
+
+	md5_append(&s, (const srt::md5_byte_t*) payload.data(), (int)PKT_MD5_BYTE_OFFSET);
+
+	const ptrdiff_t skip = PKT_MD5_BYTE_OFFSET + PKT_MD5_BYTE_LEN;
+	md5_append(&s, (const srt::md5_byte_t*)payload.data() + skip, (int)(payload.size() - skip));
+	md5_finish(&s, (srt::md5_byte_t*) (payload.data() + PKT_MD5_BYTE_OFFSET));
+}
+
+void validate_packet_checksum(const vector<char>& payload)
+{
+	srt::md5_state_t s;
+	srt::md5_init(&s);
+
+	md5_append(&s, (const srt::md5_byte_t*)payload.data(), (int)PKT_MD5_BYTE_OFFSET);
+
+	const ptrdiff_t skip = PKT_MD5_BYTE_OFFSET + PKT_MD5_BYTE_LEN;
+	md5_append(&s, (const srt::md5_byte_t*)payload.data() + skip, (int)(payload.size() - skip));
+
+	std::array<srt::md5_byte_t, PKT_MD5_BYTE_LEN> result;
+	md5_finish(&s, result.data());
+
+	const srt::md5_byte_t* ptr = (srt::md5_byte_t*) (payload.data() + PKT_MD5_BYTE_OFFSET);
+	const int cmpres = std::memcmp(ptr, result.data(), result.size());
+	if (cmpres)
+		spdlog::warn("[METRICS] Detected pkt checksum violation.");
 }
 
 std:: string validator::stats()

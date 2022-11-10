@@ -29,6 +29,10 @@ namespace metrics
 	steady_clock::time_point read_stdclock_timestamp(const vector<char>& payload);
 	void write_packet_seqno(vector<char>& payload, uint64_t seqno);
 	uint64_t read_packet_seqno(const vector<char>& payload);
+	void write_packet_length(vector<char>& payload, uint64_t length);
+	uint64_t read_packet_length(const vector<char>& payload);
+	void write_packet_checksum(vector<char>& payload);
+	void validate_packet_checksum(const vector<char>& payload);
 
 	class generator
 	{
@@ -48,6 +52,8 @@ namespace metrics
 			write_packet_seqno(payload, seqno);
 			write_steadyclock_timestamp(payload);
 			write_sysclock_timestamp(payload);
+			write_packet_length(payload, payload.size());
+			write_packet_checksum(payload);
 		}
 
 	private:
@@ -69,11 +75,16 @@ namespace metrics
 			const uint64_t pktseqno  = read_packet_seqno(payload);
 			const auto std_timestamp = read_stdclock_timestamp(payload);
 			const auto sys_timestamp = read_sysclock_timestamp(payload);
+			const uint64_t pktlength = read_packet_length(payload);
+			validate_packet_checksum(payload);
 
 			m_latency.submit_sample(sys_timestamp, sys_time_now);
 			m_jitter.submit_sample(std_timestamp, std_time_now);
 			m_delay_factor.submit_sample(std_timestamp, std_time_now);
 			m_reorder.submit_sample(pktseqno);
+
+			if (payload.size() != pktlength)
+				spdlog::warn("[METRICS] Detected wrong pkt length of {}, expected {} (seqno {}).", payload.size(), pktlength, pktseqno);
 		}
 
 		std::string stats();
