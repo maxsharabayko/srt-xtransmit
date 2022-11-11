@@ -122,7 +122,7 @@ void write_packet_checksum(vector<char>& payload)
 	md5_finish(&s, (srt::md5_byte_t*) (payload.data() + PKT_MD5_BYTE_OFFSET));
 }
 
-void validate_packet_checksum(const vector<char>& payload)
+bool validate_packet_checksum(const vector<char>& payload)
 {
 	srt::md5_state_t s;
 	srt::md5_init(&s);
@@ -137,8 +137,8 @@ void validate_packet_checksum(const vector<char>& payload)
 
 	const srt::md5_byte_t* ptr = (srt::md5_byte_t*) (payload.data() + PKT_MD5_BYTE_OFFSET);
 	const int cmpres = std::memcmp(ptr, result.data(), result.size());
-	if (cmpres)
-		spdlog::warn("[METRICS] Detected pkt checksum violation.");
+
+	return cmpres == 0;
 }
 
 std:: string validator::stats()
@@ -164,6 +164,9 @@ std:: string validator::stats()
 	ss << "Pkts: rcvd " << stats.pkts_processed << ", reordered " << stats.pkts_reordered;
 	ss << " (dist " << stats.reorder_dist;
 	ss << "), lost " << stats.pkts_lost;
+	const auto intgr_stats = m_integrity.get_stats();
+	ss << ", MD5 err " << intgr_stats.pkts_wrong_checksum;
+	ss << ", bad len " << intgr_stats.pkts_wrong_len << '.';
 
 	m_latency.reset();
 	m_delay_factor.reset();
@@ -188,7 +191,9 @@ string validator::stats_csv(bool only_header)
 		ss << "pktReceived,";
 		ss << "pktLost,";
 		ss << "pktReordered,";
-		ss << "pktReorderDist";
+		ss << "pktReorderDist,";
+		ss << "pktChecksumError,";
+		ss << "pktLengthError";
 		ss << '\n';
 	}
 	else
@@ -215,7 +220,10 @@ string validator::stats_csv(bool only_header)
 		ss << stats.pkts_processed << ',';
 		ss << stats.pkts_lost << ',';
 		ss << stats.pkts_reordered << ',';
-		ss << stats.reorder_dist;
+		ss << stats.reorder_dist << ',';
+		const auto intgr_stats = m_integrity.get_stats();
+		ss << intgr_stats.pkts_wrong_checksum << ',';
+		ss << intgr_stats.pkts_wrong_len;
 		ss << '\n';
 
 		m_latency.reset();
