@@ -1,0 +1,31 @@
+FROM ubuntu:22.04 as builder
+
+WORKDIR /usr/src
+
+ENV DEBIAN_FRONTEND noninteractive
+
+RUN     apt-get -y update \
+    &&  apt-get -y upgrade \
+    &&  apt-get -y install \
+          tclsh \
+          pkg-config \
+          cmake \
+          libssl-dev \
+          build-essential \
+          git \
+          gcc \
+    &&  git clone https://github.com/maxsharabayko/srt-xtransmit.git srt-xtransmit \
+    &&  cd srt-xtransmit \
+    &&  git submodule update --init --recursive \
+    &&  mkdir -p _build \
+    &&  cd _build \
+    &&  cmake ../ -DENABLE_CXX17=ON -DENABLE_BONDING=ON \
+    &&  cmake --build ./
+
+FROM ubuntu:22.04 as runner
+
+WORKDIR /app
+
+COPY --from=builder /usr/src/srt-xtransmit/_build/bin/srt-xtransmit .
+
+ENTRYPOINT [ "./srt-xtransmit" ]
