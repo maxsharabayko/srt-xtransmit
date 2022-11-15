@@ -112,7 +112,9 @@ uint64_t read_packet_length(const vector<char>& payload)
 
 void write_packet_checksum(vector<char>& payload)
 {
+#if SRT_VERSION_VALUE >= SRT_MAKE_VERSION(1, 5, 0)
 	using namespace srt;
+#endif
 	md5_state_t s;
 	md5_init(&s);
 
@@ -125,7 +127,9 @@ void write_packet_checksum(vector<char>& payload)
 
 bool validate_packet_checksum(const vector<char>& payload)
 {
+#if SRT_VERSION_VALUE >= SRT_MAKE_VERSION(1, 5, 0)
 	using namespace srt;
+#endif
 	md5_state_t s;
 	md5_init(&s);
 
