@@ -112,30 +112,32 @@ uint64_t read_packet_length(const vector<char>& payload)
 
 void write_packet_checksum(vector<char>& payload)
 {
-	srt::md5_state_t s;
-	srt::md5_init(&s);
+	using namespace srt;
+	md5_state_t s;
+	md5_init(&s);
 
-	md5_append(&s, (const srt::md5_byte_t*) payload.data(), (int)PKT_MD5_BYTE_OFFSET);
+	md5_append(&s, (const md5_byte_t*) payload.data(), (int)PKT_MD5_BYTE_OFFSET);
 
 	const ptrdiff_t skip = PKT_MD5_BYTE_OFFSET + PKT_MD5_BYTE_LEN;
-	md5_append(&s, (const srt::md5_byte_t*)payload.data() + skip, (int)(payload.size() - skip));
-	md5_finish(&s, (srt::md5_byte_t*) (payload.data() + PKT_MD5_BYTE_OFFSET));
+	md5_append(&s, (const md5_byte_t*)payload.data() + skip, (int)(payload.size() - skip));
+	md5_finish(&s, (md5_byte_t*) (payload.data() + PKT_MD5_BYTE_OFFSET));
 }
 
 bool validate_packet_checksum(const vector<char>& payload)
 {
-	srt::md5_state_t s;
-	srt::md5_init(&s);
+	using namespace srt;
+	md5_state_t s;
+	md5_init(&s);
 
-	md5_append(&s, (const srt::md5_byte_t*)payload.data(), (int)PKT_MD5_BYTE_OFFSET);
+	md5_append(&s, (const md5_byte_t*)payload.data(), (int)PKT_MD5_BYTE_OFFSET);
 
 	const ptrdiff_t skip = PKT_MD5_BYTE_OFFSET + PKT_MD5_BYTE_LEN;
-	md5_append(&s, (const srt::md5_byte_t*)payload.data() + skip, (int)(payload.size() - skip));
+	md5_append(&s, (const md5_byte_t*)payload.data() + skip, (int)(payload.size() - skip));
 
-	std::array<srt::md5_byte_t, PKT_MD5_BYTE_LEN> result;
+	array<md5_byte_t, PKT_MD5_BYTE_LEN> result;
 	md5_finish(&s, result.data());
 
-	const srt::md5_byte_t* ptr = (srt::md5_byte_t*) (payload.data() + PKT_MD5_BYTE_OFFSET);
+	const md5_byte_t* ptr = (md5_byte_t*) (payload.data() + PKT_MD5_BYTE_OFFSET);
 	const int cmpres = std::memcmp(ptr, result.data(), result.size());
 
 	return cmpres == 0;
