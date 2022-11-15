@@ -1,8 +1,11 @@
+#include <array>
 #include <sstream>
 #include <iomanip> // put_time
 #include <iostream> //cerr
 #include "metrics.hpp"
 #include "misc.hpp"
+
+#include "md5.h" // srtcore
 
 using namespace xtransmit::metrics;
 using namespace std;
@@ -21,7 +24,12 @@ using namespace std::chrono;
 ///    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 /// 16 |                     Monotonic Clock Timestamp                 |
 ///    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-/// 32 |                         Remaining payload                     |
+/// 32 |                              Length                           |
+///    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// 40 |                           MD5 Checksum                        |
+///    |                                                               |
+///    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// 56 |                         Remaining payload                     |
 ///
 ///    |<-------------------------- 64 bits -------------------------->|
 ///
@@ -36,6 +44,9 @@ namespace metrics
 static const ptrdiff_t PKT_SEQNO_BYTE_OFFSET     =  0;
 static const ptrdiff_t SYS_TIMESTAMP_BYTE_OFFSET =  8;
 static const ptrdiff_t STD_TIMESTAMP_BYTE_OFFSET = 16;
+static const ptrdiff_t PKT_LENGTH_BYTE_OFFSET    = 32;
+static const ptrdiff_t PKT_MD5_BYTE_OFFSET       = 40;
+static const ptrdiff_t PKT_MD5_BYTE_LEN          = 16;
 
 void write_sysclock_timestamp(vector<char>& payload)
 {
@@ -87,6 +98,51 @@ uint64_t read_packet_seqno(const vector<char>& payload)
 	return seqno;
 }
 
+void write_packet_length(vector<char>& payload, uint64_t length)
+{
+	uint64_t* ptr = reinterpret_cast<uint64_t*>(payload.data() + PKT_LENGTH_BYTE_OFFSET);
+	*ptr = length;
+}
+
+uint64_t read_packet_length(const vector<char>& payload)
+{
+	const uint64_t length = *reinterpret_cast<const uint64_t*>(payload.data() + PKT_LENGTH_BYTE_OFFSET);
+	return length;
+}
+
+void write_packet_checksum(vector<char>& payload)
+{
+	using namespace srt;
+	md5_state_t s;
+	md5_init(&s);
+
+	md5_append(&s, (const md5_byte_t*) payload.data(), (int)PKT_MD5_BYTE_OFFSET);
+
+	const ptrdiff_t skip = PKT_MD5_BYTE_OFFSET + PKT_MD5_BYTE_LEN;
+	md5_append(&s, (const md5_byte_t*)payload.data() + skip, (int)(payload.size() - skip));
+	md5_finish(&s, (md5_byte_t*) (payload.data() + PKT_MD5_BYTE_OFFSET));
+}
+
+bool validate_packet_checksum(const vector<char>& payload)
+{
+	using namespace srt;
+	md5_state_t s;
+	md5_init(&s);
+
+	md5_append(&s, (const md5_byte_t*)payload.data(), (int)PKT_MD5_BYTE_OFFSET);
+
+	const ptrdiff_t skip = PKT_MD5_BYTE_OFFSET + PKT_MD5_BYTE_LEN;
+	md5_append(&s, (const md5_byte_t*)payload.data() + skip, (int)(payload.size() - skip));
+
+	array<md5_byte_t, PKT_MD5_BYTE_LEN> result;
+	md5_finish(&s, result.data());
+
+	const md5_byte_t* ptr = (md5_byte_t*) (payload.data() + PKT_MD5_BYTE_OFFSET);
+	const int cmpres = std::memcmp(ptr, result.data(), result.size());
+
+	return cmpres == 0;
+}
+
 std:: string validator::stats()
 {
 	std::stringstream ss;
@@ -110,6 +166,9 @@ std:: string validator::stats()
 	ss << "Pkts: rcvd " << stats.pkts_processed << ", reordered " << stats.pkts_reordered;
 	ss << " (dist " << stats.reorder_dist;
 	ss << "), lost " << stats.pkts_lost;
+	const auto intgr_stats = m_integrity.get_stats();
+	ss << ", MD5 err " << intgr_stats.pkts_wrong_checksum;
+	ss << ", bad len " << intgr_stats.pkts_wrong_len << '.';
 
 	m_latency.reset();
 	m_delay_factor.reset();
@@ -134,7 +193,9 @@ string validator::stats_csv(bool only_header)
 		ss << "pktReceived,";
 		ss << "pktLost,";
 		ss << "pktReordered,";
-		ss << "pktReorderDist";
+		ss << "pktReorderDist,";
+		ss << "pktChecksumError,";
+		ss << "pktLengthError";
 		ss << '\n';
 	}
 	else
@@ -161,7 +222,10 @@ string validator::stats_csv(bool only_header)
 		ss << stats.pkts_processed << ',';
 		ss << stats.pkts_lost << ',';
 		ss << stats.pkts_reordered << ',';
-		ss << stats.reorder_dist;
+		ss << stats.reorder_dist << ',';
+		const auto intgr_stats = m_integrity.get_stats();
+		ss << intgr_stats.pkts_wrong_checksum << ',';
+		ss << intgr_stats.pkts_wrong_len;
 		ss << '\n';
 
 		m_latency.reset();

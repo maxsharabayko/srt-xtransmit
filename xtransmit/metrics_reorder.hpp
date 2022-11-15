@@ -10,7 +10,7 @@ namespace metrics
 class reorder
 {
 public:
-    reorder() {}
+	reorder() {}
 
 public:
 	struct stats
@@ -25,7 +25,7 @@ public:
 public:
 	/// Submit new sample for reorder update.
 	/// @param [in] pkt_seqno newly arrived packet sequence number
-    void submit_sample(const uint64_t pkt_seqno)
+	void submit_sample(const uint64_t pkt_seqno)
 	{
 		++m_stats.pkts_processed;
 
@@ -53,8 +53,15 @@ public:
 		}
 	}
 
+	/// @brief Increment the number of packets received, and don't touch other metrics.
+	/// Should be used when a packet received is corrupted.
+	void inc_pkts_received()
+	{
+		++m_stats.pkts_processed;
+	}
+
 	/// Get curent jitter value.
-    uint64_t pkts_lost() const { return m_stats.pkts_lost; }
+	uint64_t pkts_lost() const { return m_stats.pkts_lost; }
 
 	stats get_stats() const { return m_stats; }
 
