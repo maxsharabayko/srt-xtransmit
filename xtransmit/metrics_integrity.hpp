@@ -28,7 +28,7 @@ public:
 	{
 		if (!is_correct_length)
 		{
-			++m_stats.pkts_wrong_checksum;
+			++m_stats.pkts_wrong_len;
 			spdlog::warn("[METRICS] Incorrect length of packet seqno {}.", pkt_seqno);
 		}
 

@@ -53,6 +53,13 @@ public:
 		}
 	}
 
+	/// @brief Increment the number of packets received, and don't touch other metrics.
+	/// Should be used when a packet received is corrupted.
+	void inc_pkts_received()
+	{
+		++m_stats.pkts_processed;
+	}
+
 	/// Get curent jitter value.
 	uint64_t pkts_lost() const { return m_stats.pkts_lost; }
 

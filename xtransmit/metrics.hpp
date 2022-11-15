@@ -82,11 +82,19 @@ namespace metrics
 			const uint64_t pktlength = read_packet_length(payload);
 			const bool checksum_match = validate_packet_checksum(payload);
 
+			m_integrity.submit_sample(pktseqno, payload.size() == pktlength, checksum_match);
+			if (!checksum_match)
+			{
+				// Do not calculate other metrics, packet payload is corrupted,
+				// the embeded metadata is probably invalid.
+				m_reorder.inc_pkts_received();
+				return;
+			}
+
 			m_latency.submit_sample(sys_timestamp, sys_time_now);
 			m_jitter.submit_sample(std_timestamp, std_time_now);
 			m_delay_factor.submit_sample(std_timestamp, std_time_now);
 			m_reorder.submit_sample(pktseqno);
-			m_integrity.submit_sample(pktseqno, payload.size() == pktlength, checksum_match);
 		}
 
 		std::string stats();
