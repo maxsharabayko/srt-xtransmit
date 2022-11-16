@@ -1,8 +1,14 @@
 FROM ubuntu:22.04 as builder
+LABEL Ivan Pysmennyi <ivanpysmenni@gmail.com>
+
+ARG srt_version=""
+ARG build_options=""
 
 WORKDIR /usr/src
 
 ENV DEBIAN_FRONTEND noninteractive
+
+COPY . .
 
 RUN     apt-get -y update \
     &&  apt-get -y upgrade \
@@ -14,18 +20,17 @@ RUN     apt-get -y update \
           build-essential \
           git \
           gcc \
-    &&  git clone https://github.com/maxsharabayko/srt-xtransmit.git srt-xtransmit \
-    &&  cd srt-xtransmit \
     &&  git submodule update --init --recursive \
+    &&  if [[ ! -z "${srt_version}" ]];then cd submodule/srt && git checkout "${srt_version}" && cd ../.. ; fi\
     &&  mkdir -p _build \
     &&  cd _build \
-    &&  cmake ../ -DENABLE_CXX17=ON -DENABLE_BONDING=ON \
+    &&  cmake ../ ${build_options} \
     &&  cmake --build ./
 
 FROM ubuntu:22.04 as runner
 
 WORKDIR /app
 
-COPY --from=builder /usr/src/srt-xtransmit/_build/bin/srt-xtransmit .
+COPY --from=builder /usr/src/_build/bin/srt-xtransmit .
 
 ENTRYPOINT [ "./srt-xtransmit" ]
