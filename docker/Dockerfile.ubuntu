@@ -2,7 +2,10 @@ FROM ubuntu:22.04 as builder
 LABEL Ivan Pysmennyi <ivanpysmenni@gmail.com>
 
 ARG srt_version=""
+ENV SRT_VERSION=${srt_version}
+
 ARG build_options=""
+ENV BUILD_OPTIONS=${build_options}
 
 WORKDIR /usr/src
 
@@ -20,12 +23,7 @@ RUN     apt-get -y update \
           build-essential \
           git \
           gcc \
-    &&  git submodule update --init --recursive \
-    &&  if [[ ! -z "${srt_version}" ]];then cd submodule/srt && git checkout "${srt_version}" && cd ../.. ; fi\
-    &&  mkdir -p _build \
-    &&  cd _build \
-    &&  cmake ../ ${build_options} \
-    &&  cmake --build ./
+    &&  docker/build_srt_xtransmit.sh
 
 FROM ubuntu:22.04 as runner
 

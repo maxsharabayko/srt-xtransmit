@@ -2,31 +2,29 @@ FROM alpine:3.16 as builder
 LABEL Ivan Pysmennyi <ivanpysmenni@gmail.com>
 
 ARG srt_version=""
+ENV SRT_VERSION=${srt_version}
+
 ARG build_options=""
+ENV BUILD_OPTIONS=${build_options}
 
 WORKDIR /usr/src
 
 COPY . .
 
-RUN   apk add --no-cache \
-        openssl-dev \
-        libstdc++ \
-    && apk add --no-cache --virtual .build-deps \
-        gcc \
-        g++ \
-        curl \
-        cmake \
-        git \
-        make \
-        pkgconfig \
-        tcl \
-        linux-headers \
-    &&  git submodule update --init --recursive \
-    &&  if [[ ! -z "${srt_version}" ]];then cd submodule/srt && git checkout "${srt_version}" && cd ../.. ; fi\
-    &&  mkdir -p _build \
-    &&  cd _build \
-    &&  cmake ../ ${build_options} \
-    &&  cmake --build ./
+RUN     apk add --no-cache \
+          openssl-dev \
+          libstdc++ \
+    &&  apk add --no-cache --virtual .build-deps \
+          gcc \
+          g++ \
+          curl \
+          cmake \
+          git \
+          make \
+          pkgconfig \
+          tcl \
+          linux-headers \
+    &&  docker/build_srt_xtransmit.sh
 
 FROM alpine:3.16 as runner
 
