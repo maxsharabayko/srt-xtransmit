@@ -1,0 +1,37 @@
+FROM alpine:3.16 as builder
+LABEL Ivan Pysmennyi <ivanpysmenni@gmail.com>
+
+ARG srt_version=""
+ENV SRT_VERSION=${srt_version}
+
+ARG build_options=""
+ENV BUILD_OPTIONS=${build_options}
+
+WORKDIR /usr/src
+
+COPY . .
+
+RUN     apk add --no-cache \
+          openssl-dev \
+          libstdc++ \
+    &&  apk add --no-cache --virtual .build-deps \
+          gcc \
+          g++ \
+          curl \
+          cmake \
+          git \
+          make \
+          pkgconfig \
+          tcl \
+          linux-headers \
+    &&  docker/build_srt_xtransmit.sh
+
+FROM alpine:3.16 as runner
+
+WORKDIR /app
+
+RUN apk add --no-cache openssl-dev libstdc++
+
+COPY --from=builder /usr/src/_build/bin/srt-xtransmit .
+
+ENTRYPOINT [ "./srt-xtransmit" ]

@@ -1,0 +1,34 @@
+FROM ubuntu:22.04 as builder
+LABEL Ivan Pysmennyi <ivanpysmenni@gmail.com>
+
+ARG srt_version=""
+ENV SRT_VERSION=${srt_version}
+
+ARG build_options=""
+ENV BUILD_OPTIONS=${build_options}
+
+WORKDIR /usr/src
+
+ENV DEBIAN_FRONTEND noninteractive
+
+COPY . .
+
+RUN     apt-get -y update \
+    &&  apt-get -y upgrade \
+    &&  apt-get -y install \
+          tclsh \
+          pkg-config \
+          cmake \
+          libssl-dev \
+          build-essential \
+          git \
+          gcc \
+    &&  docker/build_srt_xtransmit.sh
+
+FROM ubuntu:22.04 as runner
+
+WORKDIR /app
+
+COPY --from=builder /usr/src/_build/bin/srt-xtransmit .
+
+ENTRYPOINT [ "./srt-xtransmit" ]
