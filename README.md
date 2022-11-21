@@ -134,13 +134,13 @@ docker build --rm -f docker/Dockerfile.ubuntu -t srt-xtransmit-ubuntu:latest .
 
 #### Build with different srt lib version
 ```shell
-docker build --rm -f docker/Dockerfile.alpine --build-arg srt_version="v1.4.0" -t srt-xtransmit-alpine:srt1.4.0
+docker build --rm -f docker/Dockerfile.alpine --build-arg srt_version="v1.4.0" -t srt-xtransmit-alpine:srt1.4.0 .
 ```
 * srt_version - branch name or commit
 
 #### Build with specififc build options
 ```shell
-docker build --rm -f docker/Dockerfile.alpine --build-arg build_options="-DENABLE_CXX17=ON -DENABLE_BONDING=ON" -t srt-xtransmit-alpine:bonding
+docker build --rm -f docker/Dockerfile.alpine --build-arg build_options="-DENABLE_CXX17=ON -DENABLE_BONDING=ON" -t srt-xtransmit-alpine:bonding .
 ```
 * build_options - list of build options
 
