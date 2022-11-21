@@ -10,5 +10,5 @@ if [[ ! -z "${SRT_VERSION}" ]];then
 fi
 mkdir -p _build
 cd _build
-cmake ../ "${BUILD_OPTIONS}"
+cmake ../ ${BUILD_OPTIONS}
 cmake --build ./
