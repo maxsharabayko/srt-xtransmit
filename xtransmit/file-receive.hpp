@@ -16,6 +16,7 @@ namespace xtransmit::file::receive
 		size_t      segment_size = 1456 * 1000;
 		int stats_freq_ms = 0;
 		std::string stats_file;
+    std::string stats_format = "csv";
 	};
 
 

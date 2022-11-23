@@ -16,6 +16,9 @@
 #include "srt.h"
 #include "uriparser.hpp"
 
+// nlohmann_json
+#include <nlohmann/json_fwd.hpp>
+
 namespace xtransmit
 {
 namespace socket
@@ -100,12 +103,16 @@ public:
 	SOCKET                   id() const final { return m_bind_socket; }
 	int                      statistics(SRT_TRACEBSTATS& stats, bool instant = true);
 	bool                     supports_statistics() const final { return true; }
-	const std::string        statistics_csv(bool print_header) const final;
+	const std::string        get_statistics(std::string statistic_format, bool print_header) const final;
 	static const std::string stats_to_csv(int socketid, const SRT_TRACEBSTATS& stats, uint16_t weight, bool print_header);
+  static const nlohmann::json stats_to_json(int socketid, const SRT_TRACEBSTATS& stats, uint16_t weight);
 
 private:
 	void raise_exception(const string&& place, SRTSOCKET sock = SRT_INVALID_SOCK) const;
 	void raise_exception(const string&& place, const string&& reason) const;
+
+  const std::string get_statistics_csv(bool print_header) const;
+  const std::string get_statistics_json() const;
 
 private:
 	SRTSOCKET              m_bind_socket = SRT_INVALID_SOCK;

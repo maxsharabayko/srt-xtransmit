@@ -107,7 +107,7 @@ void common_run(const vector<string>& urls, const stats_config& cfg, bool reconn
 		// make_unique is not supported by GCC 4.8, only starting from GCC 4.9 :(
 		try {
 			stats = unique_ptr<socket::stats_writer>(
-				new socket::stats_writer(cfg.stats_file, milliseconds(cfg.stats_freq_ms)));
+				new socket::stats_writer(cfg.stats_file, cfg.stats_format, milliseconds(cfg.stats_freq_ms)));
 		}
 		catch (const socket::exception& e)
 		{

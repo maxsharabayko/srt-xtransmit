@@ -89,7 +89,7 @@ void xtransmit::route::run(const vector<string>& src_urls, const vector<string>&
 		const bool write_stats = cfg.stats_file != "" && cfg.stats_freq_ms > 0;
 		// make_unique is not supported by GCC 4.8, only starting from GCC 4.9 :(
 		unique_ptr<socket::stats_writer> stats = write_stats
-			? unique_ptr<socket::stats_writer>(new socket::stats_writer(cfg.stats_file, milliseconds(cfg.stats_freq_ms)))
+			? unique_ptr<socket::stats_writer>(new socket::stats_writer(cfg.stats_file, cfg.stats_format, milliseconds(cfg.stats_freq_ms)))
 			: nullptr;
 
 		shared_sock dst = create_connection(parsed_dst_urls);
@@ -125,6 +125,7 @@ CLI::App* xtransmit::route::add_subcommand(CLI::App& app, config& cfg, vector<st
 	sc_route->add_option("--msgsize", cfg.message_size, "Size of a buffer to receive message payload");
 	sc_route->add_flag("--bidir", cfg.bidir, "Enable bidirectional transmission");
 	sc_route->add_option("--statsfile", cfg.stats_file, "output stats report filename");
+  sc_route->add_option("--statsformat", cfg.stats_format, "output stats report format(json, csv)");
 	sc_route->add_option("--statsfreq", cfg.stats_freq_ms, "output stats report frequency (ms)")
 		->transform(CLI::AsNumberWithUnit(to_ms, CLI::AsNumberWithUnit::CASE_SENSITIVE));
 
