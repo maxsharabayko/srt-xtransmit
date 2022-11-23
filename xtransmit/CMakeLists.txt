@@ -42,7 +42,7 @@ target_link_libraries(srt-xtransmit
 	PRIVATE CLI11::CLI11
 	PRIVATE spdlog::spdlog
 	PRIVATE ${TARGET_srt}_static ${VIRTUAL_srtsupport} ${LINKSTDCPP_FS}
-  PRIVATE nlohmann_json::nlohmann_json)
+        PRIVATE nlohmann_json::nlohmann_json)
 
 
 

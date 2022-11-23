@@ -297,7 +297,7 @@ CLI::App* xtransmit::file::send::add_subcommand(CLI::App& app, config& cfg, stri
 	sc_file_send->add_flag("--printout", cfg.only_print, "Print files found in a folder ad subfolders. No transfer.");
 	sc_file_send->add_option("--segment", cfg.segment_size, "Size of the transmission segment");
 	sc_file_send->add_option("--statsfile", cfg.stats_file, "output stats report filename");
-  sc_file_send->add_option("--statsformat", cfg.stats_format, "output stats report format(json, csv)");
+	sc_file_send->add_option("--statsformat", cfg.stats_format, "output stats report format(json, csv)");
 	sc_file_send->add_option("--statsfreq", cfg.stats_freq_ms, "output stats report frequency (ms)")
 		->transform(CLI::AsNumberWithUnit(to_ms, CLI::AsNumberWithUnit::CASE_SENSITIVE));
 

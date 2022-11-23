@@ -820,7 +820,7 @@ const string socket::srt_group::stats_to_csv(int socketid, const SRT_TRACEBSTATS
 
 const nlohmann::json socket::srt_group::stats_to_json(int socketid, const SRT_TRACEBSTATS& stats, uint16_t weight)
 {
-  nlohmann::json root;
+	nlohmann::json root;
 
 #define HAS_PKT_REORDER_TOL (SRT_VERSION_MAJOR >= 1) && (SRT_VERSION_MINOR >= 4) && (SRT_VERSION_PATCH > 0)
 // pktSentUnique, pktRecvUnique were added in SRT v1.4.2
@@ -828,51 +828,51 @@ const nlohmann::json socket::srt_group::stats_to_json(int socketid, const SRT_TR
 	(SRT_VERSION_MAJOR == 1) && ((SRT_VERSION_MINOR > 4) || ((SRT_VERSION_MINOR == 4) && (SRT_VERSION_PATCH >= 2)))
 
 #ifdef HAS_PUT_TIME
-  root["Timepoint"] = print_timestamp_now();
+	root["Timepoint"] = print_timestamp_now();
 #endif
 
-  root["Time"] = stats.msTimeStamp;
-  root["SocketID"] = socketid;
-  root["weight"] = weight;
-  root["pktFlowWindow"] = stats.pktFlowWindow;
-  root["pktCongestionWindow"] = stats.pktCongestionWindow;
-  root["pktFlightSize"] = stats.pktFlightSize;
-  root["msRTT"] = stats.msRTT;
-  root["mbpsBandwidth"] = stats.mbpsBandwidth;
-  root["mbpsMaxBW"] = stats.mbpsMaxBW;
-  root["pktSent"] = stats.pktSent;
-  root["pktSndLoss"] = stats.pktSndLoss;
-  root["pktSndDrop"] = stats.pktSndDrop;
-  root["pktRetrans"] = stats.pktRetrans;
-  root["byteSent"] = stats.byteSent;
-  root["byteAvailSndBuf"] = stats.byteAvailSndBuf;
-  root["byteSndDrop"] = stats.byteSndDrop;
-  root["mbpsSendRate"] = stats.mbpsSendRate;
-  root["usPktSndPeriod"] = stats.usPktSndPeriod;
-  root["msSndBuf"] = stats.msSndBuf;
-  root["pktRecv"] = stats.pktRecv;
-  root["pktRcvLoss"] = stats.pktRcvLoss;
-  root["pktRcvDrop"] = stats.pktRcvDrop;
-  root["pktRcvRetrans"] = stats.pktRcvRetrans;
-  root["pktRcvBelated"] = stats.pktRcvBelated;
-  root["byteRecv"] = stats.byteRecv;
-  root["byteAvailRcvBuf"] = stats.byteAvailRcvBuf;
-  root["byteRcvLoss"] = stats.byteRcvLoss;
-  root["byteRcvDrop"] = stats.byteRcvDrop;
-  root["mbpsRecvRate"] = stats.mbpsRecvRate;
-  root["msRcvBuf"] = stats.msRcvBuf;
-  root["msRcvTsbPdDelay"] = stats.msRcvTsbPdDelay;
+	root["Time"] = stats.msTimeStamp;
+	root["SocketID"] = socketid;
+	root["weight"] = weight;
+	root["pktFlowWindow"] = stats.pktFlowWindow;
+	root["pktCongestionWindow"] = stats.pktCongestionWindow;
+	root["pktFlightSize"] = stats.pktFlightSize;
+	root["msRTT"] = stats.msRTT;
+	root["mbpsBandwidth"] = stats.mbpsBandwidth;
+	root["mbpsMaxBW"] = stats.mbpsMaxBW;
+	root["pktSent"] = stats.pktSent;
+	root["pktSndLoss"] = stats.pktSndLoss;
+	root["pktSndDrop"] = stats.pktSndDrop;
+	root["pktRetrans"] = stats.pktRetrans;
+	root["byteSent"] = stats.byteSent;
+	root["byteAvailSndBuf"] = stats.byteAvailSndBuf;
+	root["byteSndDrop"] = stats.byteSndDrop;
+	root["mbpsSendRate"] = stats.mbpsSendRate;
+	root["usPktSndPeriod"] = stats.usPktSndPeriod;
+	root["msSndBuf"] = stats.msSndBuf;
+	root["pktRecv"] = stats.pktRecv;
+	root["pktRcvLoss"] = stats.pktRcvLoss;
+	root["pktRcvDrop"] = stats.pktRcvDrop;
+	root["pktRcvRetrans"] = stats.pktRcvRetrans;
+	root["pktRcvBelated"] = stats.pktRcvBelated;
+	root["byteRecv"] = stats.byteRecv;
+	root["byteAvailRcvBuf"] = stats.byteAvailRcvBuf;
+	root["byteRcvLoss"] = stats.byteRcvLoss;
+	root["byteRcvDrop"] = stats.byteRcvDrop;
+	root["mbpsRecvRate"] = stats.mbpsRecvRate;
+	root["msRcvBuf"] = stats.msRcvBuf;
+	root["msRcvTsbPdDelay"] = stats.msRcvTsbPdDelay;
 
 #if	HAS_PKT_REORDER_TOL
-  root["pktReorderTolerance"] = stats.pktReorderTolerance;
+	root["pktReorderTolerance"] = stats.pktReorderTolerance;
 #endif
 
 #if	HAS_UNIQUE_PKTS
-  root["pktSentUnique"] = stats.pktSentUnique;
-  root["pktRecvUnique"] = stats.pktRecvUnique;
+	root["pktSentUnique"] = stats.pktSentUnique;
+	root["pktRecvUnique"] = stats.pktRecvUnique;
 #endif
 
-  return root;
+	return root;
 }
 
 const string socket::srt_group::get_statistics_csv(bool print_header) const {
@@ -925,14 +925,14 @@ const string socket::srt_group::get_statistics_csv(bool print_header) const {
 }
 
 const string socket::srt_group::get_statistics_json() const {
-  nlohmann::json root;
-  root["LinksStatistic"] = nlohmann::json::array(); 
-  SRT_TRACEBSTATS stats = {};
+	nlohmann::json root;
+	root["LinksStats"] = nlohmann::json::array();
+	SRT_TRACEBSTATS stats = {};
 	if (SRT_ERROR == srt_bstats(m_bind_socket, &stats, true))
 		raise_exception("statistics");
-	root["ConnectionStatistic"] = stats_to_json(m_bind_socket, stats, 0);
+	root["ConnStats"] = stats_to_json(m_bind_socket, stats, 0);
 
-  size_t group_size = 0;
+	size_t group_size = 0;
 	if (srt_group_data(m_bind_socket, NULL, &group_size) != SRT_SUCCESS)
 	{
 		// Not throwing an exception as group stats was retrieved.
@@ -949,8 +949,8 @@ const string socket::srt_group::get_statistics_json() const {
 		return root.dump() + "\n";
 	}
 
-  nlohmann::json linksStatistic;
-  for (int i = 0; i < num_members; ++i)
+	nlohmann::json linksStats;
+	for (int i = 0; i < num_members; ++i)
 	{
 		const int id = group_data[i].id;
 		const SRT_SOCKSTATUS status = group_data[i].sockstate;
@@ -967,32 +967,32 @@ const string socket::srt_group::get_statistics_json() const {
 			continue;
 		}
 
-		linksStatistic.push_back(stats_to_json(id, stats, group_data[i].weight));
+		linksStats.push_back(stats_to_json(id, stats, group_data[i].weight));
 	}
-  root["LinksStatistic"] = linksStatistic;
+	root["LinksStats"] = linksStats;
 
 	return root.dump() + "\n";
 }
 
-const string socket::srt_group::get_statistics(string statistic_format, bool print_header) const
+const string socket::srt_group::get_statistics(string stats_format, bool print_header) const
 {
-  string res = "";
-  if(statistic_format == "json")
-  {
-    if(!print_header){
-      res = get_statistics_json();
-    }
-  }
-  else
-  {
-    if(statistic_format != "csv")
-    {
-      spdlog::warn(LOG_SRT_GROUP "get_statistics: {} format is not supported. csv format will be used instead", statistic_format);
-    }
-    res = get_statistics_csv(print_header);
-  }
+	string res = "";
+	if(stats_format == "json")
+	{
+		if(!print_header){
+			res = get_statistics_json();
+		}
+	}
+	else
+	{
+		if(stats_format != "csv")
+		{
+			spdlog::warn(LOG_SRT_GROUP "get_statistics: {} format is not supported. csv format will be used instead", stats_format);
+		}
+		res = get_statistics_csv(print_header);
+	}
 
-  return res;
+	return res;
 }
 
 #endif //ENABLE_BONDING

@@ -125,7 +125,7 @@ CLI::App* xtransmit::route::add_subcommand(CLI::App& app, config& cfg, vector<st
 	sc_route->add_option("--msgsize", cfg.message_size, "Size of a buffer to receive message payload");
 	sc_route->add_flag("--bidir", cfg.bidir, "Enable bidirectional transmission");
 	sc_route->add_option("--statsfile", cfg.stats_file, "output stats report filename");
-  sc_route->add_option("--statsformat", cfg.stats_format, "output stats report format(json, csv)");
+	sc_route->add_option("--statsformat", cfg.stats_format, "output stats report format(json, csv)");
 	sc_route->add_option("--statsfreq", cfg.stats_freq_ms, "output stats report frequency (ms)")
 		->transform(CLI::AsNumberWithUnit(to_ms, CLI::AsNumberWithUnit::CASE_SENSITIVE));
 

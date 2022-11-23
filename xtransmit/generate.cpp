@@ -115,7 +115,7 @@ CLI::App* xtransmit::generate::add_subcommand(CLI::App& app, config& cfg, std::v
 	sc_generate->add_option("--duration", cfg.duration, "Sending duration in seconds (supresses --num option)")
 		->transform(CLI::AsNumberWithUnit(to_sec, CLI::AsNumberWithUnit::CASE_SENSITIVE));
 	sc_generate->add_option("--statsfile", cfg.stats_file, "output stats report filename");
-  sc_generate->add_option("--statsformat", cfg.stats_format, "output stats report format(json, csv)");
+	sc_generate->add_option("--statsformat", cfg.stats_format, "output stats report format(json, csv)");
 	sc_generate->add_option("--statsfreq", cfg.stats_freq_ms, "output stats report frequency (ms)")
 		->transform(CLI::AsNumberWithUnit(to_ms, CLI::AsNumberWithUnit::CASE_SENSITIVE));
 	sc_generate->add_flag("--twoway", cfg.two_way, "Both send and receive data");

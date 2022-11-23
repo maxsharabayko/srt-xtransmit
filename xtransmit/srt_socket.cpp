@@ -565,7 +565,7 @@ const string socket::srt::stats_to_csv(int socketid, const SRT_TRACEBSTATS& stat
 
 const nlohmann::json socket::srt::stats_to_json(int socketid, const SRT_TRACEBSTATS& stats)
 {
-  nlohmann::json root;
+	nlohmann::json root;
 
 #define HAS_PKT_REORDER_TOL (SRT_VERSION_MAJOR >= 1) && (SRT_VERSION_MINOR >= 4) && (SRT_VERSION_PATCH > 0)
 // pktSentUnique, pktRecvUnique were added in SRT v1.4.2
@@ -575,66 +575,66 @@ const nlohmann::json socket::srt::stats_to_json(int socketid, const SRT_TRACEBST
   root["Timepoint"] = print_timestamp_now();
 #endif
 
-  root["Time"] = stats.msTimeStamp;
-  root["SocketID"] = socketid;
-  root["pktFlowWindow"] = stats.pktFlowWindow;
-  root["pktCongestionWindow"] = stats.pktCongestionWindow;
-  root["pktFlightSize"] = stats.pktFlightSize;
-  root["msRTT"] = stats.msRTT;
-  root["mbpsBandwidth"] = stats.mbpsBandwidth;
-  root["mbpsMaxBW"] = stats.mbpsMaxBW;
-  root["pktSent"] = stats.pktSent;
-  root["pktSndLoss"] = stats.pktSndLoss;
-  root["pktSndDrop"] = stats.pktSndDrop;
-  root["pktRetrans"] = stats.pktRetrans;
-  root["byteSent"] = stats.byteSent;
-  root["byteAvailSndBuf"] = stats.byteAvailSndBuf;
-  root["byteSndDrop"] = stats.byteSndDrop;
-  root["mbpsSendRate"] = stats.mbpsSendRate;
-  root["usPktSndPeriod"] = stats.usPktSndPeriod;
-  root["msSndBuf"] = stats.msSndBuf;
-  root["pktRecv"] = stats.pktRecv;
-  root["pktRcvLoss"] = stats.pktRcvLoss;
-  root["pktRcvDrop"] = stats.pktRcvDrop;
-  root["mbpsRecvRate"] = stats.mbpsRecvRate;
-  root["msRcvBuf"] = stats.msRcvBuf;
-  root["msRcvTsbPdDelay"] = stats.msRcvTsbPdDelay;
+	root["Time"] = stats.msTimeStamp;
+	root["SocketID"] = socketid;
+	root["pktFlowWindow"] = stats.pktFlowWindow;
+	root["pktCongestionWindow"] = stats.pktCongestionWindow;
+	root["pktFlightSize"] = stats.pktFlightSize;
+	root["msRTT"] = stats.msRTT;
+	root["mbpsBandwidth"] = stats.mbpsBandwidth;
+	root["mbpsMaxBW"] = stats.mbpsMaxBW;
+	root["pktSent"] = stats.pktSent;
+	root["pktSndLoss"] = stats.pktSndLoss;
+	root["pktSndDrop"] = stats.pktSndDrop;
+	root["pktRetrans"] = stats.pktRetrans;
+	root["byteSent"] = stats.byteSent;
+	root["byteAvailSndBuf"] = stats.byteAvailSndBuf;
+	root["byteSndDrop"] = stats.byteSndDrop;
+	root["mbpsSendRate"] = stats.mbpsSendRate;
+	root["usPktSndPeriod"] = stats.usPktSndPeriod;
+	root["msSndBuf"] = stats.msSndBuf;
+	root["pktRecv"] = stats.pktRecv;
+	root["pktRcvLoss"] = stats.pktRcvLoss;
+	root["pktRcvDrop"] = stats.pktRcvDrop;
+	root["mbpsRecvRate"] = stats.mbpsRecvRate;
+	root["msRcvBuf"] = stats.msRcvBuf;
+	root["msRcvTsbPdDelay"] = stats.msRcvTsbPdDelay;
 
 #if	HAS_PKT_REORDER_TOL
   root["pktReorderTolerance"] = stats.pktReorderTolerance;
 #endif
 
 #if	HAS_UNIQUE_PKTS
-  root["pktSentUnique"] = stats.pktSentUnique;
-  root["pktRecvUnique"] = stats.pktRecvUnique;
+	root["pktSentUnique"] = stats.pktSentUnique;
+	root["pktRecvUnique"] = stats.pktRecvUnique;
 #endif
 
-  return root;
+	return root;
 }
 
-const string socket::srt::get_statistics(string statistic_format, bool print_header) const
+const string socket::srt::get_statistics(string stats_format, bool print_header) const
 {
 	SRT_TRACEBSTATS stats;
 	if (SRT_ERROR == srt_bstats(m_bind_socket, &stats, true))
 		raise_exception("statistics");
 
-  if(statistic_format == "json")
-  {
-    if(print_header){
-      // JSON format doesn't have header. Return empty string
-      return "";
-    }
-    nlohmann::json root;
-    root["ConnectionStatistic"] = stats_to_json(m_bind_socket, stats);
-    root["LinksStatistic"] = nullptr; // No need links array because only one link exist
-    return root.dump() + "\n";
-  }
-  else
-  {
-    if(statistic_format != "csv")
-    {
-      spdlog::warn(LOG_SOCK_SRT "{} format is not supported. csv format will be used instead", statistic_format);
-    }
-	  return stats_to_csv(m_bind_socket, stats, print_header);
-  }
+	if(stats_format == "json")
+	{
+		if(print_header){
+			// JSON format doesn't have header. Return empty string
+			return "";
+		}
+		nlohmann::json root;
+		root["ConnStats"] = stats_to_json(m_bind_socket, stats);
+		root["LinksStats"] = nullptr; // No need for the array of links because only one link exists.
+		return root.dump() + "\n";
+	}
+	else
+	{
+		if(stats_format != "csv")
+		{
+			spdlog::warn(LOG_SOCK_SRT "{} format is not supported. csv format will be used instead", stats_format);
+		}
+		return stats_to_csv(m_bind_socket, stats, print_header);
+	}
 }

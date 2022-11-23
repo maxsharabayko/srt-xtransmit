@@ -10,7 +10,7 @@ using namespace std::chrono;
 
 xtransmit::socket::stats_writer::stats_writer(const std::string& filename, const std::string& format, const std::chrono::milliseconds& interval)
 	: m_logfile(filename.c_str())
-  , m_format(format)
+	, m_format(format)
 	, m_interval(interval)
 {
 	if (!m_logfile)
@@ -78,7 +78,7 @@ future<void> xtransmit::socket::stats_writer::launch()
 	auto print_stats = [](map<SOCKET, shared_sock>& sock_vector,
 		ofstream& out,
 		mutex& stats_lock,
-    string format,
+		string format,
 		bool print_header)
 	{
 #ifdef ENABLE_CXX17
@@ -130,7 +130,7 @@ future<void> xtransmit::socket::stats_writer::launch()
 
 	auto stats_func = [&print_stats](map<SOCKET, shared_sock>& sock_vector,
 						 ofstream&            out,
-             string&              format,
+						 string&              format,
 						 const milliseconds   interval,
 						 mutex&               stats_lock,
 						 const atomic_bool&   stop_stats) {
