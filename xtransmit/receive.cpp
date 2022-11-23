@@ -187,7 +187,7 @@ CLI::App* xtransmit::receive::add_subcommand(CLI::App& app, config& cfg, std::ve
 	sc_receive->add_option("-i,--input,src", src_urls, "Source URI");
 	sc_receive->add_option("--msgsize", cfg.message_size, "Size of a buffer to receive message payload");
 	sc_receive->add_option("--statsfile", cfg.stats_file, "output stats report filename");
-	sc_receive->add_option("--statsformat", cfg.stats_format, "output stats report format(json, csv)");
+	sc_receive->add_option("--statsformat", cfg.stats_format, "output stats report format (json, csv)");
 	sc_receive->add_option("--statsfreq", cfg.stats_freq_ms, "output stats report frequency (ms)")
 		->transform(CLI::AsNumberWithUnit(to_ms, CLI::AsNumberWithUnit::CASE_SENSITIVE));
 	sc_receive->add_flag("--printmsg", cfg.print_notifications, "print message into to stdout");
