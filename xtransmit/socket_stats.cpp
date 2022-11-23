@@ -8,8 +8,9 @@ using namespace std;
 using namespace xtransmit;
 using namespace std::chrono;
 
-xtransmit::socket::stats_writer::stats_writer(const std::string& filename, const std::chrono::milliseconds& interval)
+xtransmit::socket::stats_writer::stats_writer(const std::string& filename, const std::string& format, const std::chrono::milliseconds& interval)
 	: m_logfile(filename.c_str())
+	, m_format(format)
 	, m_interval(interval)
 {
 	if (!m_logfile)
@@ -77,6 +78,7 @@ future<void> xtransmit::socket::stats_writer::launch()
 	auto print_stats = [](map<SOCKET, shared_sock>& sock_vector,
 		ofstream& out,
 		mutex& stats_lock,
+		string format,
 		bool print_header)
 	{
 #ifdef ENABLE_CXX17
@@ -97,8 +99,8 @@ future<void> xtransmit::socket::stats_writer::launch()
 			try
 			{
 				if (print_header)
-					out << s->statistics_csv(true);
-				out << s->statistics_csv(false) << flush;
+					out << s->get_statistics(format, true);
+				out << s->get_statistics(format, false) << flush;
 				print_header = false;
 			}
 			catch (const socket::exception& e)
@@ -128,6 +130,7 @@ future<void> xtransmit::socket::stats_writer::launch()
 
 	auto stats_func = [&print_stats](map<SOCKET, shared_sock>& sock_vector,
 						 ofstream&            out,
+						 string&              format,
 						 const milliseconds   interval,
 						 mutex&               stats_lock,
 						 const atomic_bool&   stop_stats) {
@@ -135,12 +138,12 @@ future<void> xtransmit::socket::stats_writer::launch()
 
 		while (!stop_stats)
 		{
-			print_header = print_stats(sock_vector, out, stats_lock, print_header);
+			print_header = print_stats(sock_vector, out, stats_lock, format, print_header);
 
 			// No lock on stats_lock while sleeping
 			this_thread::sleep_for(interval);
 		}
 	};
 
-	return async(::launch::async, stats_func, ref(m_sock), ref(m_logfile), m_interval, ref(m_lock), ref(m_stop));
+	return async(::launch::async, stats_func, ref(m_sock), ref(m_logfile), ref(m_format), m_interval, ref(m_lock), ref(m_stop));
 }

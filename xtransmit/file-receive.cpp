@@ -177,7 +177,7 @@ void start_filereceiver(future<shared_srt> connection, const config& cfg,
 		{
 			this_thread::sleep_for(interval);
 
-			logfile_stats << sock->statistics_csv(print_header) << flush;
+			logfile_stats << sock->get_statistics(cfg.stats_format, print_header) << flush;
 			print_header = false;
 		}
 	};
@@ -223,6 +223,7 @@ CLI::App* xtransmit::file::receive::add_subcommand(CLI::App& app, config& cfg, s
 	sc_file_recv->add_option("dst", cfg.dst_path, "Destination path to file/folder");
 	sc_file_recv->add_option("--segment", cfg.segment_size, "Size of the transmission segment");
 	sc_file_recv->add_option("--statsfile", cfg.stats_file, "output stats report filename");
+	sc_file_recv->add_option("--statsformat", cfg.stats_format, "output stats report format (json, csv)");
 	sc_file_recv->add_option("--statsfreq", cfg.stats_freq_ms, "output stats report frequency (ms)")
 		->transform(CLI::AsNumberWithUnit(to_ms, CLI::AsNumberWithUnit::CASE_SENSITIVE));
 

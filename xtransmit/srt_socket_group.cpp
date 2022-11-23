@@ -12,6 +12,9 @@
 #include "srt_socket.hpp"
 #include "misc.hpp" // HAS_PUTTIME
 
+// nlohmann_json
+#include <nlohmann/json.hpp>
+
 // srt utils
 #include "verbose.hpp"
 #include "socketoptions.hpp"
@@ -815,9 +818,65 @@ const string socket::srt_group::stats_to_csv(int socketid, const SRT_TRACEBSTATS
 #undef HAS_UNIQUE_PKTS
 }
 
-const string socket::srt_group::statistics_csv(bool print_header) const
+const nlohmann::json socket::srt_group::stats_to_json(int socketid, const SRT_TRACEBSTATS& stats, uint16_t weight)
 {
-	if (print_header)
+	nlohmann::json root;
+
+#define HAS_PKT_REORDER_TOL (SRT_VERSION_MAJOR >= 1) && (SRT_VERSION_MINOR >= 4) && (SRT_VERSION_PATCH > 0)
+// pktSentUnique, pktRecvUnique were added in SRT v1.4.2
+#define HAS_UNIQUE_PKTS                                                                                                \
+	(SRT_VERSION_MAJOR == 1) && ((SRT_VERSION_MINOR > 4) || ((SRT_VERSION_MINOR == 4) && (SRT_VERSION_PATCH >= 2)))
+
+#ifdef HAS_PUT_TIME
+	root["Timepoint"] = print_timestamp_now();
+#endif
+
+	root["Time"] = stats.msTimeStamp;
+	root["SocketID"] = socketid;
+	root["weight"] = weight;
+	root["pktFlowWindow"] = stats.pktFlowWindow;
+	root["pktCongestionWindow"] = stats.pktCongestionWindow;
+	root["pktFlightSize"] = stats.pktFlightSize;
+	root["msRTT"] = stats.msRTT;
+	root["mbpsBandwidth"] = stats.mbpsBandwidth;
+	root["mbpsMaxBW"] = stats.mbpsMaxBW;
+	root["pktSent"] = stats.pktSent;
+	root["pktSndLoss"] = stats.pktSndLoss;
+	root["pktSndDrop"] = stats.pktSndDrop;
+	root["pktRetrans"] = stats.pktRetrans;
+	root["byteSent"] = stats.byteSent;
+	root["byteAvailSndBuf"] = stats.byteAvailSndBuf;
+	root["byteSndDrop"] = stats.byteSndDrop;
+	root["mbpsSendRate"] = stats.mbpsSendRate;
+	root["usPktSndPeriod"] = stats.usPktSndPeriod;
+	root["msSndBuf"] = stats.msSndBuf;
+	root["pktRecv"] = stats.pktRecv;
+	root["pktRcvLoss"] = stats.pktRcvLoss;
+	root["pktRcvDrop"] = stats.pktRcvDrop;
+	root["pktRcvRetrans"] = stats.pktRcvRetrans;
+	root["pktRcvBelated"] = stats.pktRcvBelated;
+	root["byteRecv"] = stats.byteRecv;
+	root["byteAvailRcvBuf"] = stats.byteAvailRcvBuf;
+	root["byteRcvLoss"] = stats.byteRcvLoss;
+	root["byteRcvDrop"] = stats.byteRcvDrop;
+	root["mbpsRecvRate"] = stats.mbpsRecvRate;
+	root["msRcvBuf"] = stats.msRcvBuf;
+	root["msRcvTsbPdDelay"] = stats.msRcvTsbPdDelay;
+
+#if	HAS_PKT_REORDER_TOL
+	root["pktReorderTolerance"] = stats.pktReorderTolerance;
+#endif
+
+#if	HAS_UNIQUE_PKTS
+	root["pktSentUnique"] = stats.pktSentUnique;
+	root["pktRecvUnique"] = stats.pktRecvUnique;
+#endif
+
+	return root;
+}
+
+const string socket::srt_group::get_statistics_csv(bool print_header) const {
+  if (print_header)
 		return stats_to_csv(m_bind_socket, SRT_TRACEBSTATS(), 0, print_header);;
 
 	SRT_TRACEBSTATS stats = {};
@@ -829,7 +888,7 @@ const string socket::srt_group::statistics_csv(bool print_header) const
 	if (srt_group_data(m_bind_socket, NULL, &group_size) != SRT_SUCCESS)
 	{
 		// Not throwing an exception as group stats was retrieved.
-		spdlog::warn(LOG_SRT_GROUP "0x{:X} statistics_csv: Failed to retrieve the number of group members", m_bind_socket);
+		spdlog::warn(LOG_SRT_GROUP "0x{:X} get_statistics_csv: Failed to retrieve the number of group members", m_bind_socket);
 		return csv_stats;
 	}
 
@@ -838,7 +897,7 @@ const string socket::srt_group::statistics_csv(bool print_header) const
 	if (num_members == SRT_ERROR)
 	{
 		// Not throwing an exception as group stats was retrieved.
-		spdlog::warn(LOG_SRT_GROUP "0x{:X} statistics_csv: Failed to retrieve group data, {}", m_bind_socket, srt_getlasterror_str());
+		spdlog::warn(LOG_SRT_GROUP "0x{:X} get_statistics_csv: Failed to retrieve group data, {}", m_bind_socket, srt_getlasterror_str());
 		return csv_stats;
 	}
 
@@ -849,13 +908,13 @@ const string socket::srt_group::statistics_csv(bool print_header) const
 
 		if (group_data[i].sockstate != SRTS_CONNECTED)
 		{
-			spdlog::trace(LOG_SRT_GROUP "0x{:X} statistics_csv: Socket 0x{:X} state is {}, skipping.", m_bind_socket, id, srt_logging::SockStatusStr(status));
+			spdlog::trace(LOG_SRT_GROUP "0x{:X} get_statistics_csv: Socket 0x{:X} state is {}, skipping.", m_bind_socket, id, srt_logging::SockStatusStr(status));
 			continue;
 		}
 
 		if (SRT_ERROR == srt_bstats(id, &stats, true))
 		{
-			spdlog::warn(LOG_SRT_GROUP "0x{:X} statistics_csv: Failed to retrieve stats for member 0x{:X}. {}", m_bind_socket, id, srt_getlasterror_str());
+			spdlog::warn(LOG_SRT_GROUP "0x{:X} get_statistics_csv: Failed to retrieve stats for member 0x{:X}. {}", m_bind_socket, id, srt_getlasterror_str());
 			continue;
 		}
 
@@ -863,6 +922,77 @@ const string socket::srt_group::statistics_csv(bool print_header) const
 	}
 
 	return csv_stats;
+}
+
+const string socket::srt_group::get_statistics_json() const {
+	nlohmann::json root;
+	root["LinksStats"] = nlohmann::json::array();
+	SRT_TRACEBSTATS stats = {};
+	if (SRT_ERROR == srt_bstats(m_bind_socket, &stats, true))
+		raise_exception("statistics");
+	root["ConnStats"] = stats_to_json(m_bind_socket, stats, 0);
+
+	size_t group_size = 0;
+	if (srt_group_data(m_bind_socket, NULL, &group_size) != SRT_SUCCESS)
+	{
+		// Not throwing an exception as group stats was retrieved.
+		spdlog::warn(LOG_SRT_GROUP "0x{:X} get_statistics_json: Failed to retrieve the number of group members", m_bind_socket);
+		return root.dump() + "\n";
+	}
+
+	vector<SRT_SOCKGROUPDATA> group_data(group_size);
+	const int num_members = srt_group_data(m_bind_socket, group_data.data(), &group_size);
+	if (num_members == SRT_ERROR)
+	{
+		// Not throwing an exception as group stats was retrieved.
+		spdlog::warn(LOG_SRT_GROUP "0x{:X} get_statistics_json: Failed to retrieve group data, {}", m_bind_socket, srt_getlasterror_str());
+		return root.dump() + "\n";
+	}
+
+	nlohmann::json linksStats;
+	for (int i = 0; i < num_members; ++i)
+	{
+		const int id = group_data[i].id;
+		const SRT_SOCKSTATUS status = group_data[i].sockstate;
+
+		if (group_data[i].sockstate != SRTS_CONNECTED)
+		{
+			spdlog::trace(LOG_SRT_GROUP "0x{:X} get_statistics_json: Socket 0x{:X} state is {}, skipping.", m_bind_socket, id, srt_logging::SockStatusStr(status));
+			continue;
+		}
+
+		if (SRT_ERROR == srt_bstats(id, &stats, true))
+		{
+			spdlog::warn(LOG_SRT_GROUP "0x{:X} get_statistics_json: Failed to retrieve stats for member 0x{:X}. {}", m_bind_socket, id, srt_getlasterror_str());
+			continue;
+		}
+
+		linksStats.push_back(stats_to_json(id, stats, group_data[i].weight));
+	}
+	root["LinksStats"] = linksStats;
+
+	return root.dump() + "\n";
+}
+
+const string socket::srt_group::get_statistics(string stats_format, bool print_header) const
+{
+	string res = "";
+	if(stats_format == "json")
+	{
+		if(!print_header){
+			res = get_statistics_json();
+		}
+	}
+	else
+	{
+		if(stats_format != "csv")
+		{
+			spdlog::warn(LOG_SRT_GROUP "get_statistics: {} format is not supported. csv format will be used instead", stats_format);
+		}
+		res = get_statistics_csv(print_header);
+	}
+
+	return res;
 }
 
 #endif //ENABLE_BONDING
