@@ -23,11 +23,14 @@ add_subdirectory(submodule/spdlog)
 #include_directories(${Boost_INCLUDE_DIR})
 #link_directories(${Boost_INCLUDE_DIR}/stage/lib)
 
+IF (NOT DEFINED WITH_SRT_DIR)
+SET(WITH_SRT_DIR submodule/srt)
+ENDIF()
 
 SET(ENABLE_APPS ON)
 SET(ENABLE_SHARED OFF)
 SET(ENABLE_ENCRYPTION ON)
-add_subdirectory(submodule/srt)
+add_subdirectory(${WITH_SRT_DIR})
 
 set(JSON_BuildTests OFF CACHE INTERNAL "")
 add_subdirectory(submodule/nlohmann_json)
@@ -40,15 +43,15 @@ add_subdirectory(submodule/nlohmann_json)
 #)
 
 SET(SRT_INCLUDE_DIR
-	${CMAKE_SOURCE_DIR}/submodule/srt/srtcore
-	${CMAKE_BINARY_DIR}/submodule/srt
-	${CMAKE_SOURCE_DIR}/submodule/srt/common
-	${CMAKE_SOURCE_DIR}/submodule/srt/haicrypt
+	${CMAKE_SOURCE_DIR}/${WITH_SRT_DIR}/srtcore
+	${CMAKE_BINARY_DIR}/${WITH_SRT_DIR}
+	${CMAKE_SOURCE_DIR}/${WITH_SRT_DIR}/common
+	${CMAKE_SOURCE_DIR}/${WITH_SRT_DIR}/haicrypt
 )
 
 SET(SRT_UTILS_INCLUDE_DIR
-	${CMAKE_SOURCE_DIR}/submodule/srt/apps
-	${CMAKE_SOURCE_DIR}/submodule/srt/testing
+	${CMAKE_SOURCE_DIR}/${WITH_SRT_DIR}/apps
+	${CMAKE_SOURCE_DIR}/${WITH_SRT_DIR}/testing
 )
 
 add_subdirectory(xtransmit)
