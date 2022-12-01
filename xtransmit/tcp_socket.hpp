@@ -23,7 +23,7 @@ class tcp
 	using string     = std::string;
 
 public:
-	explicit tcp(const UriParser &src_uri);
+	explicit tcp(const UriParser& src_uri);
 	tcp(const int sock, bool blocking);
 	~tcp();
 
@@ -44,12 +44,20 @@ public:
 	 *
 	 * @throws socket_exception Thrown on failure.
 	 */
-	size_t read(const mutable_buffer &buffer, int timeout_ms = -1) final;
-	int    write(const const_buffer &buffer, int timeout_ms = -1) final;
+	size_t read(const mutable_buffer& buffer, int timeout_ms = -1) final;
+	int    write(const const_buffer& buffer, int timeout_ms = -1) final;
 
 public:
-	bool                     supports_statistics() const final { return true; }
-	const std::string        statistics_csv(bool print_header) const final;
+	bool supports_statistics() const final
+	{
+#ifdef ENABLE_TCP_STATS
+		return true;
+#else
+		return false;
+#endif
+	}
+
+	const std::string statistics_csv(bool print_header) const final;
 
 private:
 	void raise_exception(const string&& place, const string&& reason) const;
@@ -62,8 +70,8 @@ private:
 	void set_blocking_flags(bool is_blocking) const;
 
 private:
-	SOCKET m_bind_socket = -1; // INVALID_SOCK;
-	sockaddr_in m_dst_addr = {};
+	SOCKET      m_bind_socket = -1; // INVALID_SOCK;
+	sockaddr_in m_dst_addr    = {};
 
 	bool                     m_blocking_mode = false;
 	string                   m_host;

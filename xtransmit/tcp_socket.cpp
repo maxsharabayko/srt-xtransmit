@@ -357,9 +357,9 @@ int socket::tcp::write(const const_buffer& buffer, int timeout_ms)
 	return static_cast<size_t>(res);
 }
 
-#ifndef _WIN32
+#ifdef ENABLE_TCP_STATS
 namespace detail {
-const string tcp_info_to_csv(int socketid, const tcp_info& stats, bool print_header)
+string tcp_info_to_csv(int socketid, const tcp_info& stats, bool print_header)
 {
 	std::ostringstream output;
 
@@ -407,7 +407,7 @@ const string tcp_info_to_csv(int socketid, const tcp_info& stats, bool print_hea
 
 const string socket::tcp::statistics_csv(bool print_header) const
 {
-#ifndef _WIN32
+#ifdef ENABLE_TCP_STATS
 	tcp_info tcp_stats = {};
 	socklen_t len = sizeof tcp_stats;
 
