@@ -13,6 +13,8 @@
 # Build results
 _build*/
 build*/
+.venv/
+venv/
 [Dd]ebug/
 [Dd]ebugPublic/
 [Rr]elease/
