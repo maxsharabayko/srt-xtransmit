@@ -137,6 +137,12 @@ void common_run(const vector<string>& urls, const stats_config& cfg, bool reconn
 			// The scope of `conn` closes it unless stats_writer holds a pointer.
 			shared_sock_t conn = create_connection(parsed_urls, listening_sock);
 
+			if (!conn)
+			{
+				spdlog::error(LOG_SC_CONN "Failed to create a connection to '{}'.", urls[0]);
+				return;
+			}
+
 			// Closing a listener socket (if any) will not allow further connections.
 			if (!reconnect)
 				listening_sock.reset();
