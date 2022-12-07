@@ -68,6 +68,7 @@ private:
 	int  configure_pre(SRTSOCKET sock);
 	int  configure_post(SRTSOCKET sock);
 	void handle_hosts();
+	void print_negotiated_config(SRTSOCKET) const;
 
 public:
 	std::future<shared_srt> async_read(std::vector<char>& buffer);
