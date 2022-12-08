@@ -142,14 +142,13 @@ shared_srt socket::srt::accept()
 		raise_exception("accept");
 	}
 
-	spdlog::debug(LOG_SOCK_SRT "0x{:X} (srt://{}:{:d}) Accepted connection 0x{:X}",
-		m_bind_socket, m_host, m_port, sock);
 
 	const int res = configure_post(sock);
 	if (res == SRT_ERROR)
 		raise_exception("accept::configure_post");
 
-	print_negotiated_config(sock);
+	spdlog::info(LOG_SOCK_SRT "0x{:X} (srt://{}:{:d}) Accepted connection 0x{:X}. {}.",
+		m_bind_socket, m_host, m_port, sock, print_negotiated_config(sock));
 
 	return make_shared<srt>(sock, m_blocking_mode);
 }
@@ -215,15 +214,15 @@ shared_srt socket::srt::connect()
 		}
 	}
 
-	spdlog::debug(LOG_SOCK_SRT "0x{:X} {} Connected to srt://{}:{:d}",
-		m_bind_socket, m_blocking_mode ? "SYNC" : "ASYNC", m_host, m_port);
 	{
 		const int res = configure_post(m_bind_socket);
 		if (res == SRT_ERROR)
 			raise_exception("connect::onfigure_post");
 	}
 
-	print_negotiated_config(m_bind_socket);
+	spdlog::info(LOG_SOCK_SRT "0x{:X} {} Connected to srt://{}:{:d}. {}.",
+		m_bind_socket, m_blocking_mode ? "SYNC" : "ASYNC", m_host, m_port,
+		print_negotiated_config(m_bind_socket));
 
 	return shared_from_this();
 }
@@ -321,23 +320,23 @@ int socket::srt::configure_pre(SRTSOCKET sock)
 	return SRT_SUCCESS;
 }
 
-void socket::srt::print_negotiated_config(SRTSOCKET sock) const
+std::string socket::srt::print_negotiated_config(SRTSOCKET sock) const
 {
-	static const map<int, char*> cryptomodes = {
+	static const map<int, const char*> cryptomodes = {
 		{0, "AUTO"},
 		{1, "AES-CTR"},
 		{2, "AES-GCM"}
 	};
 
-	static const map<int, char*> km_states = {
-		{0, "SRT_KM_S_UNSECURED (0)"}, //No encryption
-		{1, "SRT_KM_S_SECURING  (1)"}, //Stream encrypted, exchanging Keying Material
-		{2, "SRT_KM_S_SECURED   (2)"}, //Stream encrypted, keying Material exchanged, decrypting ok.
-		{3, "SRT_KM_S_NOSECRET  (3)"}, //Stream encrypted and no secret to decrypt Keying Material
-		{4, "SRT_KM_S_BADSECRET (4)"}  //Stream encrypted and wrong secret, cannot decrypt Keying Material        
+	static const map<int, const char*> km_states = {
+		{0, "UNSECURED"}, //No encryption
+		{1, "SECURING"},  //Stream encrypted, exchanging Keying Material
+		{2, "SECURED"},   //Stream encrypted, keying Material exchanged, decrypting ok.
+		{3, "NOSECRET"},  //Stream encrypted and no secret to decrypt Keying Material
+		{4, "BADSECRET"}  //Stream encrypted and wrong secret, cannot decrypt Keying Material        
 	};
 
-	auto convert = [](int v, const map<int, char*> values) -> const char* {
+	auto convert = [](int v, const map<int, const char*> values) -> const char* {
 		const auto m = values.find(v);
 		if (m == values.end())
 			return "INVALID";
@@ -347,24 +346,25 @@ void socket::srt::print_negotiated_config(SRTSOCKET sock) const
 
 	int ival = 0;
 	int ilen = sizeof ival;
-	int res = srt_getsockflag(sock, SRTO_CRYPTOMODE, &ival, &ilen);
-	spdlog::info(LOG_SOCK_SRT "Crypto mode: {}.", convert(ival, cryptomodes));
+	//int res = srt_getsockflag(sock, SRTO_CRYPTOMODE, &ival, &ilen);
+	//spdlog::info(LOG_SOCK_SRT "Crypto mode: {}.", convert(ival, cryptomodes));
 
 	ilen = sizeof ival;
-	res = srt_getsockflag(sock, SRTO_PBKEYLEN, &ival, &ilen);
+	int res = srt_getsockflag(sock, SRTO_PBKEYLEN, &ival, &ilen);
 	spdlog::info(LOG_SOCK_SRT "PB key length: {}.", ival);
 
 	srt_getsockflag(sock, SRTO_KMSTATE, &ival, &ilen);
-	spdlog::info(LOG_SOCK_SRT "KM state: {}.", convert(ival, km_states));
+	const int km_state = ival;
 
 	ilen = sizeof ival;
 	srt_getsockflag(sock, SRTO_RCVKMSTATE, &ival, &ilen);
-	spdlog::info(LOG_SOCK_SRT "KM state RCV: {}.", convert(ival, km_states));
+	const int km_state_rcv = ival;
 
 	ilen = sizeof ival;
 	srt_getsockflag(sock, SRTO_SNDKMSTATE, &ival, &ilen);
-	spdlog::info(LOG_SOCK_SRT "KM state SND: {}.", convert(ival, km_states));
+	const int km_state_snd = ival;
 
+	return fmt::format("KM state {} (RCV {}, SND {})", convert(km_state, km_states), convert(km_state_rcv, km_states), convert(km_state_snd, km_states));
 }
 
 int socket::srt::configure_post(SRTSOCKET sock)
