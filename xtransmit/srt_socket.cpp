@@ -142,12 +142,13 @@ shared_srt socket::srt::accept()
 		raise_exception("accept");
 	}
 
-	spdlog::debug(LOG_SOCK_SRT "0x{:X} (srt://{}:{:d}) Accepted connection 0x{:X}",
-		m_bind_socket, m_host, m_port, sock);
 
 	const int res = configure_post(sock);
 	if (res == SRT_ERROR)
 		raise_exception("accept::configure_post");
+
+	spdlog::info(LOG_SOCK_SRT "0x{:X} (srt://{}:{:d}) Accepted connection 0x{:X}. {}.",
+		m_bind_socket, m_host, m_port, sock, print_negotiated_config(sock));
 
 	return make_shared<srt>(sock, m_blocking_mode);
 }
@@ -213,13 +214,15 @@ shared_srt socket::srt::connect()
 		}
 	}
 
-	spdlog::debug(LOG_SOCK_SRT "0x{:X} {} Connected to srt://{}:{:d}",
-		m_bind_socket, m_blocking_mode ? "SYNC" : "ASYNC", m_host, m_port);
 	{
 		const int res = configure_post(m_bind_socket);
 		if (res == SRT_ERROR)
 			raise_exception("connect::onfigure_post");
 	}
+
+	spdlog::info(LOG_SOCK_SRT "0x{:X} {} Connected to srt://{}:{:d}. {}.",
+		m_bind_socket, m_blocking_mode ? "SYNC" : "ASYNC", m_host, m_port,
+		print_negotiated_config(m_bind_socket));
 
 	return shared_from_this();
 }
@@ -300,7 +303,7 @@ int socket::srt::configure_pre(SRTSOCKET sock)
 	{
 		stringstream ss;
 		copy(failures.begin(), failures.end(), ostream_iterator<string>(ss, ", "));
-		spdlog::warn(LOG_SOCK_SRT "failed to set options: {}.", ss.str());
+		 
 		return SRT_ERROR;
 	}
 
@@ -315,6 +318,56 @@ int socket::srt::configure_pre(SRTSOCKET sock)
 	}
 
 	return SRT_SUCCESS;
+}
+
+std::string socket::srt::print_negotiated_config(SRTSOCKET sock) const
+{
+	static const map<int, const char*> cryptomodes = {
+		{0, "AUTO"},
+		{1, "AES-CTR"},
+		{2, "AES-GCM"}
+	};
+
+	static const map<int, const char*> km_states = {
+		{0, "UNSECURED"}, //No encryption
+		{1, "SECURING"},  //Stream encrypted, exchanging Keying Material
+		{2, "SECURED"},   //Stream encrypted, keying Material exchanged, decrypting ok.
+		{3, "NOSECRET"},  //Stream encrypted and no secret to decrypt Keying Material
+		{4, "BADSECRET"}  //Stream encrypted and wrong secret, cannot decrypt Keying Material        
+	};
+
+	auto convert = [](int v, const map<int, const char*> values) -> const char* {
+		const auto m = values.find(v);
+		if (m == values.end())
+			return "INVALID";
+
+		return m->second;
+	};
+
+	auto get_sock_value = [](int sock, SRT_SOCKOPT sockopt, const char* const sockopt_str) {
+		int ival = 0;
+		int ilen = sizeof ival;
+		const int res = srt_getsockflag(sock, sockopt, &ival, &ilen);
+		if (res != SRT_SUCCESS)
+		{
+			spdlog::error(LOG_SOCK_SRT "Failed to get sockopt {}.", sockopt, sockopt_str);
+			return -1;
+		}
+		return ival;
+	};
+
+#define VAL_AND_STR(X) X, "X"
+	const int pbkeylen     = get_sock_value(sock, VAL_AND_STR(SRTO_PBKEYLEN));
+	const int km_state     = get_sock_value(sock, VAL_AND_STR(SRTO_KMSTATE));
+	const int km_state_rcv = get_sock_value(sock, VAL_AND_STR(SRTO_RCVKMSTATE));
+	const int km_state_snd = get_sock_value(sock, VAL_AND_STR(SRTO_SNDKMSTATE));
+#undef VAL_AND_STR
+
+	return fmt::format("KM state {} (RCV {}, SND {}). PB key length : {}",
+					   convert(km_state, km_states),
+					   convert(km_state_rcv, km_states),
+					   convert(km_state_snd, km_states),
+					   pbkeylen);
 }
 
 int socket::srt::configure_post(SRTSOCKET sock)
