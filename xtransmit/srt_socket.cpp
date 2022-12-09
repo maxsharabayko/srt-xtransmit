@@ -344,27 +344,30 @@ std::string socket::srt::print_negotiated_config(SRTSOCKET sock) const
 		return m->second;
 	};
 
-	int ival = 0;
-	int ilen = sizeof ival;
-	//int res = srt_getsockflag(sock, SRTO_CRYPTOMODE, &ival, &ilen);
-	//spdlog::info(LOG_SOCK_SRT "Crypto mode: {}.", convert(ival, cryptomodes));
+	auto get_sock_value = [](int sock, SRT_SOCKOPT sockopt, const char* const sockopt_str) {
+		int ival = 0;
+		int ilen = sizeof ival;
+		const int res = srt_getsockflag(sock, sockopt, &ival, &ilen);
+		if (res != SRT_SUCCESS)
+		{
+			spdlog::error(LOG_SOCK_SRT "Failed to get sockopt {}.", sockopt, sockopt_str);
+			return -1;
+		}
+		return ival;
+	};
 
-	ilen = sizeof ival;
-	int res = srt_getsockflag(sock, SRTO_PBKEYLEN, &ival, &ilen);
-	spdlog::info(LOG_SOCK_SRT "PB key length: {}.", ival);
+#define VAL_AND_STR(X) X, "X"
+	const int pbkeylen     = get_sock_value(sock, VAL_AND_STR(SRTO_PBKEYLEN));
+	const int km_state     = get_sock_value(sock, VAL_AND_STR(SRTO_KMSTATE));
+	const int km_state_rcv = get_sock_value(sock, VAL_AND_STR(SRTO_RCVKMSTATE));
+	const int km_state_snd = get_sock_value(sock, VAL_AND_STR(SRTO_SNDKMSTATE));
+#undef VAL_AND_STR
 
-	srt_getsockflag(sock, SRTO_KMSTATE, &ival, &ilen);
-	const int km_state = ival;
-
-	ilen = sizeof ival;
-	srt_getsockflag(sock, SRTO_RCVKMSTATE, &ival, &ilen);
-	const int km_state_rcv = ival;
-
-	ilen = sizeof ival;
-	srt_getsockflag(sock, SRTO_SNDKMSTATE, &ival, &ilen);
-	const int km_state_snd = ival;
-
-	return fmt::format("KM state {} (RCV {}, SND {})", convert(km_state, km_states), convert(km_state_rcv, km_states), convert(km_state_snd, km_states));
+	return fmt::format("KM state {} (RCV {}, SND {}). PB key length : {}",
+					   convert(km_state, km_states),
+					   convert(km_state_rcv, km_states),
+					   convert(km_state_snd, km_states),
+					   pbkeylen);
 }
 
 int socket::srt::configure_post(SRTSOCKET sock)
