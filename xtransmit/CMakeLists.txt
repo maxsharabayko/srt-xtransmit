@@ -17,9 +17,9 @@ target_include_directories(srt-xtransmit PUBLIC
 	${PTHREAD_INCLUDE_DIR}
 	)
 
-if (ENABLE_BONDING)
+if (ENABLE_BONDING OR ENABLE_EXPERIMENTAL_BONDING)
 	target_compile_options(srt-xtransmit
-		PRIVATE "-DENABLE_BONDING=1"
+		PRIVATE "-DENABLE_BONDING=1" "-DENABLE_EXPERIMENTAL_BONDING"
 	)
 endif()
 
