@@ -9,6 +9,7 @@
 // submodules
 #include "spdlog/spdlog.h"
 
+#include "buffer.hpp"
 #include "metrics_latency.hpp"      // Transmission Delay
 #include "metrics_jitter.hpp"       // Interarrival Jitter (RFC 3550)
 #include "metrics_delay_factor.hpp" // Time-Stamped Delay Factor (TS-DF) (EBU TECH 3337)
@@ -25,18 +26,18 @@ namespace metrics
 	//#define LOG_SC_METRICS "METRIC "
 
 	void write_sysclock_timestamp(vector<char>& payload);
-	system_clock::time_point read_sysclock_timestamp(const vector<char>& payload);
+	system_clock::time_point read_sysclock_timestamp(const const_buffer& payload);
 	void write_steadyclock_timestamp(vector<char>& payload);
-	steady_clock::time_point read_stdclock_timestamp(const vector<char>& payload);
+	steady_clock::time_point read_stdclock_timestamp(const const_buffer& payload);
 	void write_packet_seqno(vector<char>& payload, uint64_t seqno);
-	uint64_t read_packet_seqno(const vector<char>& payload);
+	uint64_t read_packet_seqno(const const_buffer& payload);
 	void write_packet_length(vector<char>& payload, uint64_t length);
-	uint64_t read_packet_length(const vector<char>& payload);
+	uint64_t read_packet_length(const const_buffer& payload);
 	void write_packet_checksum(vector<char>& payload);
 	/// @brief Check if the MD5 checksum of the packet is correct.
 	/// @param payload the payload
 	/// @return true if the checksum is correct, false otherwise.
-	bool validate_packet_checksum(const vector<char>& payload);
+	bool validate_packet_checksum(const const_buffer& payload);
 
 	class generator
 	{
@@ -71,7 +72,7 @@ namespace metrics
 		validator() {}
 
 	public:
-		inline void validate_packet(const vector<char>& payload)
+		inline void validate_packet(const const_buffer& payload)
 		{
 			const auto sys_time_now = system_clock::now();
 			const auto std_time_now = steady_clock::now();
@@ -82,7 +83,7 @@ namespace metrics
 			const uint64_t pktlength = read_packet_length(payload);
 			const bool checksum_match = validate_packet_checksum(payload);
 
-			m_integrity.submit_sample(pktseqno, payload.size() == pktlength, checksum_match);
+			m_integrity.submit_sample(pktseqno, pktlength, payload.size(), checksum_match);
 			if (!checksum_match)
 			{
 				// Do not calculate other metrics, packet payload is corrupted,
