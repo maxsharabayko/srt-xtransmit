@@ -150,7 +150,7 @@ socket::srt_group::srt_group(const vector<UriParser>& uris)
 	for (auto uri : uris)
 	{
 		// Will throw an exception if invalid options were provided.
-		srt::assert_options_valid(uri.parameters(), {"bind", "mode", "weight", "grouptype"});
+		srt::assert_options_valid(uri.parameters(), {"bind", "mode", "weight", "grouptype", "blocking"});
 		m_opts_link.push_back(uri.parameters());
 	}
 
