@@ -142,7 +142,7 @@ void run_pipe(shared_sock src, const config& cfg, const atomic_bool& force_break
 			if (cfg.enable_metrics)
 			{
 				lock_guard<mutex> lck(metrics_mtx);
-				validator.validate_packet(buffer);
+				validator.validate_packet(const_buffer(buffer.data(), bytes));
 			}
 
 			if (cfg.send_reply)

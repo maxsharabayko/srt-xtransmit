@@ -56,9 +56,10 @@ void write_sysclock_timestamp(vector<char>& payload)
 	*(reinterpret_cast<int64_t*>(payload.data() + SYS_TIMESTAMP_BYTE_OFFSET)) = elapsed_us.count();
 }
 
-system_clock::time_point read_sysclock_timestamp(const vector<char>& payload)
+system_clock::time_point read_sysclock_timestamp(const const_buffer& payload)
 {
-	const int64_t elapsed_us = *(reinterpret_cast<const int64_t*>(payload.data() + SYS_TIMESTAMP_BYTE_OFFSET));
+	const int8_t* ptr = reinterpret_cast<const int8_t*>(payload.data());
+	const int64_t elapsed_us = *(reinterpret_cast<const int64_t*>(ptr + SYS_TIMESTAMP_BYTE_OFFSET));
 
 	// auto in_time_t = std::chrono::system_clock::to_time_t(system_clock::time_point() + microseconds(elapsed_us));
 	// std::stringstream ss;
@@ -79,9 +80,10 @@ void write_steadyclock_timestamp(vector<char>& payload)
 	*(reinterpret_cast<int64_t*>(payload.data() + STD_TIMESTAMP_BYTE_OFFSET)) = elapsed_us.count();
 }
 
-steady_clock::time_point read_stdclock_timestamp(const vector<char>& payload)
+steady_clock::time_point read_stdclock_timestamp(const const_buffer& payload)
 {
-	const int64_t elapsed_us = *(reinterpret_cast<const int64_t*>(payload.data() + STD_TIMESTAMP_BYTE_OFFSET));
+	const int8_t* ptr = reinterpret_cast<const int8_t*>(payload.data());
+	const int64_t elapsed_us = *(reinterpret_cast<const int64_t*>(ptr + STD_TIMESTAMP_BYTE_OFFSET));
 	const auto std_timestamp = steady_clock::time_point() + microseconds(elapsed_us);
 	return std_timestamp;
 }
@@ -92,9 +94,10 @@ void write_packet_seqno(vector<char>& payload, uint64_t seqno)
 	*ptr = seqno;
 }
 
-uint64_t read_packet_seqno(const vector<char>& payload)
+uint64_t read_packet_seqno(const const_buffer& payload)
 {
-	const uint64_t seqno = *reinterpret_cast<const uint64_t*>(payload.data() + PKT_SEQNO_BYTE_OFFSET);
+	const uint8_t* ptr = reinterpret_cast<const uint8_t*>(payload.data());
+	const uint64_t seqno = *reinterpret_cast<const uint64_t*>(ptr + PKT_SEQNO_BYTE_OFFSET);
 	return seqno;
 }
 
@@ -104,9 +107,10 @@ void write_packet_length(vector<char>& payload, uint64_t length)
 	*ptr = length;
 }
 
-uint64_t read_packet_length(const vector<char>& payload)
+uint64_t read_packet_length(const const_buffer& payload)
 {
-	const uint64_t length = *reinterpret_cast<const uint64_t*>(payload.data() + PKT_LENGTH_BYTE_OFFSET);
+	const uint8_t* ptr = reinterpret_cast<const uint8_t*>(payload.data());
+	const uint64_t length = *reinterpret_cast<const uint64_t*>(ptr + PKT_LENGTH_BYTE_OFFSET);
 	return length;
 }
 
@@ -125,7 +129,7 @@ void write_packet_checksum(vector<char>& payload)
 	md5_finish(&s, (md5_byte_t*) (payload.data() + PKT_MD5_BYTE_OFFSET));
 }
 
-bool validate_packet_checksum(const vector<char>& payload)
+bool validate_packet_checksum(const const_buffer& payload)
 {
 #if SRT_VERSION_VALUE >= SRT_MAKE_VERSION(1, 5, 0)
 	using namespace srt;
@@ -141,7 +145,7 @@ bool validate_packet_checksum(const vector<char>& payload)
 	array<md5_byte_t, PKT_MD5_BYTE_LEN> result;
 	md5_finish(&s, result.data());
 
-	const md5_byte_t* ptr = (md5_byte_t*) (payload.data() + PKT_MD5_BYTE_OFFSET);
+	const md5_byte_t* ptr = reinterpret_cast<const md5_byte_t*>(payload.data()) + PKT_MD5_BYTE_OFFSET;
 	const int cmpres = std::memcmp(ptr, result.data(), result.size());
 
 	return cmpres == 0;

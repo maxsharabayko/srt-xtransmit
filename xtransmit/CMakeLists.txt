@@ -23,6 +23,12 @@ if (ENABLE_BONDING OR ENABLE_EXPERIMENTAL_BONDING)
 	)
 endif()
 
+if (ENABLE_AEAD_API_PREVIEW)
+	target_compile_options(srt-xtransmit
+		PRIVATE "-DENABLE_AEAD_API_PREVIEW"
+	)
+endif()
+
 if (ENABLE_CXX17)
 	set(REQUIRE_CXX_VER 17)
 	if (${CMAKE_CXX_COMPILER_ID} MATCHES "GNU|Intel")
