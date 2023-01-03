@@ -548,7 +548,7 @@ const string socket::srt::stats_to_csv(int socketid, const SRT_TRACEBSTATS& stat
 		output << "Time,SocketID,pktFlowWindow,pktCongestionWindow,pktFlightSize,";
 		output << "msRTT,mbpsBandwidth,mbpsMaxBW,pktSent,pktSndLoss,pktSndDrop,";
 		output << "pktRetrans,byteSent,byteAvailSndBuf,byteSndDrop,mbpsSendRate,usPktSndPeriod,msSndBuf,";
-		output << "pktRecv,pktRcvLoss,pktRcvDrop,pktRcvRetrans,pktRcvBelated,";
+		output << "pktRecv,pktRcvLoss,pktRcvDrop,pktRcvUndecrypt,pktRcvRetrans,pktRcvBelated,";
 		output << "byteRecv,byteAvailRcvBuf,byteRcvLoss,byteRcvDrop,mbpsRecvRate,msRcvBuf,msRcvTsbPdDelay";
 #if HAS_PKT_REORDER_TOL
 		output << ",pktReorderTolerance";
@@ -588,6 +588,7 @@ const string socket::srt::stats_to_csv(int socketid, const SRT_TRACEBSTATS& stat
 	output << stats.pktRecv << ',';
 	output << stats.pktRcvLoss << ',';
 	output << stats.pktRcvDrop << ',';
+	output << stats.pktRcvUndecrypt << ",";
 	output << stats.pktRcvRetrans << ',';
 	output << stats.pktRcvBelated << ',';
 
@@ -649,6 +650,7 @@ const nlohmann::json socket::srt::stats_to_json(int socketid, const SRT_TRACEBST
 	root["pktRecv"] = stats.pktRecv;
 	root["pktRcvLoss"] = stats.pktRcvLoss;
 	root["pktRcvDrop"] = stats.pktRcvDrop;
+	root["pktRcvUndecrypt"] = stats.pktRcvUndecrypt;
 	root["mbpsRecvRate"] = stats.mbpsRecvRate;
 	root["msRcvBuf"] = stats.msRcvBuf;
 	root["msRcvTsbPdDelay"] = stats.msRcvTsbPdDelay;
