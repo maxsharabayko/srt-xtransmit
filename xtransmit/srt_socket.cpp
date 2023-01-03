@@ -656,7 +656,7 @@ const nlohmann::json socket::srt::stats_to_json(int socketid, const SRT_TRACEBST
 	root["msRcvTsbPdDelay"] = stats.msRcvTsbPdDelay;
 
 #if	HAS_PKT_REORDER_TOL
-  root["pktReorderTolerance"] = stats.pktReorderTolerance;
+	root["pktReorderTolerance"] = stats.pktReorderTolerance;
 #endif
 
 #if	HAS_UNIQUE_PKTS
