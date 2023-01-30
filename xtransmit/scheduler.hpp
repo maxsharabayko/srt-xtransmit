@@ -46,7 +46,9 @@ public:
 	~scheduler()
 	{
 		done_ = true;
+		sync_.mtx.lock();
 		sync_.cv.notify_one();
+		sync_.mtx.unlock();
 		if (thread_.joinable())
 			thread_.join();
 	}
@@ -86,7 +88,7 @@ private:
 			if (this->tasks_.empty())
 			{
 				unique_lock<mutex> lock(sync_.mtx);
-				sync_.cv.wait(lock);
+				sync_.cv.wait(lock, [this]() { return done_ || !tasks_.empty(); });
 			}
 			else
 			{
