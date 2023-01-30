@@ -88,7 +88,7 @@ static int detect_link_weight(const UriParser& uri)
 	{
 		throw socket::exception(LOG_SRT_GROUP ": Bad input. weight=" + weight_str);
 	}
-	catch (std::out_of_range const &e)
+	catch (std::out_of_range const &)
 	{
 		throw socket::exception(LOG_SRT_GROUP ": Integer overflow. weight=" + weight_str);
 	}
