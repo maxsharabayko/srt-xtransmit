@@ -22,6 +22,9 @@
 #include "apputil.hpp"
 #include "uriparser.hpp"
 
+// SRTX
+#include "pkt_base.hpp"
+
 using namespace std;
 using namespace xtransmit;
 using namespace xtransmit::route;
@@ -61,15 +64,20 @@ namespace route
 			}
 
 			const auto tnow = steady_clock::now();
-			if (bytes_read > 1000 && (cfg.corrupt_freq_ms > 0 && (tnow - prev_corrupt_ts > milliseconds(cfg.corrupt_freq_ms))
+			if (bytes_read > 1 && (cfg.corrupt_freq_ms > 0 && (tnow - prev_corrupt_ts > milliseconds(cfg.corrupt_freq_ms))
 				|| --pkts_untill_corrupt == 0))
 			{
-				spdlog::info(LOG_SC_ROUTE "{} Corrupting a packet!", desc);
 				prev_corrupt_ts = tnow;
 				static std::random_device s_RandomDevice;
 				static std::mt19937 s_GenMT19937(s_RandomDevice());
 				uniform_int_distribution<size_t> dis(0, bytes_read);
 				const ptrdiff_t byteoff = (ptrdiff_t) dis(s_GenMT19937);
+
+				srtx::pkt_base<vector<char>> pkt(buffer);
+				const auto pkt_type_str = pkt.is_ctrl() ? srtx::ctrl_type_str(pkt.control_type()) : "DATA";
+
+				spdlog::info(LOG_SC_ROUTE "{} Corrupting a {} at byte offset {}", desc, pkt_type_str,
+					byteoff);
 				++buffer[byteoff];
 				pkts_untill_corrupt = cfg.corrupt_pkt_freq;
 			}
