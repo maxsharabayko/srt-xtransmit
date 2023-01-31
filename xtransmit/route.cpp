@@ -61,8 +61,8 @@ namespace route
 			}
 
 			const auto tnow = steady_clock::now();
-			if (cfg.corrupt_freq_ms > 0 && (tnow - prev_corrupt_ts > milliseconds(cfg.corrupt_freq_ms))
-				|| --pkts_untill_corrupt == 0)
+			if (bytes_read > 1000 && (cfg.corrupt_freq_ms > 0 && (tnow - prev_corrupt_ts > milliseconds(cfg.corrupt_freq_ms))
+				|| --pkts_untill_corrupt == 0))
 			{
 				spdlog::info(LOG_SC_ROUTE "{} Corrupting a packet!", desc);
 				prev_corrupt_ts = tnow;
