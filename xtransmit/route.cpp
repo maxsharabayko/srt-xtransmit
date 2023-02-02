@@ -24,6 +24,7 @@
 
 // SRTX
 #include "pkt_base.hpp"
+#include "pkt_ack.hpp"
 
 using namespace std;
 using namespace xtransmit;
@@ -75,6 +76,12 @@ namespace route
 
 				srtx::pkt_base<vector<char>> pkt(buffer);
 				const auto pkt_type_str = pkt.is_ctrl() ? srtx::ctrl_type_str(pkt.control_type()) : "DATA";
+				std::string ack_details;
+				if (pkt.is_ctrl() && pkt.control_type() == srtx::ctrl_type::ACK)
+				{
+					srtx::pkt_ack< vector<char>> ack(pkt);
+					ack_details = fmt::format(" ackno {}, ackseqno {}", ack.ackno(), ack.ackseqno());
+				}
 
 				spdlog::info(LOG_SC_ROUTE "{} Corrupting a {} at byte offset {}", desc, pkt_type_str,
 					byteoff);
