@@ -185,16 +185,16 @@ CLI::App* xtransmit::receive::add_subcommand(CLI::App& app, config& cfg, std::ve
 
 	CLI::App* sc_receive = app.add_subcommand("receive", "Receive data (SRT, UDP)")->fallthrough();
 	sc_receive->add_option("-i,--input,src", src_urls, "Source URI");
-	sc_receive->add_option("--msgsize", cfg.message_size, "Size of a buffer to receive message payload");
-	sc_receive->add_option("--statsfile", cfg.stats_file, "output stats report filename");
-	sc_receive->add_option("--statsformat", cfg.stats_format, "output stats report format (json, csv)");
-	sc_receive->add_option("--statsfreq", cfg.stats_freq_ms, "output stats report frequency (ms)")
+	sc_receive->add_option("--msgsize", cfg.message_size, fmt::format("Size of the buffer to receive message payload (default {})", cfg.message_size));
+	sc_receive->add_option("--statsfile", cfg.stats_file, "Output stats report filename");
+	sc_receive->add_option("--statsformat", cfg.stats_format, "Output stats report format (csv - default, json)");
+	sc_receive->add_option("--statsfreq", cfg.stats_freq_ms, fmt::format("Output stats report frequency, ms (default {})", cfg.stats_freq_ms))
 		->transform(CLI::AsNumberWithUnit(to_ms, CLI::AsNumberWithUnit::CASE_SENSITIVE));
-	sc_receive->add_flag("--printmsg", cfg.print_notifications, "print message into to stdout");
+	sc_receive->add_flag("--printmsg", cfg.print_notifications, "Print message to stdout");
 	sc_receive->add_flag("--reconnect", cfg.reconnect, "Reconnect automatically");
 	sc_receive->add_flag("--enable-metrics", cfg.enable_metrics, "Enable checking metrics: jitter, latency, etc.");
-	sc_receive->add_option("--metricsfile", cfg.metrics_file, "Metrics output filename (stdout if not set)");
-	sc_receive->add_option("--metricsfreq", cfg.metrics_freq_ms, "Metrics report frequency")
+	sc_receive->add_option("--metricsfile", cfg.metrics_file, "Metrics output filename (default stdout)");
+	sc_receive->add_option("--metricsfreq", cfg.metrics_freq_ms, fmt::format("Metrics report frequency, ms (default {})", cfg.metrics_freq_ms))
 		->transform(CLI::AsNumberWithUnit(to_ms, CLI::AsNumberWithUnit::CASE_SENSITIVE));
 	sc_receive->add_flag("--twoway", cfg.send_reply, "Both send and receive data");
 
