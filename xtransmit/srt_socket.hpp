@@ -61,6 +61,8 @@ public:
 	///
 	static void assert_options_valid(const std::map<string, string>& options, const std::unordered_set<string>& extra);
 
+	static std::string print_negotiated_config(SRTSOCKET);
+
 private:
 	void configure(const std::map<string, string>& options);
 
@@ -68,7 +70,6 @@ private:
 	int  configure_pre(SRTSOCKET sock);
 	int  configure_post(SRTSOCKET sock);
 	void handle_hosts();
-	std::string print_negotiated_config(SRTSOCKET) const;
 
 public:
 	std::future<shared_srt> async_read(std::vector<char>& buffer);

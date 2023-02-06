@@ -382,7 +382,7 @@ shared_srt_group socket::srt_group::accept()
 			raise_exception("accept_bond failed with {}", srt_getlasterror_str());
 	}
 
-	spdlog::info(LOG_SRT_GROUP "Accepted connection sock 0x{:X}", accepted_sock);
+	spdlog::info(LOG_SRT_GROUP "Accepted connection sock 0x{:X}. {}.", accepted_sock, srt::print_negotiated_config(accepted_sock));
 	const int res = configure_post(accepted_sock, 0); // TODO: are there POST options per link?
 	if (res == SRT_ERROR)
 		raise_exception("accept::configure_post");
@@ -588,7 +588,8 @@ shared_srt_group socket::srt_group::connect()
 	}
 
 	spdlog::debug(
-		LOG_SRT_GROUP "0x{:X} {} Group member connected to remote", m_bind_socket, m_blocking_mode ? "SYNC" : "ASYNC");
+		LOG_SRT_GROUP "0x{:X} {} Group member connected to remote. {}.", m_bind_socket, m_blocking_mode ? "SYNC" : "ASYNC",
+		srt::print_negotiated_config(m_bind_socket));
 
 	return shared_from_this();
 }

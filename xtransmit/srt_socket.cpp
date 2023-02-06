@@ -320,7 +320,7 @@ int socket::srt::configure_pre(SRTSOCKET sock)
 	return SRT_SUCCESS;
 }
 
-std::string socket::srt::print_negotiated_config(SRTSOCKET sock) const
+std::string socket::srt::print_negotiated_config(SRTSOCKET sock)
 {
 	static const map<int, const char*> cryptomodes = {
 		{0, "AUTO"},
@@ -361,13 +361,20 @@ std::string socket::srt::print_negotiated_config(SRTSOCKET sock) const
 	const int km_state     = get_sock_value(sock, VAL_AND_STR(SRTO_KMSTATE));
 	const int km_state_rcv = get_sock_value(sock, VAL_AND_STR(SRTO_RCVKMSTATE));
 	const int km_state_snd = get_sock_value(sock, VAL_AND_STR(SRTO_SNDKMSTATE));
+
+#if ENABLE_AEAD_API_PREVIEW
+	const int crypto_mode  = get_sock_value(sock, VAL_AND_STR(SRTO_CRYPTOMODE));
+	const auto crypto_mode_str = fmt::format(". Cryptomode {}", convert(crypto_mode, cryptomodes));
+#else
+	const string crypto_mode_str = "";
+#endif
 #undef VAL_AND_STR
 
-	return fmt::format("KM state {} (RCV {}, SND {}). PB key length : {}",
+	return fmt::format("KM state {} (RCV {}, SND {}). PB key length : {}{}",
 					   convert(km_state, km_states),
 					   convert(km_state_rcv, km_states),
 					   convert(km_state_snd, km_states),
-					   pbkeylen);
+					   pbkeylen, crypto_mode_str);
 }
 
 int socket::srt::configure_post(SRTSOCKET sock)
