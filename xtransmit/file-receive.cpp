@@ -92,7 +92,7 @@ bool receive_files(socket::srt& src, const string& dstpath
 		{
 			ofile.close();
 			// extranct the filename from the received buffer
-			string filename = string(buf.data() + 1);
+			const string filename = dstpath + string(buf.data() + 1);
 			hdr_size += filename.size() + 1;    // 1 for null character
 
 			create_subfolders(filename);
