@@ -27,14 +27,20 @@ using shared_srt = std::shared_ptr<socket::srt>;
 bool create_folder(const string& path)
 {
 	// If the function fails because p resolves to an existing directory, no error is reported.
-	if (fs::create_directory(path))
+	// Otherwise filesystem::filesystem_error is thrown.
+	error_code ec;
+	if (fs::create_directory(path, ec))
 	{
-		cerr << "Directory '" << path << "' was successfully created" << endl;
+		cerr << "Created directory '" << path << "'" << endl;
 		return true;
 	}
 
-	cerr << "Directory '" << path << "' failed to be created" << endl;
-	return false;
+	if (ec)
+	{
+		cerr << "Failed to create the directory '" << path << "'. Error " << ec.message() << endl;
+		return false;
+	}
+	return true;
 }
 
 
@@ -59,7 +65,6 @@ bool create_subfolders(const string& path)
 	while (pos != std::string::npos && pos != last_delim)
 	{
 		pos = path.find_first_of("\\/", pos + 1);
-		cerr << "Creating folder " << path.substr(0, pos) << "\n";
 		if (!create_folder(path.substr(0, pos).c_str()))
 			return false;
 	};
@@ -75,7 +80,10 @@ bool receive_files(socket::srt& src, const string& dstpath
 	cerr << "Downloading to '" << dstpath << endl;
 
 	chrono::steady_clock::time_point time_start;
+	chrono::steady_clock::time_point time_progress;
 	size_t file_size = 0;
+
+	string download_str = "";
 
 	ofstream ofile;
 	while (!force_break)
@@ -87,6 +95,7 @@ bool receive_files(socket::srt& src, const string& dstpath
 		int hdr_size = 1;
 		const bool is_first = (buf[0] & 0x01) != 0;
 		const bool is_eof = (buf[0] & 0x02) != 0;
+		const auto tnow = chrono::steady_clock::now();
 
 		if (is_first)
 		{
@@ -95,7 +104,11 @@ bool receive_files(socket::srt& src, const string& dstpath
 			const string filename = dstpath + string(buf.data() + 1);
 			hdr_size += filename.size() + 1;    // 1 for null character
 
-			create_subfolders(filename);
+			if (!create_subfolders(filename))
+			{
+				cerr << "Download: failed creating folders for '" << filename << "'" << endl;
+				return false;
+			}
 
 			ofile.open(filename.c_str(), ios::out | ios::trunc | ios::binary);
 			if (!ofile) {
@@ -103,8 +116,9 @@ bool receive_files(socket::srt& src, const string& dstpath
 				break;
 			}
 
-			cerr << "Downloading: --> " << filename;
-			time_start = chrono::steady_clock::now();
+			download_str = "Downloading '" + filename + "'";
+			cerr << download_str << "\r";
+			time_start = time_progress = tnow;
 			file_size = 0;
 		}
 
@@ -117,21 +131,27 @@ bool receive_files(socket::srt& src, const string& dstpath
 		ofile.write(buf.data() + hdr_size, bytes - hdr_size);
 		file_size += bytes - hdr_size;
 
+		auto get_rate_kbps = [](steady_clock::time_point t_start, steady_clock::time_point t_now, size_t bytes) {
+			const auto delta_us = chrono::duration_cast<chrono::microseconds>(t_now - t_start).count();
+			const size_t rate_kbps = (bytes * 1000) / (delta_us ? delta_us : 1) * 8;
+			return rate_kbps;
+		};
+
+		
+		if (chrono::steady_clock::now() >= time_progress + 1s)
+		{
+			const size_t rate_kbps = get_rate_kbps(time_start, tnow, file_size);
+			cerr << download_str << ": " << file_size / 1024 << " kB @ " << rate_kbps << " kbps...\r";
+			time_progress = tnow;
+		}
+
 		if (is_eof)
 		{
 			ofile.close();
-			const chrono::steady_clock::time_point time_end = chrono::steady_clock::now();
-			const auto delta_us = chrono::duration_cast<chrono::microseconds>(time_end - time_start).count();
-
-			const size_t rate_kbps = (file_size * 1000) / (delta_us ? delta_us : 1) * 8;
-#if ENABLE_JSON_INPUT
-			const auto delta_ms = chrono::duration_cast<chrono::milliseconds>(time_end - time_start).count();
-			cerr << "--> done (" << file_size / 1024 << " kbytes transfered at " << rate_kbps << " kbps, took "
-				<< delta_ms / 1000.0 << " sec)";
-#else
-			cerr << "--> done (" << file_size / 1024 << " kbytes transfered at " << rate_kbps << " kbps, took "
-				<< chrono::duration_cast<chrono::minutes>(time_end - time_start).count() << " minute(s))";
-#endif
+			const size_t rate_kbps = get_rate_kbps(time_start, tnow, file_size);
+			const auto delta_ms = chrono::duration_cast<chrono::milliseconds>(tnow - time_start).count();
+			cerr << download_str << ": done (" << file_size / 1024 << " kB @ " << rate_kbps << " kbps, took "
+				<< delta_ms / 1000.0 << " sec)." << endl;
 		}
 	}
 
