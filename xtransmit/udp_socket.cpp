@@ -189,6 +189,8 @@ int socket::udp::write(const const_buffer &buffer, int timeout_ms)
 	return static_cast<size_t>(res);
 }
 
+#ifdef __linux__
+
 socket::mudp::mudp(const UriParser& u)
     : udp_base(u)
 {
@@ -333,3 +335,4 @@ int socket::mudp::write(const const_buffer &buffer, int timeout_ms)
 
 	return static_cast<size_t>(res);
 }
+#endif // __linux__
