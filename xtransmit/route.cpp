@@ -87,15 +87,9 @@ void xtransmit::route::run(const vector<string>& src_urls, const vector<string>&
 		parsed_dst_urls.emplace_back(url);
 	}
 
-	try {
-		const bool write_stats = cfg.stats_file != "" && cfg.stats_freq_ms > 0;
-		// make_unique is not supported by GCC 4.8, only starting from GCC 4.9 :(
-		unique_ptr<socket::stats_writer> stats = write_stats
-			? unique_ptr<socket::stats_writer>(new socket::stats_writer(cfg.stats_file, cfg.stats_format, milliseconds(cfg.stats_freq_ms)))
-			: nullptr;
-
-	shared_sock_t src_sock; // A shared pointer to store a listening socket for multiple connections.
-	shared_sock_t dst_sock; // A shared pointer to store a listening socket for multiple connections.
+	// Shared pointers to store a listening socket for multiple connections.
+	shared_sock_t src_sock;
+	shared_sock_t dst_sock;
 	steady_clock::time_point next_reconnect = steady_clock::now();
 
 	do {
@@ -109,7 +103,7 @@ void xtransmit::route::run(const vector<string>& src_urls, const vector<string>&
 			const bool write_stats = cfg.stats_file != "" && cfg.stats_freq_ms > 0;
 			// make_unique is not supported by GCC 4.8, only starting from GCC 4.9 :(
 			unique_ptr<socket::stats_writer> stats = write_stats
-				? unique_ptr<socket::stats_writer>(new socket::stats_writer(cfg.stats_file, milliseconds(cfg.stats_freq_ms)))
+				? unique_ptr<socket::stats_writer>(new socket::stats_writer(cfg.stats_file, cfg.stats_format, milliseconds(cfg.stats_freq_ms)))
 				: nullptr;
 
 			shared_sock dst = create_connection(parsed_dst_urls, dst_sock);
@@ -161,6 +155,3 @@ CLI::App* xtransmit::route::add_subcommand(CLI::App& app, config& cfg, vector<st
 
 	return sc_route;
 }
-
-
-
