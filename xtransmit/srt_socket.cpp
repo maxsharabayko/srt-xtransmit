@@ -302,9 +302,9 @@ int socket::srt::configure_pre(SRTSOCKET sock)
 	if (conmode == SocketOption::FAILURE)
 	{
 		stringstream ss;
+		ss << "Wrong value of option(s): ";
 		copy(failures.begin(), failures.end(), ostream_iterator<string>(ss, ", "));
-		 
-		return SRT_ERROR;
+		throw socket::exception(ss.str());
 	}
 
 	m_mode = static_cast<connection_mode>(conmode);
