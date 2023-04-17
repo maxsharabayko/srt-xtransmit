@@ -253,13 +253,13 @@ void socket::srt::assert_options_valid(const std::map<string, string>& options, 
 	for (const auto& [key, val] : options)
 	{
 #else
-	for (const auto el : options)
+	for (const auto& el : options)
 	{
 		const string& key = el.first;
 		const string& val = el.second;
 #endif
 		bool opt_found = false;
-		for (const auto o : srt_options)
+		for (const auto& o : srt_options)
 		{
 			if (o.name != key)
 				continue;
@@ -336,7 +336,7 @@ std::string socket::srt::print_negotiated_config(SRTSOCKET sock)
 		{4, "BADSECRET"}  //Stream encrypted and wrong secret, cannot decrypt Keying Material        
 	};
 
-	auto convert = [](int v, const map<int, const char*> values) -> const char* {
+	auto convert = [](int v, const map<int, const char*>& values) {
 		const auto m = values.find(v);
 		if (m == values.end())
 			return "INVALID";
@@ -344,13 +344,13 @@ std::string socket::srt::print_negotiated_config(SRTSOCKET sock)
 		return m->second;
 	};
 
-	auto get_sock_value = [](int sock, SRT_SOCKOPT sockopt, const char* const sockopt_str) {
+	auto get_sock_value = [](int s, SRT_SOCKOPT sopt, const char* const sopt_str) {
 		int ival = 0;
 		int ilen = sizeof ival;
-		const int res = srt_getsockflag(sock, sockopt, &ival, &ilen);
+		const int res = srt_getsockflag(s, sopt, &ival, &ilen);
 		if (res != SRT_SUCCESS)
 		{
-			spdlog::error(LOG_SOCK_SRT "Failed to get sockopt {}.", sockopt, sockopt_str);
+			spdlog::error(LOG_SOCK_SRT "Failed to get sockopt {}.", sopt, sopt_str);
 			return -1;
 		}
 		return ival;
@@ -377,7 +377,7 @@ std::string socket::srt::print_negotiated_config(SRTSOCKET sock)
 					   pbkeylen, crypto_mode_str);
 }
 
-int socket::srt::configure_post(SRTSOCKET sock)
+int socket::srt::configure_post(SRTSOCKET sock) const
 {
 	int is_blocking = m_blocking_mode ? 1 : 0;
 

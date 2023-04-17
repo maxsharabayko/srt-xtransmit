@@ -68,7 +68,7 @@ private:
 
 	void assert_options_valid() const;
 	int  configure_pre(SRTSOCKET sock);
-	int  configure_post(SRTSOCKET sock);
+	int  configure_post(SRTSOCKET sock) const;
 	void handle_hosts();
 
 public:
