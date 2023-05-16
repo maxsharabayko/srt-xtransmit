@@ -350,7 +350,7 @@ std::string socket::srt::print_negotiated_config(SRTSOCKET sock)
 		const int res = srt_getsockflag(s, sopt, &ival, &ilen);
 		if (res != SRT_SUCCESS)
 		{
-			spdlog::error(LOG_SOCK_SRT "Failed to get sockopt {}.", sopt, sopt_str);
+			spdlog::error(LOG_SOCK_SRT "Failed to get sockopt {}.", sopt_str);
 			return -1;
 		}
 		return ival;
@@ -369,12 +369,22 @@ std::string socket::srt::print_negotiated_config(SRTSOCKET sock)
 	const string crypto_mode_str = "";
 #endif
 #undef VAL_AND_STR
+	
+	// Template lambdas are only available since C++20, have to duplicate the code.
+	std::string streamid(512, '\0');
+	int         streamid_len = (int) streamid.size();
+	if (srt_getsockflag(sock, SRTO_STREAMID, (void*)streamid.data(), &streamid_len) != SRT_SUCCESS)
+	{
+		spdlog::error(LOG_SOCK_SRT "Failed to get sockopt SRTO_STREAMID.");
+		streamid_len = 0;
+	}
 
-	return fmt::format("KM state {} (RCV {}, SND {}). PB key length : {}{}",
+	return fmt::format("KM state {} (RCV {}, SND {}). PB key length : {}{}. Stream ID: {}",
 					   convert(km_state, km_states),
 					   convert(km_state_rcv, km_states),
 					   convert(km_state_snd, km_states),
-					   pbkeylen, crypto_mode_str);
+					   pbkeylen, crypto_mode_str,
+					   streamid_len > 0 ? streamid : "not set");
 }
 
 int socket::srt::configure_post(SRTSOCKET sock) const
