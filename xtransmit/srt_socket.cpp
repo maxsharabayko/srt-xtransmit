@@ -362,9 +362,21 @@ std::string socket::srt::print_negotiated_config(SRTSOCKET sock)
 	const int km_state_rcv = get_sock_value(sock, VAL_AND_STR(SRTO_RCVKMSTATE));
 	const int km_state_snd = get_sock_value(sock, VAL_AND_STR(SRTO_SNDKMSTATE));
 
+	std::string latency_str;
+	if (get_sock_value(sock, VAL_AND_STR(SRTO_TSBPDMODE)) > 0)
+	{
+		const int latency_rcv  = get_sock_value(sock, VAL_AND_STR(SRTO_RCVLATENCY));
+		const int latency_peer = get_sock_value(sock, VAL_AND_STR(SRTO_PEERLATENCY));
+		latency_str = fmt::format("Latency RCV {}ms, peer {}ms", latency_rcv, latency_peer);
+	}
+	else
+	{
+		latency_str = "off";
+	}
+
 #if ENABLE_AEAD_API_PREVIEW
 	const int crypto_mode  = get_sock_value(sock, VAL_AND_STR(SRTO_CRYPTOMODE));
-	const auto crypto_mode_str = fmt::format(". Cryptomode {}", convert(crypto_mode, cryptomodes));
+	const auto crypto_mode_str = fmt::format("{}", convert(crypto_mode, cryptomodes));
 #else
 	const string crypto_mode_str = "";
 #endif
@@ -379,7 +391,8 @@ std::string socket::srt::print_negotiated_config(SRTSOCKET sock)
 		streamid_len = 0;
 	}
 
-	return fmt::format("KM state {} (RCV {}, SND {}). PB key length : {}{}. Stream ID: {}",
+	return fmt::format("TSBPD {}. KM state {} (RCV {}, SND {}). PB key length: {}. Cryptomode {}. Stream ID: {}",
+					   latency_str,
 					   convert(km_state, km_states),
 					   convert(km_state_rcv, km_states),
 					   convert(km_state_snd, km_states),
