@@ -85,7 +85,7 @@ shared_sock_t create_connection(const vector<UriParser>& parsed_urls, shared_soc
 		return connection;
 	}
 
-	return nullptr;
+	throw socket::exception(fmt::format("Unknown protocol '{}'.", uri.proto()));
 }
 
 
