@@ -52,7 +52,7 @@ future<void> io_dispatch::launch()
 		SRTSOCKET     wr_ready[MAX_POLL_EVENTS] = { SRT_INVALID_SOCK };
 
 		int epoll_res = SRT_SUCCESS;
-		while (epoll_res = srt_epoll_wait(m_epoll_io, rd_ready, &rd_len, wr_ready, &wr_len, POLL_TIMEOUT_MS, 0, 0, 0, 0) >= 0)
+		while ((epoll_res = srt_epoll_wait(m_epoll_io, rd_ready, &rd_len, wr_ready, &wr_len, POLL_TIMEOUT_MS, 0, 0, 0, 0)) >= 0)
 		{
 			if (m_stop_requested)
 			{
