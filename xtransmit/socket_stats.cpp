@@ -4,6 +4,8 @@
 // submodules
 #include "spdlog/spdlog.h"
 
+#include "threadname.h"
+
 using namespace std;
 using namespace xtransmit;
 using namespace std::chrono;
@@ -135,6 +137,7 @@ future<void> xtransmit::socket::stats_writer::launch()
 						 mutex&               stats_lock,
 						 const atomic_bool&   stop_stats) {
 		bool print_header = true;
+		//srt::ThreadName tn("xtr::stats");
 
 		while (!stop_stats)
 		{

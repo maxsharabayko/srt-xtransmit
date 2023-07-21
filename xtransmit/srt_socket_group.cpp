@@ -666,11 +666,10 @@ int socket::srt_group::configure_post(SRTSOCKET sock, int link_index)
 
 size_t socket::srt_group::read(const mutable_buffer& buffer, int timeout_ms)
 {
+	int ready[2] = {SRT_INVALID_SOCK, SRT_INVALID_SOCK};
+	int len      = 2;
 	if (!m_blocking_mode)
 	{
-		int ready[2] = {SRT_INVALID_SOCK, SRT_INVALID_SOCK};
-		int len      = 2;
-
 		const int epoll_res = srt_epoll_wait(m_epoll_io, ready, &len, nullptr, nullptr, timeout_ms, 0, 0, 0, 0);
 		if (epoll_res == SRT_ERROR)
 		{
@@ -687,7 +686,16 @@ size_t socket::srt_group::read(const mutable_buffer& buffer, int timeout_ms)
 		if (srt_getlasterror(nullptr) != SRT_EASYNCRCV)
 			raise_exception("read::recv");
 
-		spdlog::warn(LOG_SRT_GROUP "recvmsg returned error 6002: read error, try again");
+		std::stringstream ss;
+		for (unsigned i = 0; i < 2; ++i)
+		{
+			if (ready[i] == SRT_INVALID_SOCK)
+				continue;
+
+			ss << " @" << ready[i];
+		}
+
+		spdlog::warn(LOG_SRT_GROUP "@{} recvmsg returned error 6002: read error, try again. Ready: {}.", m_bind_socket, ss.str());
 		return 0;
 	}
 

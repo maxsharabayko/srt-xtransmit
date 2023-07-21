@@ -13,7 +13,6 @@ namespace xtransmit {
 
 #define LOG_SC_CONN "CONN "
 
-
 shared_sock_t create_connection(const vector<UriParser>& parsed_urls, shared_sock_t& listening_sock)
 {
 	if (parsed_urls.empty())

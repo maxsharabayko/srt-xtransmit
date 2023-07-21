@@ -110,5 +110,18 @@ namespace metrics
 	};
 
 
+	/// @brief Output metrics in a loop until @a force_break is true.
+	/// @param metrics_file the output file handle; print to stdout if not open.
+	/// @param validator the source of the metrics.
+	/// @param mtx mutex to protect access to validator
+	/// @param freq output frequency.
+	/// @param force_break break the loop and return from the function once set to true.
+	void writing_loop(ofstream& metrics_file,
+		metrics::validator& validator,
+		mutex& mtx,
+		const std::chrono::milliseconds& freq,
+		const std::atomic_bool& force_break);
+
+
 } // namespace metrics
 } // namespace xtransmit

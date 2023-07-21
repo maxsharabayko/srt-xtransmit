@@ -21,6 +21,7 @@
 
 #include "forward.h"
 #include "generate.hpp"
+#include "mreceive.hpp"
 #include "receive.hpp"
 #include "route.hpp"
 #include "file-send.hpp"
@@ -200,6 +201,9 @@ int main(int argc, char** argv)
 	xtransmit::receive::config cfg_receive;
 	CLI::App*                  sc_receive = receive::add_subcommand(app, cfg_receive, src_urls);
 
+	xtransmit::mreceive::config cfg_mreceive;
+	CLI::App* sc_mreceive = mreceive::add_subcommand(app, cfg_mreceive, src_urls);
+
 	xtransmit::route::config cfg_route;
 	CLI::App*                sc_route = route::add_subcommand(app, cfg_route, src_urls, dst_urls);
 
@@ -229,6 +233,11 @@ int main(int argc, char** argv)
 	else if (sc_receive->parsed())
 	{
 		xtransmit::receive::run(src_urls, cfg_receive, force_break);
+		return 0;
+	}
+	else if (sc_mreceive->parsed())
+	{
+		xtransmit::mreceive::run(src_urls, cfg_mreceive, force_break);
 		return 0;
 	}
 	else if (sc_route->parsed())

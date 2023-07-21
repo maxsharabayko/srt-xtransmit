@@ -243,5 +243,42 @@ string validator::stats_csv(bool only_header)
 	return ss.str();
 }
 
+
+/// @brief Output metrics in a loop until @a force_break is true.
+/// @param metrics_file the output file handle; print to stdout if not open.
+/// @param validator the source of the metrics.
+/// @param mtx mutex to protect access to validator
+/// @param freq output frequency.
+/// @param force_break break the loop and return from the function once set to true.
+void writing_loop(ofstream& metrics_file,
+	validator& validator,
+	mutex& mtx,
+	const chrono::milliseconds& freq,
+	const atomic_bool& force_break)
+{
+	auto stat_time = steady_clock::now();
+	while (!force_break)
+	{
+		const auto tnow = steady_clock::now();
+		if (tnow >= stat_time)
+		{
+			if (metrics_file.is_open())
+			{
+				lock_guard<mutex> lck(mtx);
+				metrics_file << validator.stats_csv(false);
+			}
+			else
+			{
+				lock_guard<mutex> lck(mtx);
+				const auto        stats_str = validator.stats();
+				spdlog::info("METRICS {}", stats_str);
+			}
+			stat_time += freq;
+		}
+
+		std::this_thread::sleep_until(stat_time);
+	}
+}
+
 } // namespace metrics
 } // namespace xtransmit

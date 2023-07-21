@@ -14,8 +14,9 @@
 // xtransmit
 #include "socket_stats.hpp"
 #include "misc.hpp"
-#include "receive.hpp"
+#include "mreceive.hpp"
 #include "metrics.hpp"
+#include "thread_io.hpp"
 
 // OpenSRT
 #include "apputil.hpp"
@@ -24,38 +25,14 @@
 
 using namespace std;
 using namespace xtransmit;
-using namespace xtransmit::receive;
+using namespace xtransmit::mreceive;
 using namespace std::chrono;
 
-using shared_srt  = std::shared_ptr<socket::srt>;
+using shared_srt = std::shared_ptr<socket::srt>;
 using shared_sock = std::shared_ptr<socket::isocket>;
 
-#define LOG_SC_RECEIVE "RECEIVE "
+#define LOG_SC_RECEIVE "MRCV "
 
-void trace_message(const size_t bytes, const vector<char>& buffer, SOCKET conn_id)
-{
-	::cout << "RECEIVED MESSAGE length " << bytes << " on conn ID " << conn_id;
-
-#if 0
-	if (bytes < 50)
-	{
-		::cout << ":\n";
-		::cout << string(buffer.data(), bytes).c_str();
-	}
-	else if (buffer[0] >= '0' && buffer[0] <= 'z')
-	{
-		::cout << " (first character):";
-		::cout << buffer[0];
-	}
-#endif
-	::cout << endl;
-
-	// CHandShake hs;
-	// if (hs.load_from(buffer.data(), buffer.size()) < 0)
-	//	return;
-	//
-	//::cout << "SRT HS: " << hs.show() << endl;
-}
 
 void run_pipe(shared_sock src, const config& cfg, const atomic_bool& force_break)
 {
@@ -82,12 +59,12 @@ void run_pipe(shared_sock src, const config& cfg, const atomic_bool& force_break
 		}
 
 		metrics_th = async(::launch::async,
-						   metrics::writing_loop,
-						   ref(metrics_file),
-						   ref(validator),
-						   ref(metrics_mtx),
-						   chrono::milliseconds(cfg.metrics_freq_ms),
-						   ref(metrics_stop));
+			metrics::writing_loop,
+			ref(metrics_file),
+			ref(validator),
+			ref(metrics_mtx),
+			chrono::milliseconds(cfg.metrics_freq_ms),
+			ref(metrics_stop));
 	}
 
 	try
@@ -102,8 +79,6 @@ void run_pipe(shared_sock src, const config& cfg, const atomic_bool& force_break
 				continue;
 			}
 
-			if (cfg.print_notifications)
-				trace_message(bytes, buffer, sock.id());
 			if (cfg.enable_metrics)
 			{
 				lock_guard<mutex> lck(metrics_mtx);
@@ -135,21 +110,47 @@ void run_pipe(shared_sock src, const config& cfg, const atomic_bool& force_break
 	}
 }
 
-void xtransmit::receive::run(const std::vector<std::string>& src_urls,
-							 const config&                   cfg,
-							 const atomic_bool&              force_break)
+void xtransmit::mreceive::run(const std::vector<std::string>& src_urls,
+	const config& cfg,
+	const atomic_bool& force_break)
 {
 	using namespace std::placeholders;
-	srt::ThreadName tn(std::string("xtr::rcv"));
-	processing_fn_t process_fn = std::bind(run_pipe, _1, cfg, _2);
-	common_run(src_urls, cfg, cfg.reconnect, force_break, process_fn);
+	io_dispatch io;
+
+	std::function<void(shared_sock_t, const std::atomic_bool&)> on_connect_fn = [&io, cfg](shared_sock_t sock, const std::atomic_bool& force_break)
+	{
+		auto read_fn = [cfg](shared_sock_t& src)
+		{
+			try
+			{
+				vector<char>       buffer(cfg.message_size);
+				socket::isocket& sock = *src.get();
+				const size_t bytes = sock.read(mutable_buffer(buffer.data(), buffer.size()), -1);
+
+				if (bytes == 0)
+				{
+					spdlog::debug(LOG_SC_RECEIVE "sock::read() returned 0 bytes (spurious read ready?). Retrying.");
+					return;
+				}
+			}
+			catch (const socket::exception& e)
+			{
+				spdlog::warn(LOG_SC_RECEIVE "{}", e.what());
+			}
+		};
+
+		const int events = SRT_EPOLL_IN | SRT_EPOLL_ERR;
+		io.add(sock, force_break, events, read_fn);
+	};
+
+	common_run(src_urls, cfg, cfg.reconnect, force_break, on_connect_fn);
 }
 
-CLI::App* xtransmit::receive::add_subcommand(CLI::App& app, config& cfg, std::vector<std::string>& src_urls)
+CLI::App* xtransmit::mreceive::add_subcommand(CLI::App& app, config& cfg, std::vector<std::string>& src_urls)
 {
-	const map<string, int> to_ms{{"s", 1000}, {"ms", 1}};
+	const map<string, int> to_ms{{"s", 1000}, { "ms", 1 }};
 
-	CLI::App* sc_receive = app.add_subcommand("receive", "Receive data (SRT, UDP)")->fallthrough();
+	CLI::App* sc_receive = app.add_subcommand("mreceive", "Receive data from multiple sockets (SRT, UDP)")->fallthrough();
 	sc_receive->add_option("-i,--input,src", src_urls, "Source URI");
 	sc_receive->add_option("--msgsize", cfg.message_size, fmt::format("Size of the buffer to receive message payload (default {})", cfg.message_size));
 	sc_receive->add_option("--statsfile", cfg.stats_file, "Output stats report filename");
@@ -162,7 +163,6 @@ CLI::App* xtransmit::receive::add_subcommand(CLI::App& app, config& cfg, std::ve
 	sc_receive->add_option("--metricsfile", cfg.metrics_file, "Metrics output filename (default stdout)");
 	sc_receive->add_option("--metricsfreq", cfg.metrics_freq_ms, fmt::format("Metrics report frequency, ms (default {})", cfg.metrics_freq_ms))
 		->transform(CLI::AsNumberWithUnit(to_ms, CLI::AsNumberWithUnit::CASE_SENSITIVE));
-	sc_receive->add_flag("--twoway", cfg.send_reply, "Both send and receive data");
 
 	return sc_receive;
 }
