@@ -1,4 +1,4 @@
-#if ENABLE_BONDING
+#if false && ENABLE_BONDING
 
 #include <thread>
 #include <iostream>
@@ -167,6 +167,10 @@ socket::srt_group::srt_group(const vector<UriParser>& uris)
 		m_epoll_connect = srt_epoll_create();
 		if (m_epoll_connect == -1)
 			throw socket::exception(srt_getlasterror_str());
+
+		m_epoll_io = srt_epoll_create();
+		if (m_epoll_io == -1)
+			throw socket::exception(srt_getlasterror_str());
 	}
 
 	// Create SRT socket group
@@ -188,17 +192,29 @@ socket::srt_group::srt_group(srt_group& group, int group_id)
 	, m_mode(group.m_mode)
 	, m_blocking_mode(group.m_blocking_mode)
 {
+	if (!m_blocking_mode)
+	{
+		m_epoll_io = srt_epoll_create();
+		if (m_epoll_io == -1)
+			throw socket::exception(srt_getlasterror_str());
+
+		const int io_modes = SRT_EPOLL_IN | SRT_EPOLL_OUT | SRT_EPOLL_ERR;
+		if (SRT_ERROR == srt_epoll_add_usock(m_epoll_io, m_bind_socket, &io_modes))
+			throw socket::exception(srt_getlasterror_str());
+	}
 }
 
 socket::srt_group::~srt_group()
 {
 	if (!m_blocking_mode)
 	{
-		spdlog::debug(LOG_SRT_GROUP "@{} Closing. Releasing epolls", m_bind_socket);
+		spdlog::debug(LOG_SRT_GROUP "0x{:X} Closing. Releasing epolls", m_bind_socket);
 		if (m_epoll_connect != -1)
 			srt_epoll_release(m_epoll_connect);
+		if (m_epoll_io != -1)
+			srt_epoll_release(m_epoll_io);
 	}
-	spdlog::debug(LOG_SRT_GROUP "@{} Closing SRT group", m_bind_socket);
+	spdlog::debug(LOG_SRT_GROUP "0x{:X} Closing SRT group", m_bind_socket);
 	release_targets();
 	release_listeners();
 	srt_close(m_bind_socket);
@@ -207,7 +223,7 @@ socket::srt_group::~srt_group()
 void socket::srt_group::create_listeners(const vector<UriParser>& src_uri)
 {
 	// Create listeners according to the parameters
-	for (int i = 0; i < (int) src_uri.size(); ++i)
+	for (size_t i = 0; i < src_uri.size(); ++i)
 	{
 		const UriParser& url = src_uri[i];
 		netaddr_any      sa  = create_addr(url.host(), url.portno());
@@ -231,9 +247,13 @@ void socket::srt_group::create_listeners(const vector<UriParser>& src_uri)
 			const int modes = SRT_EPOLL_IN | SRT_EPOLL_ERR;
 			if (SRT_ERROR == srt_epoll_add_usock(m_epoll_connect, s, &modes))
 				throw socket::exception(srt_getlasterror_str());
+
+			const int io_modes = SRT_EPOLL_IN | SRT_EPOLL_OUT | SRT_EPOLL_ERR;
+			if (SRT_ERROR == srt_epoll_add_usock(m_epoll_io, s, &io_modes))
+				throw socket::exception(srt_getlasterror_str());
 		}
 
-		spdlog::trace(LOG_SRT_GROUP "Created listener @{} on {}:{}", s, url.host(), url.portno());
+		spdlog::trace(LOG_SRT_GROUP "Created listener 0x{:X} on {}:{}", s, url.host(), url.portno());
 
 		m_listeners.push_back(s);
 	}
@@ -309,6 +329,10 @@ void socket::srt_group::create_callers(const vector<UriParser>& uris, SRT_GROUP_
 		const int modes = SRT_EPOLL_OUT | SRT_EPOLL_ERR;
 		if (SRT_ERROR == srt_epoll_add_usock(m_epoll_connect, m_bind_socket, &modes))
 			throw socket::exception(srt_getlasterror_str());
+
+		const int io_modes = SRT_EPOLL_IN | SRT_EPOLL_OUT | SRT_EPOLL_ERR;
+		if (SRT_ERROR == srt_epoll_add_usock(m_epoll_io, m_bind_socket, &io_modes))
+			throw socket::exception(srt_getlasterror_str());
 	}
 
 	set_connect_callback();
@@ -342,7 +366,7 @@ shared_srt_group socket::srt_group::accept()
 		if (srt_epoll_wait(m_epoll_connect, ready, &len, 0, 0, timeout_ms, 0, 0, 0, 0) == SRT_ERROR)
 			raise_exception("accept::epoll_wait");
 
-		spdlog::trace(LOG_SRT_GROUP "Epoll read-ready sock @{}, @{}", ready[0], len > 1 ? ready[1] : 0);
+		spdlog::trace(LOG_SRT_GROUP "Epoll read-ready sock 0x{:X}, 0x{:X}", ready[0], len > 1 ? ready[1] : 0);
 
 		sockaddr_in     scl;
 		int             sclen      = sizeof scl;
@@ -353,12 +377,12 @@ shared_srt_group socket::srt_group::accept()
 	}
 	else
 	{
-		accepted_sock = srt_accept_bond(m_listeners.data(), (int) m_listeners.size(), -1);
+		accepted_sock = srt_accept_bond(m_listeners.data(), m_listeners.size(), -1);
 		if (accepted_sock == SRT_INVALID_SOCK)
 			raise_exception("accept_bond failed with {}", srt_getlasterror_str());
 	}
 
-	spdlog::info(LOG_SRT_GROUP "Accepted connection sock @{}. {}.", accepted_sock, srt::print_negotiated_config(accepted_sock));
+	spdlog::info(LOG_SRT_GROUP "Accepted connection sock 0x{:X}. {}.", accepted_sock, srt::print_negotiated_config(accepted_sock));
 	const int res = configure_post(accepted_sock, 0); // TODO: are there POST options per link?
 	if (res == SRT_ERROR)
 		raise_exception("accept::configure_post");
@@ -391,7 +415,7 @@ void socket::srt_group::print_member_socket(SRTSOCKET sock)
 
 	gtype = gtype < 0 ? 0 : (gtype > 3 ? 0 : gtype);
 	const char* gtype_str[] = { "NO GROUP", "BROADCAST", "BACKUP", "BALANCING"};
-	spdlog::trace(LOG_SRT_GROUP "Member socket @{}, {} weight = {}", sock,
+	spdlog::trace(LOG_SRT_GROUP "Member socket 0x{:X}, {} weight = {}", sock,
 		gtype_str[gtype], weight);
 }
 
@@ -416,7 +440,7 @@ int socket::srt_group::listen_callback_fn(void* opaq, SRTSOCKET sock, int hsvers
 	int host_sa_len = sizeof host_sa;
 	srt_getsockname(sock, &host_sa, &host_sa_len);
 	netaddr_any host(&host_sa, host_sa_len);
-	spdlog::trace(LOG_SRT_GROUP "Accepted member socket @{}, host IP {}, remote IP {}", sock, host.str(), sa.str());
+	spdlog::trace(LOG_SRT_GROUP "Accepted member socket 0x{:X}, host IP {}, remote IP {}", sock, host.str(), sa.str());
 
 	// TODO: this group may no longer exist. Use some global array to track valid groups.
 	socket::srt_group* group = reinterpret_cast<socket::srt_group*>(opaq);
@@ -451,11 +475,11 @@ void socket::srt_group::on_connect_callback(SRTSOCKET sock, int error, const soc
 	if (error == SRT_SUCCESS)
 	{
 		// After SRT v1.4.2 connection callback is no longer called on connection success.
-		spdlog::trace(LOG_SRT_GROUP "@{} Member socket connected @{} (token {}).", m_bind_socket, sock, token);
+		spdlog::trace(LOG_SRT_GROUP "Member socket connected 0x{:X} (token {}).", sock, token);
 		return;
 	}
 
-	spdlog::warn(LOG_SRT_GROUP "@{} Member socket @{} (token {}) connection error: ({}) {}.", m_bind_socket, sock, token, error,
+	spdlog::warn(LOG_SRT_GROUP "Member socket 0x{:X} (token {}) connection error: ({}) {}.", sock, token, error,
 		srt_strerror(error, 0));
 
 	bool reconn_scheduled = false;
@@ -465,19 +489,19 @@ void socket::srt_group::on_connect_callback(SRTSOCKET sock, int error, const soc
 			continue;
 
 		auto connfn = [](SRTSOCKET group, SRT_SOCKGROUPCONFIG target) {
-			spdlog::trace(LOG_SRT_GROUP "@{}: Reconnecting member socket (token {})", group, target.token);
+			spdlog::trace(LOG_SRT_GROUP "0x{:X}: Reconnecting member socket (token {})", group, target.token);
 			const int st = srt_connect_group(group, &target, 1);
 			if (st == SRT_ERROR)
-				spdlog::warn(LOG_SRT_GROUP "@{}: Member reconnection failed (token {})", group, target.token);
+				spdlog::warn(LOG_SRT_GROUP "0x{:X}: Member reconnection failed (token {})", group, target.token);
 		};
 
-		spdlog::trace(LOG_SRT_GROUP "@{}: Scheduling member reconnection (token {})", m_bind_socket, token);
+		spdlog::trace(LOG_SRT_GROUP "0x{:X}: Scheduling member reconnection (token {})", m_bind_socket, token);
 		reconn_scheduled = true;
 		m_scheduler.schedule_in(std::chrono::seconds(1), connfn, m_bind_socket, target);
 	}
 
 	if (!reconn_scheduled)
-		spdlog::warn(LOG_SRT_GROUP "@{}: Could not schedule member reconnection (token {})", m_bind_socket, token);
+		spdlog::warn(LOG_SRT_GROUP "0x{:X}: Could not schedule member reconnection (token {})", m_bind_socket, token);
 
 	return;
 }
@@ -492,13 +516,13 @@ void socket::srt_group::raise_exception(const string&& place, SRTSOCKET sock) co
 	const int    udt_result = srt_getlasterror(nullptr);
 	const string message    = srt_getlasterror_str();
 	spdlog::debug(
-		LOG_SRT_GROUP "@{} {} ERROR {} {}", sock != SRT_INVALID_SOCK ? sock : m_bind_socket, place, udt_result, message);
+		LOG_SRT_GROUP "0x{:X} {} ERROR {} {}", sock != SRT_INVALID_SOCK ? sock : m_bind_socket, place, udt_result, message);
 	throw socket::exception(place + ": " + message);
 }
 
 void socket::srt_group::raise_exception(const string&& place, const string&& reason) const
 {
-	spdlog::debug(LOG_SRT_GROUP "@{} {} ERROR {}", m_bind_socket, place, reason);
+	spdlog::debug(LOG_SRT_GROUP "0x{:X} {} ERROR {}", m_bind_socket, place, reason);
 	throw socket::exception(place + ": " + reason);
 }
 
@@ -512,7 +536,7 @@ void socket::srt_group::release_targets()
 void socket::srt_group::release_listeners()
 {
 	for (auto sock : m_listeners) {
-		spdlog::trace(LOG_SRT_GROUP "Closing listener @{}", sock);
+		spdlog::trace(LOG_SRT_GROUP "Closing listener 0x{:X}", sock);
 		srt_close(sock);
 	}
 	m_listeners.clear();
@@ -521,7 +545,7 @@ void socket::srt_group::release_listeners()
 shared_srt_group socket::srt_group::connect()
 {
 	spdlog::debug(
-		LOG_SRT_GROUP "@{} {} Connecting group to remote SRT", m_bind_socket, m_blocking_mode ? "SYNC" : "ASYNC");
+		LOG_SRT_GROUP "0x{:X} {} Connecting group to remote SRT", m_bind_socket, m_blocking_mode ? "SYNC" : "ASYNC");
 
 	if (!m_blocking_mode && false)
 	{
@@ -558,13 +582,13 @@ shared_srt_group socket::srt_group::connect()
 	{
 		spdlog::debug(
 			LOG_SRT_GROUP "srt_connect_group");
-		const int st = srt_connect_group(m_bind_socket, m_targets.data(), (int) m_targets.size());
+		const int st = srt_connect_group(m_bind_socket, m_targets.data(), m_targets.size());
 		if (st == SRT_ERROR)
 			raise_exception("srt_group::connect");
 	}
 
 	spdlog::debug(
-		LOG_SRT_GROUP "@{} {} Group member connected to remote. {}.", m_bind_socket, m_blocking_mode ? "SYNC" : "ASYNC",
+		LOG_SRT_GROUP "0x{:X} {} Group member connected to remote. {}.", m_bind_socket, m_blocking_mode ? "SYNC" : "ASYNC",
 		srt::print_negotiated_config(m_bind_socket));
 
 	return shared_from_this();
@@ -642,13 +666,36 @@ int socket::srt_group::configure_post(SRTSOCKET sock, int link_index)
 
 size_t socket::srt_group::read(const mutable_buffer& buffer, int timeout_ms)
 {
+	int ready[2] = {SRT_INVALID_SOCK, SRT_INVALID_SOCK};
+	int len      = 2;
+	if (!m_blocking_mode)
+	{
+		const int epoll_res = srt_epoll_wait(m_epoll_io, ready, &len, nullptr, nullptr, timeout_ms, 0, 0, 0, 0);
+		if (epoll_res == SRT_ERROR)
+		{
+			if (srt_getlasterror(nullptr) == SRT_ETIMEOUT)
+				return 0;
+
+			raise_exception("read::epoll");
+		}
+	}
+
 	const int res = srt_recvmsg2(m_bind_socket, static_cast<char*>(buffer.data()), (int)buffer.size(), nullptr);
 	if (SRT_ERROR == res)
 	{
 		if (srt_getlasterror(nullptr) != SRT_EASYNCRCV)
 			raise_exception("read::recv");
 
-		spdlog::warn(LOG_SRT_GROUP "@{} recvmsg returned error 6002: read error, try again.", m_bind_socket);
+		std::stringstream ss;
+		for (unsigned i = 0; i < 2; ++i)
+		{
+			if (ready[i] == SRT_INVALID_SOCK)
+				continue;
+
+			ss << " @" << ready[i];
+		}
+
+		spdlog::warn(LOG_SRT_GROUP "@{} recvmsg returned error 6002: read error, try again. Ready: {}.", m_bind_socket, ss.str());
 		return 0;
 	}
 
@@ -657,6 +704,18 @@ size_t socket::srt_group::read(const mutable_buffer& buffer, int timeout_ms)
 
 int socket::srt_group::write(const const_buffer& buffer, int timeout_ms)
 {
+	if (!m_blocking_mode)
+	{
+		int ready[2]  = {SRT_INVALID_SOCK, SRT_INVALID_SOCK};
+		int len       = 2;
+		int rready[2] = {SRT_INVALID_SOCK, SRT_INVALID_SOCK};
+		int rlen      = 2;
+		// TODO: check error fds
+		const int res = srt_epoll_wait(m_epoll_io, rready, &rlen, ready, &len, timeout_ms, 0, 0, 0, 0);
+		if (res == SRT_ERROR)
+			raise_exception("write::epoll");
+	}
+
 	const int res =
 		srt_sendmsg2(m_bind_socket, static_cast<const char*>(buffer.data()), static_cast<int>(buffer.size()), nullptr);
 	if (res == SRT_ERROR)
@@ -838,7 +897,7 @@ const string socket::srt_group::get_statistics_csv(bool print_header) const {
 	if (srt_group_data(m_bind_socket, NULL, &group_size) != SRT_SUCCESS)
 	{
 		// Not throwing an exception as group stats was retrieved.
-		spdlog::warn(LOG_SRT_GROUP "@{} get_statistics_csv: Failed to retrieve the number of group members", m_bind_socket);
+		spdlog::warn(LOG_SRT_GROUP "0x{:X} get_statistics_csv: Failed to retrieve the number of group members", m_bind_socket);
 		return csv_stats;
 	}
 
@@ -847,7 +906,7 @@ const string socket::srt_group::get_statistics_csv(bool print_header) const {
 	if (num_members == SRT_ERROR)
 	{
 		// Not throwing an exception as group stats was retrieved.
-		spdlog::warn(LOG_SRT_GROUP "@{} get_statistics_csv: Failed to retrieve group data, {}", m_bind_socket, srt_getlasterror_str());
+		spdlog::warn(LOG_SRT_GROUP "0x{:X} get_statistics_csv: Failed to retrieve group data, {}", m_bind_socket, srt_getlasterror_str());
 		return csv_stats;
 	}
 
@@ -858,13 +917,13 @@ const string socket::srt_group::get_statistics_csv(bool print_header) const {
 
 		if (group_data[i].sockstate != SRTS_CONNECTED)
 		{
-			spdlog::trace(LOG_SRT_GROUP "@{} get_statistics_csv: Socket @{} state is {}, skipping.", m_bind_socket, id, srt_logging::SockStatusStr(status));
+			spdlog::trace(LOG_SRT_GROUP "0x{:X} get_statistics_csv: Socket 0x{:X} state is {}, skipping.", m_bind_socket, id, srt_logging::SockStatusStr(status));
 			continue;
 		}
 
 		if (SRT_ERROR == srt_bstats(id, &stats, true))
 		{
-			spdlog::warn(LOG_SRT_GROUP "@{} get_statistics_csv: Failed to retrieve stats for member @{}. {}", m_bind_socket, id, srt_getlasterror_str());
+			spdlog::warn(LOG_SRT_GROUP "0x{:X} get_statistics_csv: Failed to retrieve stats for member 0x{:X}. {}", m_bind_socket, id, srt_getlasterror_str());
 			continue;
 		}
 
@@ -886,7 +945,7 @@ const string socket::srt_group::get_statistics_json() const {
 	if (srt_group_data(m_bind_socket, NULL, &group_size) != SRT_SUCCESS)
 	{
 		// Not throwing an exception as group stats was retrieved.
-		spdlog::warn(LOG_SRT_GROUP "@{} get_statistics_json: Failed to retrieve the number of group members", m_bind_socket);
+		spdlog::warn(LOG_SRT_GROUP "0x{:X} get_statistics_json: Failed to retrieve the number of group members", m_bind_socket);
 		return root.dump() + "\n";
 	}
 
@@ -895,7 +954,7 @@ const string socket::srt_group::get_statistics_json() const {
 	if (num_members == SRT_ERROR)
 	{
 		// Not throwing an exception as group stats was retrieved.
-		spdlog::warn(LOG_SRT_GROUP "@{} get_statistics_json: Failed to retrieve group data, {}", m_bind_socket, srt_getlasterror_str());
+		spdlog::warn(LOG_SRT_GROUP "0x{:X} get_statistics_json: Failed to retrieve group data, {}", m_bind_socket, srt_getlasterror_str());
 		return root.dump() + "\n";
 	}
 
@@ -907,13 +966,13 @@ const string socket::srt_group::get_statistics_json() const {
 
 		if (group_data[i].sockstate != SRTS_CONNECTED)
 		{
-			spdlog::trace(LOG_SRT_GROUP "@{} get_statistics_json: Socket 0x{:X} state is {}, skipping.", m_bind_socket, id, srt_logging::SockStatusStr(status));
+			spdlog::trace(LOG_SRT_GROUP "0x{:X} get_statistics_json: Socket 0x{:X} state is {}, skipping.", m_bind_socket, id, srt_logging::SockStatusStr(status));
 			continue;
 		}
 
 		if (SRT_ERROR == srt_bstats(id, &stats, true))
 		{
-			spdlog::warn(LOG_SRT_GROUP "@{} get_statistics_json: Failed to retrieve stats for member @{}. {}", m_bind_socket, id, srt_getlasterror_str());
+			spdlog::warn(LOG_SRT_GROUP "0x{:X} get_statistics_json: Failed to retrieve stats for member 0x{:X}. {}", m_bind_socket, id, srt_getlasterror_str());
 			continue;
 		}
 

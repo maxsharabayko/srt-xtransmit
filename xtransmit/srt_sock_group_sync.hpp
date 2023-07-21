@@ -1,5 +1,5 @@
 #pragma once
-#if ENABLE_BONDING
+#if false && ENABLE_BONDING
 #include <memory>
 #include <exception>
 #include <future>
@@ -119,6 +119,7 @@ private:
 	std::vector<SRTSOCKET> m_listeners;
 	std::vector<SRT_SOCKGROUPCONFIG> m_targets;
 	int                    m_epoll_connect = -1;
+	int                    m_epoll_io      = -1;
 
 	connection_mode          m_mode          = FAILURE;
 	bool                     m_blocking_mode = true;
