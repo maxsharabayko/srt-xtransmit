@@ -51,13 +51,21 @@ future<void> io_dispatch::launch()
 		SRTSOCKET     rd_ready[MAX_POLL_EVENTS] = { SRT_INVALID_SOCK };
 		SRTSOCKET     wr_ready[MAX_POLL_EVENTS] = { SRT_INVALID_SOCK };
 
-		int epoll_res = SRT_SUCCESS;
-		while ((epoll_res = srt_epoll_wait(m_epoll_io, rd_ready, &rd_len, wr_ready, &wr_len, POLL_TIMEOUT_MS, 0, 0, 0, 0)) >= 0)
+		while (true)
 		{
+			const int epoll_res = srt_epoll_wait(m_epoll_io, rd_ready, &rd_len, wr_ready, &wr_len, POLL_TIMEOUT_MS, 0, 0, 0, 0);
 			if (m_stop_requested)
 			{
 				spdlog::info(LOG_IO "dispatch stop requested.");
 				break;
+			}
+			if (epoll_res <= 0)
+			{
+				const auto e = srt_getlasterror(nullptr);
+				if (e == SRT_ETIMEOUT)
+					continue;
+				spdlog::error(LOG_IO "Epoll error {}.", srt_getlasterror_str());
+				break;	
 			}
 
 			if (rd_len == 1 && wr_len == 1)
@@ -71,7 +79,7 @@ future<void> io_dispatch::launch()
 			{
 				// Handle reading.
 				try {
-					spdlog::info(LOG_IO "Signalled read-ready on @{}.", rd_ready[0]);
+					//spdlog::info(LOG_IO "Signalled read-ready on @{}.", rd_ready[0]);
 					auto& s = m_sockets.at(rd_ready[0]);
 					s.read_fn(s.sock);
 				}
@@ -88,7 +96,7 @@ future<void> io_dispatch::launch()
 			}
 		}
 
-		spdlog::warn(LOG_IO "dispatch finishing, epoll res {}.", epoll_res);
+		spdlog::warn(LOG_IO "dispatch finishing.");
 	};
 
 	return async(std::launch::async, th_fn);
