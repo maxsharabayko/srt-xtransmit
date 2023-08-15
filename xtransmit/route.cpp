@@ -25,6 +25,7 @@
 // SRTX
 #include "pkt_base.hpp"
 #include "pkt_ack.hpp"
+#include "pkt_data.hpp"
 
 using namespace std;
 using namespace xtransmit;
@@ -79,13 +80,34 @@ namespace route
 				std::string ack_details;
 				if (pkt.is_ctrl() && pkt.control_type() == srtx::ctrl_type::ACK)
 				{
+					if (byteoff >= 4 && byteoff < 8)
+						ack_details = "ackno";
+					else if (byteoff >= 8 && byteoff < 12)
+						ack_details = "timestamp";
+					else if (byteoff >= 12 && byteoff < 16)
+						ack_details = "DST sock ID";
+					else if (byteoff >= 16 && byteoff < 20)
+						ack_details = "ack seqno";
+					else if (byteoff >= 32 && byteoff < 36)
+						ack_details = "avail RCV buffer";
+
 					srtx::pkt_ack< vector<char>> ack(pkt);
-					ack_details = fmt::format(" ackno {}, ackseqno {}", ack.ackno(), ack.ackseqno());
+					ack_details += fmt::format(" (ackno {}, ackseqno {}).", ack.ackno(), ack.ackseqno());
 				}
 
-				spdlog::info(LOG_SC_ROUTE "{} Corrupting a {} at byte offset {}", desc, pkt_type_str,
-					byteoff);
-				++buffer[byteoff];
+				if (!pkt.is_ctrl() && cfg.corrupt_kk_flag)
+				{
+					srtx::pkt_data< vector<char>> d(pkt);
+					spdlog::info(LOG_SC_ROUTE "{} Corrupting a {} pkt seqno {} setting KK flag to 0.", desc, pkt_type_str, d.seqno());
+					//d.key_flag(0);
+					buffer[4] = 0xE7 & buffer[4];
+				}
+				else
+				{
+					spdlog::info(LOG_SC_ROUTE "{} Corrupting a {} pkt at byte offset {}. {}", desc, pkt_type_str,
+						byteoff, ack_details);
+					++buffer[byteoff];
+				}
 				pkts_untill_corrupt = cfg.corrupt_pkt_freq;
 			}
 
@@ -160,6 +182,7 @@ CLI::App* xtransmit::route::add_subcommand(CLI::App& app, config& cfg, vector<st
 	sc_route->add_option("--corruptfreq", cfg.corrupt_freq_ms, "artificial packet corruption frequency (ms)")
 		->transform(CLI::AsNumberWithUnit(to_ms, CLI::AsNumberWithUnit::CASE_SENSITIVE));
 	sc_route->add_option("--corruptpkt", cfg.corrupt_pkt_freq, "artificial packet corruption frequency (every n-th packet)");
+	sc_route->add_flag("--corruptkkflag", cfg.corrupt_kk_flag, "when corrupting a data packet corrupt KK flag setting it to 0.");
 	sc_route->add_option("--statsfile", cfg.stats_file, "output stats report filename");
 	sc_route->add_option("--statsformat", cfg.stats_format, "output stats report format (json, csv)");
 	sc_route->add_option("--statsfreq", cfg.stats_freq_ms, "output stats report frequency (ms)")

@@ -18,6 +18,7 @@ namespace xtransmit {
 			int corrupt_pkt_freq = 0; // Corrupt every n-th packet.
 			std::string stats_file;
 			std::string stats_format = "csv";
+			bool corrupt_kk_flag = false;
 		};
 
 
