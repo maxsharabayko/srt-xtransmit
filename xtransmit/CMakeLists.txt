@@ -29,6 +29,12 @@ if (ENABLE_AEAD_API_PREVIEW)
 	)
 endif()
 
+if (ENABLE_MAXREXMITBW)
+	target_compile_options(srt-xtransmit
+		PRIVATE "-DENABLE_MAXREXMITBW=1"
+	)
+endif()
+
 if (ENABLE_CXX17)
 	set(REQUIRE_CXX_VER 17)
 	if (${CMAKE_CXX_COMPILER_ID} MATCHES "GNU|Intel")
