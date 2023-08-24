@@ -167,7 +167,6 @@ namespace srtx
 
 		void msgno(uint32_t msgno_val)
 		{
-			SRTX_ASSERT(msgno_val <= 0x03FFFFFF);
 			typedef pkt_field<uint32_t, 1 * 4> fld_msgno;
 			const uint32_t old_val = pkt_view<storage>::template get_field<fld_msgno>();
 			const uint32_t new_val = (old_val & 0xFC000000) | msgno_val;
@@ -184,11 +183,6 @@ namespace srtx
 		/// @brief Set all 32 bits of msgno fielf, including PP, O, KK and R.
 		void msgno_32bits(uint32_t msgno_val, uint32_t pp_bits, uint32_t o_bit, uint32_t kk_bits, uint32_t r_bit)
 		{
-			SRTX_ASSERT(msgno_val <= 0x03FFFFFF);
-			SRTX_ASSERT(pp_bits <= 0b11);
-			SRTX_ASSERT(o_bit <= 1);
-			SRTX_ASSERT(kk_bits < 0b11); // 0b11 is an invalid value.
-			SRTX_ASSERT(r_bit <= 1);
 			typedef pkt_field<uint32_t, 1 * 4> fld_msgno;
 			const uint32_t value = msgno_val | (r_bit << 26) | (kk_bits << 27) | (o_bit << 29) | (pp_bits << 30);
 			return pkt_view<storage>::template set_field<fld_msgno>(value);
