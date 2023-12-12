@@ -84,12 +84,12 @@ socket::srt::~srt()
 {
 	if (!m_blocking_mode)
 	{
-		spdlog::debug(LOG_SOCK_SRT "0x{:X} Releasing epolls before closing", m_bind_socket);
+		spdlog::debug(LOG_SOCK_SRT "@{} Releasing epolls before closing", m_bind_socket);
 		if (m_epoll_connect != -1)
 			srt_epoll_release(m_epoll_connect);
 		srt_epoll_release(m_epoll_io);
 	}
-	spdlog::debug(LOG_SOCK_SRT "0x{:X} Closing", m_bind_socket);
+	spdlog::debug(LOG_SOCK_SRT "@{} Closing", m_bind_socket);
 	srt_close(m_bind_socket);
 }
 
@@ -103,7 +103,7 @@ void socket::srt::listen()
 		raise_exception("listen");
 	}
 
-	spdlog::debug(LOG_SOCK_SRT "0x{:X} (srt://{}:{:d}) Listening", m_bind_socket, m_host, m_port);
+	spdlog::debug(LOG_SOCK_SRT "@{} (srt://{}:{:d}) Listening", m_bind_socket, m_host, m_port);
 	res = configure_post(m_bind_socket);
 	if (res == SRT_ERROR)
 		raise_exception("listen::configure_post");
@@ -111,7 +111,7 @@ void socket::srt::listen()
 
 shared_srt socket::srt::accept()
 {
-	spdlog::debug(LOG_SOCK_SRT "0x{:X} (srt://{}:{:d}) {} Waiting for incoming connection",
+	spdlog::debug(LOG_SOCK_SRT "@{} (srt://{}:{:d}) {} Waiting for incoming connection",
 		m_bind_socket, m_host, m_port, m_blocking_mode ? "SYNC" : "ASYNC");
 	
 	// Wait for REAL connected state if nonblocking mode
@@ -130,7 +130,7 @@ shared_srt socket::srt::accept()
 			raise_exception("accept::epoll_wait");
 		}
 
-		spdlog::debug(LOG_SOCK_SRT "0x{:X} (srt://{}:{:d}) {} ready, [0]: 0x{:X}",
+		spdlog::debug(LOG_SOCK_SRT "@{} (srt://{}:{:d}) {} ready, [0]: 0x{:X}",
 			m_bind_socket, m_host, m_port, len, ready[0]);
 	}
 
@@ -147,7 +147,7 @@ shared_srt socket::srt::accept()
 	if (res == SRT_ERROR)
 		raise_exception("accept::configure_post");
 
-	spdlog::info(LOG_SOCK_SRT "0x{:X} (srt://{}:{:d}) Accepted connection 0x{:X}. {}.",
+	spdlog::info(LOG_SOCK_SRT "@{} (srt://{}:{:d}) Accepted connection @{}. {}.",
 		m_bind_socket, m_host, m_port, sock, print_negotiated_config(sock));
 
 	return make_shared<srt>(sock, m_blocking_mode);
@@ -157,13 +157,13 @@ void socket::srt::raise_exception(const string &&place) const
 {
 	const int    udt_result = srt_getlasterror(nullptr);
 	const string message = srt_getlasterror_str();
-	spdlog::debug(LOG_SOCK_SRT "0x{:X} {} ERROR {} {}", m_bind_socket, place, udt_result, message);
+	spdlog::debug(LOG_SOCK_SRT "@{} {} ERROR {} {}", m_bind_socket, place, udt_result, message);
 	throw socket::exception(place + ": " + message);
 }
 
 void socket::srt::raise_exception(const string &&place, const string &&reason) const
 {
-	spdlog::debug(LOG_SOCK_SRT "0x{:X} {}. ERROR: {}.", m_bind_socket, place, reason);
+	spdlog::debug(LOG_SOCK_SRT "@{} {}. ERROR: {}.", m_bind_socket, place, reason);
 	throw socket::exception(place + ": " + reason);
 }
 
@@ -179,7 +179,7 @@ shared_srt socket::srt::connect()
 		raise_exception("connect::create_addr", e.what());
 	}
 
-	spdlog::debug(LOG_SOCK_SRT "0x{:X} {} Connecting to srt://{}:{:d}",
+	spdlog::debug(LOG_SOCK_SRT "@{} {} Connecting to srt://{}:{:d}",
 		m_bind_socket, m_blocking_mode ? "SYNC" : "ASYNC", m_host, m_port);
 
 	{
@@ -220,7 +220,7 @@ shared_srt socket::srt::connect()
 			raise_exception("connect::onfigure_post");
 	}
 
-	spdlog::info(LOG_SOCK_SRT "0x{:X} {} Connected to srt://{}:{:d}. {}.",
+	spdlog::info(LOG_SOCK_SRT "@{} {} Connected to srt://{}:{:d}. {}.",
 		m_bind_socket, m_blocking_mode ? "SYNC" : "ASYNC", m_host, m_port,
 		print_negotiated_config(m_bind_socket));
 
