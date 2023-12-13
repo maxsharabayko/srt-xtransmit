@@ -101,18 +101,19 @@ bool receive_files(socket::srt& src, const string& dstpath
 		{
 			ofile.close();
 			// extranct the filename from the received buffer
-			const string filename = dstpath + string(buf.data() + 1);
+			const string filename = string(buf.data() + 1);
+			const string filepath = dstpath + filename;
 			hdr_size += filename.size() + 1;    // 1 for null character
 
-			if (!create_subfolders(filename))
+			if (!create_subfolders(filepath))
 			{
-				cerr << "Download: failed creating folders for '" << filename << "'" << endl;
+				cerr << "Download: failed creating folders for '" << filepath << "'" << endl;
 				return false;
 			}
 
-			ofile.open(filename.c_str(), ios::out | ios::trunc | ios::binary);
+			ofile.open(filepath.c_str(), ios::out | ios::trunc | ios::binary);
 			if (!ofile) {
-				cerr << "Download: error opening file " << filename << endl;
+				cerr << "Download: error opening file " << filepath << endl;
 				break;
 			}
 
