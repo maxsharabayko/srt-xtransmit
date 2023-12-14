@@ -21,13 +21,7 @@ shared_sock_t create_connection(const vector<UriParser>& parsed_urls, shared_soc
 		throw socket::exception("No URL was provided");
 	}
 
-	// if (parsed_urls[0].count("groupconnect"))
-	// {
-
-	// }
-	// SRTO_GROUPCONNECT
-
-	if (parsed_urls.size() > 1)
+	if (parsed_urls.size() > 1 || parsed_urls[0].parameters().count("grouptype"))
 	{
 #if ENABLE_BONDING
 		// Group SRT connection
