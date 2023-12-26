@@ -4,6 +4,7 @@
 #include <future>
 #include <iomanip>
 #include <memory>
+#include <random>
 #include <thread>
 #include <vector>
 
@@ -46,6 +47,9 @@ namespace route
 
 		spdlog::info(LOG_SC_ROUTE "{0} Started", desc);
 
+		auto prev_corrupt_ts = steady_clock::now();
+		int pkts_untill_corrupt = cfg.corrupt_pkt_freq;
+
 		while (!force_break)
 		{
 			const size_t bytes_read = sock_src.read(mutable_buffer(buffer.data(), buffer.size()), -1);
@@ -54,6 +58,20 @@ namespace route
 			{
 				spdlog::info(LOG_SC_ROUTE "{} read 0 bytes on a socket (spurious read-ready?). Retrying.", desc);
 				continue;
+			}
+
+			const auto tnow = steady_clock::now();
+			if (bytes_read > 1000 && (cfg.corrupt_freq_ms > 0 && (tnow - prev_corrupt_ts > milliseconds(cfg.corrupt_freq_ms))
+				|| --pkts_untill_corrupt == 0))
+			{
+				spdlog::info(LOG_SC_ROUTE "{} Corrupting a packet!", desc);
+				prev_corrupt_ts = tnow;
+				static std::random_device s_RandomDevice;
+				static std::mt19937 s_GenMT19937(s_RandomDevice());
+				uniform_int_distribution<size_t> dis(0, bytes_read);
+				const ptrdiff_t byteoff = (ptrdiff_t) dis(s_GenMT19937);
+				++buffer[byteoff];
+				pkts_untill_corrupt = cfg.corrupt_pkt_freq;
 			}
 
 			// SRT can return 0 on SRT_EASYNCSND. Rare for sending. However might be worth to retry.
@@ -124,6 +142,9 @@ CLI::App* xtransmit::route::add_subcommand(CLI::App& app, config& cfg, vector<st
 	sc_route->add_option("-o,--output", dst_urls, "Destination URIs");
 	sc_route->add_option("--msgsize", cfg.message_size, "Size of a buffer to receive message payload");
 	sc_route->add_flag("--bidir", cfg.bidir, "Enable bidirectional transmission");
+	sc_route->add_option("--corruptfreq", cfg.corrupt_freq_ms, "artificial packet corruption frequency (ms)")
+		->transform(CLI::AsNumberWithUnit(to_ms, CLI::AsNumberWithUnit::CASE_SENSITIVE));
+	sc_route->add_option("--corruptpkt", cfg.corrupt_pkt_freq, "artificial packet corruption frequency (every n-th packet)");
 	sc_route->add_option("--statsfile", cfg.stats_file, "output stats report filename");
 	sc_route->add_option("--statsformat", cfg.stats_format, "output stats report format (json, csv)");
 	sc_route->add_option("--statsfreq", cfg.stats_freq_ms, "output stats report frequency (ms)")

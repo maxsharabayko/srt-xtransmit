@@ -14,6 +14,8 @@ namespace xtransmit {
 			int message_size = 1456;
 			bool bidir = false;
 			int stats_freq_ms = 0;
+			int corrupt_freq_ms = 0;
+			int corrupt_pkt_freq = 0; // Corrupt every n-th packet.
 			std::string stats_file;
 			std::string stats_format = "csv";
 		};
