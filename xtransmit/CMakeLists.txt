@@ -11,11 +11,15 @@ message(STATUS "SRT_INCLUDE_DIR: ${SRT_INCLUDE_DIR}")
 message(STATUS "SRT_UTILS_INCLUDE_DIR: ${SRT_UTILS_INCLUDE_DIR}")
 message(STATUS "CMAKE_BINARY_DIR: ${CMAKE_BINARY_DIR}")
 message(STATUS "VIRTUAL_srtsupport: ${VIRTUAL_srtsupport}")
+message(STATUS "SSL_LIBRARY_DIRS: ${SSL_LIBRARY_DIRS}")
 target_include_directories(srt-xtransmit PUBLIC
 	${SRT_INCLUDE_DIR}
 	${SRT_UTILS_INCLUDE_DIR}
 	${PTHREAD_INCLUDE_DIR}
+	${SSL_INCLUDE_DIRS}
 	)
+
+target_link_directories(srt-xtransmit PUBLIC ${SSL_LIBRARY_DIRS})
 
 if (ENABLE_BONDING OR ENABLE_EXPERIMENTAL_BONDING)
 	target_compile_options(srt-xtransmit
