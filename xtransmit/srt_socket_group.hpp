@@ -122,6 +122,7 @@ private:
 
 	connection_mode          m_mode          = FAILURE;
 	bool                     m_blocking_mode = true;
+	bool                     m_is_listening  = false;
 	string                   m_host;
 	int                      m_port = -1;
 	std::vector<options> m_opts_link; // Options per member link. [0] - also defines common options.

@@ -316,6 +316,10 @@ void socket::srt_group::create_callers(const vector<UriParser>& uris, SRT_GROUP_
 
 void socket::srt_group::listen()
 {
+	if (m_is_listening)
+		return;
+
+	m_is_listening = true;
 	set_listen_callback();
 
 	for (const auto sockid : m_listeners)
