@@ -184,11 +184,14 @@ int main(int argc, char** argv)
 		"log level [debug, error, note, info, fatal]");
 
 #ifdef __linux__
+	// TODO: Move this to UDI URI options.
     app.add_option(
         "--udp-mode",
         [](CLI::results_t val) {
             if (val[0] == "bulk")
                 ::xtransmit::g_udp_mode_bulk = true;
+            else if (val[0] != "simple")
+               return false;
             return true;
         },
         "UDP mode: simple or bulk [Linux only]");

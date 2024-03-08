@@ -217,7 +217,7 @@ socket::mudp::mudp(const UriParser& u)
 
 size_t socket::mudp::read(const mutable_buffer &buffer, int timeout_ms)
 {
-	while (!m_blocking_mode)
+	while (!m_blocking_mode && cbuffer == nbuffers)
 	{
 		fd_set set;
 		timeval tv;
@@ -264,13 +264,12 @@ size_t socket::mudp::read(const mutable_buffer &buffer, int timeout_ms)
             return 0;
         }
 
-        /* TRACE - enable if necessary for development
-        for (int i = 0; i < res; ++i)
-        {
-            std::cout << "[" << (*bufsizes[i]) << "]";
-        }
-        std::cout << std::endl;
-        */
+        // TRACE - enable if necessary for development
+        //for (int i = 0; i < res; ++i)
+        //{
+        //    std::cout << "[" << (*bufsizes[i]) << "]";
+        //}
+        //std::cout << std::endl;
 
         // Reset conditions to "freshly filled"
         cbuffer = 0;

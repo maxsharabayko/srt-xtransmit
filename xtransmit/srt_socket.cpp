@@ -356,7 +356,7 @@ std::string socket::srt::print_negotiated_config(SRTSOCKET sock)
 		return ival;
 	};
 
-#define VAL_AND_STR(X) X, "X"
+#define VAL_AND_STR(X) X, #X
 	const int pbkeylen     = get_sock_value(sock, VAL_AND_STR(SRTO_PBKEYLEN));
 	const int km_state     = get_sock_value(sock, VAL_AND_STR(SRTO_KMSTATE));
 	const int km_state_rcv = get_sock_value(sock, VAL_AND_STR(SRTO_RCVKMSTATE));
