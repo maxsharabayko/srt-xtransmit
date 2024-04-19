@@ -17,7 +17,7 @@ struct config : stats_config
 {
 	bool        print_notifications = false; // Print notifications about the messages received
 	bool        send_reply          = false;
-	bool        reconnect           = false;
+	bool        reconnect           = true;
 	bool        enable_metrics      = false;
 	unsigned    metrics_freq_ms     = 1000;
 	std::string metrics_file;
