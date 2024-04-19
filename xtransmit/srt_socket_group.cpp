@@ -752,7 +752,7 @@ const string socket::srt_group::stats_to_csv(int socketid, const SRT_TRACEBSTATS
 #if HAS_UNIQUE_PKTS
 		output << "pktRecvUnique,";
 #endif
-		output << "pktRcvLoss,pktRcvDrop,pktRcvRetrans,pktRcvBelated,";
+		output << "pktRcvLoss,pktRcvDrop,pktRcvUndecrypt,pktRcvRetrans,pktRcvBelated,";
 		output << "byteRecv,byteAvailRcvBuf,byteRcvLoss,byteRcvDrop,mbpsRecvRate,msRcvBuf,msRcvTsbPdDelay";
 #if HAS_PKT_REORDER_TOL
 		output << ",pktReorderTolerance";
@@ -796,6 +796,7 @@ const string socket::srt_group::stats_to_csv(int socketid, const SRT_TRACEBSTATS
 #endif
 	output << stats.pktRcvLoss << ',';
 	output << stats.pktRcvDrop << ',';
+	output << stats.pktRcvUndecrypt << ",";
 	output << stats.pktRcvRetrans << ',';
 	output << stats.pktRcvBelated << ',';
 
@@ -877,7 +878,7 @@ const nlohmann::json socket::srt_group::stats_to_json(int socketid, const SRT_TR
 }
 
 const string socket::srt_group::get_statistics_csv(bool print_header) const {
-  if (print_header)
+	if (print_header)
 		return stats_to_csv(m_bind_socket, SRT_TRACEBSTATS(), 0, print_header);;
 
 	SRT_TRACEBSTATS stats = {};
