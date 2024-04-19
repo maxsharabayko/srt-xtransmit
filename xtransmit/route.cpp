@@ -85,6 +85,7 @@ void xtransmit::route::run(const vector<string>& src_urls, const vector<string>&
 		parsed_dst_urls.emplace_back(url);
 	}
 
+
 	try {
 		const bool write_stats = cfg.stats_file != "" && cfg.stats_freq_ms > 0;
 		// make_unique is not supported by GCC 4.8, only starting from GCC 4.9 :(
@@ -92,8 +93,10 @@ void xtransmit::route::run(const vector<string>& src_urls, const vector<string>&
 			? unique_ptr<socket::stats_writer>(new socket::stats_writer(cfg.stats_file, cfg.stats_format, milliseconds(cfg.stats_freq_ms)))
 			: nullptr;
 
-		shared_sock dst = create_connection(parsed_dst_urls);
-		shared_sock src = create_connection(parsed_src_urls);
+		shared_sock_t listening_sock_a; // A shared pointer to store a listening socket for multiple connections.
+		shared_sock_t listening_sock_b; // A shared pointer to store a listening socket for multiple connections.
+		shared_sock dst = create_connection(parsed_dst_urls, listening_sock_a);
+		shared_sock src = create_connection(parsed_src_urls, listening_sock_b);
 
 		if (stats)
 		{
