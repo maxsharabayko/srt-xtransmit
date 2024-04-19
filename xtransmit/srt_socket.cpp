@@ -575,16 +575,20 @@ const string socket::srt::stats_to_csv(int socketid, const SRT_TRACEBSTATS& stat
 #ifdef HAS_PUT_TIME
 		output << "Timepoint,";
 #endif
-		output << "Time,SocketID,pktFlowWindow,pktCongestionWindow,pktFlightSize,";
-		output << "msRTT,mbpsBandwidth,mbpsMaxBW,pktSent,pktSndLoss,pktSndDrop,";
-		output << "pktRetrans,byteSent,byteAvailSndBuf,byteSndDrop,mbpsSendRate,usPktSndPeriod,msSndBuf,";
-		output << "pktRecv,pktRcvLoss,pktRcvDrop,pktRcvUndecrypt,pktRcvRetrans,pktRcvBelated,";
+		output << "Time,SocketID,weight,pktFlowWindow,pktCongestionWindow,pktFlightSize,";
+		output << "msRTT,mbpsBandwidth,mbpsMaxBW,pktSent,";
+#if HAS_UNIQUE_PKTS
+		output << "pktSentUnique,";
+#endif
+		output << "pktSndLoss,pktSndDrop,pktRetrans,byteSent,";
+		output << "byteAvailSndBuf,byteSndDrop,mbpsSendRate,usPktSndPeriod,msSndBuf,pktRecv,";
+#if HAS_UNIQUE_PKTS
+		output << "pktRecvUnique,";
+#endif
+		output << "pktRcvLoss,pktRcvDrop,pktRcvUndecrypt,pktRcvRetrans,pktRcvBelated,";
 		output << "byteRecv,byteAvailRcvBuf,byteRcvLoss,byteRcvDrop,mbpsRecvRate,msRcvBuf,msRcvTsbPdDelay";
 #if HAS_PKT_REORDER_TOL
 		output << ",pktReorderTolerance";
-#endif
-#if HAS_UNIQUE_PKTS
-		output << ",pktSentUnique,pktRecvUnique";
 #endif
 		output << endl;
 		return output.str();
@@ -596,6 +600,7 @@ const string socket::srt::stats_to_csv(int socketid, const SRT_TRACEBSTATS& stat
 
 	output << stats.msTimeStamp << ',';
 	output << socketid << ',';
+	output << 0 << ','; // weight
 	output << stats.pktFlowWindow << ',';
 	output << stats.pktCongestionWindow << ',';
 	output << stats.pktFlightSize << ',';
@@ -604,6 +609,9 @@ const string socket::srt::stats_to_csv(int socketid, const SRT_TRACEBSTATS& stat
 	output << stats.mbpsBandwidth << ',';
 	output << stats.mbpsMaxBW << ',';
 	output << stats.pktSent << ',';
+#if HAS_UNIQUE_PKTS
+	output << stats.pktSentUnique << ",";
+#endif
 	output << stats.pktSndLoss << ',';
 	output << stats.pktSndDrop << ',';
 
@@ -616,6 +624,9 @@ const string socket::srt::stats_to_csv(int socketid, const SRT_TRACEBSTATS& stat
 	output << stats.msSndBuf << ',';
 
 	output << stats.pktRecv << ',';
+#if HAS_UNIQUE_PKTS
+	output << stats.pktRecvUnique << ",";
+#endif
 	output << stats.pktRcvLoss << ',';
 	output << stats.pktRcvDrop << ',';
 	output << stats.pktRcvUndecrypt << ",";
@@ -632,11 +643,6 @@ const string socket::srt::stats_to_csv(int socketid, const SRT_TRACEBSTATS& stat
 
 #if	HAS_PKT_REORDER_TOL
 	output << "," << stats.pktReorderTolerance;
-#endif
-
-#if HAS_UNIQUE_PKTS
-	output << "," << stats.pktSentUnique;
-	output << "," << stats.pktRecvUnique;
 #endif
 
 	output << endl;
