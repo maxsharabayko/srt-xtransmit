@@ -84,7 +84,7 @@ shared_sock_t create_connection(const vector<UriParser>& parsed_urls, shared_soc
 
 
 // Use std::bind to pass the run_pipe function, and bind arguments to it.
-void common_run(const vector<string>& urls, const stats_config& cfg, bool reconnect, const atomic_bool& force_break,
+void common_run(const vector<string>& urls, const stats_config& cfg, bool reconnect, bool close_listener, const atomic_bool& force_break,
 	processing_fn_t& processing_fn)
 {
 	if (urls.empty())
@@ -138,7 +138,7 @@ void common_run(const vector<string>& urls, const stats_config& cfg, bool reconn
 			}
 
 			// Closing a listener socket (if any) will not allow further connections.
-			if (!reconnect)
+			if (close_listener)
 				listening_sock.reset();
 
 			if (stats)

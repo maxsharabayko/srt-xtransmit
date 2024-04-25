@@ -97,7 +97,7 @@ void xtransmit::generate::run(const std::vector<std::string>& dst_urls, const co
 {
 	using namespace std::placeholders;
 	processing_fn_t process_fn = std::bind(run_pipe, _1, cfg, _2);
-	common_run(dst_urls, cfg, cfg.reconnect, force_break, process_fn);
+	common_run(dst_urls, cfg, cfg.reconnect, cfg.close_listener, force_break, process_fn);
 }
 
 CLI::App* xtransmit::generate::add_subcommand(CLI::App& app, config& cfg, std::vector<std::string>& dst_urls)
@@ -119,7 +119,8 @@ CLI::App* xtransmit::generate::add_subcommand(CLI::App& app, config& cfg, std::v
 	sc_generate->add_option("--statsfreq", cfg.stats_freq_ms, fmt::format("Output stats report frequency, ms (default {})", cfg.stats_freq_ms))
 		->transform(CLI::AsNumberWithUnit(to_ms, CLI::AsNumberWithUnit::CASE_SENSITIVE));
 	sc_generate->add_flag("--twoway", cfg.two_way, "Both send and receive data");
-	sc_generate->add_flag("--reconnect", cfg.reconnect, "Reconnect automatically");
+	sc_generate->add_flag("--reconnect,!--no-reconnect", cfg.reconnect, "Reconnect automatically");
+	sc_generate->add_flag("--close-listener,!--no-close-listener", cfg.close_listener, "Close listener once connection is established");
 	sc_generate->add_flag("--enable-metrics", cfg.enable_metrics, "Enable embeding metrics: latency, loss, reordering, jitter, etc.");
 	sc_generate->add_option("--playback-csv", cfg.playback_csv, "Input CSV file with timestamp of every packet");
 	sc_generate->add_flag("--spin-wait", cfg.spin_wait, "Use CPU-expensive spin waiting for better sending accuracy");
