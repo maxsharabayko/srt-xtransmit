@@ -95,8 +95,12 @@ void xtransmit::route::run(const vector<string>& src_urls, const vector<string>&
 
 		shared_sock_t listening_sock_a; // A shared pointer to store a listening socket for multiple connections.
 		shared_sock_t listening_sock_b; // A shared pointer to store a listening socket for multiple connections.
-		shared_sock dst = create_connection(parsed_dst_urls, cfg.close_listener ? nullptr : listening_sock_a);
-		shared_sock src = create_connection(parsed_src_urls, cfg.close_listener ? nullptr : listening_sock_b);
+		shared_sock dst = cfg.close_listener
+			? create_connection(parsed_dst_urls)
+			: create_connection(parsed_dst_urls, listening_sock_a);;
+		shared_sock src = cfg.close_listener
+			? create_connection(parsed_src_urls)
+			: create_connection(parsed_src_urls, listening_sock_b);;
 
 		if (stats)
 		{
