@@ -176,7 +176,7 @@ void xtransmit::receive::run(const std::vector<std::string>& src_urls,
 {
 	using namespace std::placeholders;
 	processing_fn_t process_fn = std::bind(run_pipe, _1, cfg, _2);
-	common_run(src_urls, cfg, cfg.reconnect, force_break, process_fn);
+	common_run(src_urls, cfg, cfg.reconnect, cfg.close_listener, force_break, process_fn);
 }
 
 CLI::App* xtransmit::receive::add_subcommand(CLI::App& app, config& cfg, std::vector<std::string>& src_urls)
@@ -191,7 +191,8 @@ CLI::App* xtransmit::receive::add_subcommand(CLI::App& app, config& cfg, std::ve
 	sc_receive->add_option("--statsfreq", cfg.stats_freq_ms, fmt::format("Output stats report frequency, ms (default {})", cfg.stats_freq_ms))
 		->transform(CLI::AsNumberWithUnit(to_ms, CLI::AsNumberWithUnit::CASE_SENSITIVE));
 	sc_receive->add_flag("--printmsg", cfg.print_notifications, "Print message to stdout");
-	sc_receive->add_flag("--reconnect", cfg.reconnect, "Reconnect automatically");
+	sc_receive->add_flag("--reconnect,!--no-reconnect", cfg.reconnect, "Reconnect automatically");
+	sc_receive->add_flag("--close-listener,!--no-close-listener", cfg.close_listener, "Close listener once connection is established");
 	sc_receive->add_flag("--enable-metrics", cfg.enable_metrics, "Enable checking metrics: jitter, latency, etc.");
 	sc_receive->add_option("--metricsfile", cfg.metrics_file, "Metrics output filename (default stdout)");
 	sc_receive->add_option("--metricsfreq", cfg.metrics_freq_ms, fmt::format("Metrics report frequency, ms (default {})", cfg.metrics_freq_ms))

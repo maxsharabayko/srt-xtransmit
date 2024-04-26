@@ -87,11 +87,16 @@ typedef std::function<void(shared_sock_t, const std::atomic_bool&)> processing_f
 /// @brief Creates stats writer if needed, establishes a connection, and runs `processing_fn`.
 /// @param urls a list of URLs to to establish a connection
 /// @param cfg 
-/// @param reconnect 
+/// @param reconnect whether to reconnect after existing connection was broken
+/// @param close_listener whether to close a listener once a connection has been established
 /// @param force_break 
-/// @param processing_fn 
-void common_run(const std::vector<std::string>& urls, const stats_config& cfg, bool reconnect, const std::atomic_bool& force_break,
-	processing_fn_t& processing_fn);
+/// @param processing_fn
+void common_run(const std::vector<std::string>& urls,
+				const stats_config&             cfg,
+				bool                            reconnect,
+				bool                            close_listener,
+				const std::atomic_bool&         force_break,
+				processing_fn_t&                processing_fn);
 
 /// @brief Create netaddr_any from host and port values.
 netaddr_any create_addr(const std::string& host, unsigned short port, int pref_family = AF_UNSPEC);

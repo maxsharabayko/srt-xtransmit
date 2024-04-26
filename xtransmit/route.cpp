@@ -95,8 +95,12 @@ void xtransmit::route::run(const vector<string>& src_urls, const vector<string>&
 
 		shared_sock_t listening_sock_a; // A shared pointer to store a listening socket for multiple connections.
 		shared_sock_t listening_sock_b; // A shared pointer to store a listening socket for multiple connections.
-		shared_sock dst = create_connection(parsed_dst_urls, listening_sock_a);
-		shared_sock src = create_connection(parsed_src_urls, listening_sock_b);
+		shared_sock dst = cfg.close_listener
+			? create_connection(parsed_dst_urls)
+			: create_connection(parsed_dst_urls, listening_sock_a);;
+		shared_sock src = cfg.close_listener
+			? create_connection(parsed_src_urls)
+			: create_connection(parsed_src_urls, listening_sock_b);;
 
 		if (stats)
 		{
@@ -127,6 +131,7 @@ CLI::App* xtransmit::route::add_subcommand(CLI::App& app, config& cfg, vector<st
 	sc_route->add_option("-o,--output", dst_urls, "Destination URIs");
 	sc_route->add_option("--msgsize", cfg.message_size, "Size of a buffer to receive message payload");
 	sc_route->add_flag("--bidir", cfg.bidir, "Enable bidirectional transmission");
+	sc_route->add_flag("--close-listener,!--no-close-listener", cfg.close_listener, "Close listener once connection is established");
 	sc_route->add_option("--statsfile", cfg.stats_file, "output stats report filename");
 	sc_route->add_option("--statsformat", cfg.stats_format, "output stats report format (json, csv)");
 	sc_route->add_option("--statsfreq", cfg.stats_freq_ms, "output stats report frequency (ms)")

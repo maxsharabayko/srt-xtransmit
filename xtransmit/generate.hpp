@@ -20,7 +20,8 @@ struct config : public stats_config
 	int         duration       = 0;
 	int         message_size   = 1316; ////8 * 1024 * 1024;
 	bool        two_way        = false;
-	bool        reconnect      = true;
+	bool        reconnect      = false;
+	bool        close_listener = false;
 	bool        enable_metrics = false;
 	bool        spin_wait      = false;
 	std::string playback_csv;
