@@ -479,8 +479,9 @@ void socket::srt_group::on_connect_callback(SRTSOCKET sock, int error, const soc
 		return;
 	}
 
-	spdlog::warn(LOG_SRT_GROUP "@{} Member socket @{} (token {}) connection error: ({}) {}.", m_bind_socket, sock, token, error,
-		srt_strerror(error, 0));
+	
+
+	SRT_SOCKGROUPCONFIG* member = nullptr;
 
 	bool reconn_scheduled = false;
 	for (auto target : m_targets)
@@ -488,20 +489,32 @@ void socket::srt_group::on_connect_callback(SRTSOCKET sock, int error, const soc
 		if (target.token != token)
 			continue;
 
-		auto connfn = [](SRTSOCKET group, SRT_SOCKGROUPCONFIG target) {
-			spdlog::trace(LOG_SRT_GROUP "@{}: Reconnecting member socket (token {})", group, target.token);
-			const int st = srt_connect_group(group, &target, 1);
-			if (st == SRT_ERROR)
-				spdlog::warn(LOG_SRT_GROUP "@{}: Member reconnection failed (token {})", group, target.token);
-		};
-
-		spdlog::trace(LOG_SRT_GROUP "@{}: Scheduling member reconnection (token {})", m_bind_socket, token);
-		reconn_scheduled = true;
-		m_scheduler.schedule_in(std::chrono::seconds(1), connfn, m_bind_socket, target);
+		member = &target;
+		break;
 	}
 
-	if (!reconn_scheduled)
+	auto connfn = [](SRTSOCKET group, SRT_SOCKGROUPCONFIG target) {
+		spdlog::trace(LOG_SRT_GROUP "@{}: Reconnecting member socket (token {})", group, target.token);
+		const int st = srt_connect_group(group, &target, 1);
+		if (st == SRT_ERROR)
+			spdlog::warn(LOG_SRT_GROUP "@{}: Member reconnection failed (token {})", group, target.token);
+		};
+
+	if (member)
+	{
+		spdlog::warn(LOG_SRT_GROUP "@{} Member socket @{} ({}->{}) connection error: ({}) {}.", m_bind_socket, sock,
+			netaddr_any(member->srcaddr).str(), netaddr_any(member->peeraddr).str(), error,
+			srt_strerror(error, 0));
+
+		spdlog::trace(LOG_SRT_GROUP "@{}: Scheduling member reconnection ({} -> {})", m_bind_socket,
+			netaddr_any(member->srcaddr).str(), netaddr_any(member->peeraddr).str());
+		reconn_scheduled = true;
+		m_scheduler.schedule_in(std::chrono::seconds(1), connfn, m_bind_socket, *member);
+	}
+	else
+	{
 		spdlog::warn(LOG_SRT_GROUP "@{}: Could not schedule member reconnection (token {})", m_bind_socket, token);
+	}
 
 	return;
 }
