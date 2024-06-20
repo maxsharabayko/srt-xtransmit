@@ -436,10 +436,10 @@ int socket::srt_group::listen_callback_fn(void* opaq, SRTSOCKET sock, int hsvers
 
 	netaddr_any sa(peeraddr);
 
-	sockaddr host_sa = {};
-	int host_sa_len = sizeof host_sa;
-	srt_getsockname(sock, &host_sa, &host_sa_len);
-	netaddr_any host(&host_sa, host_sa_len);
+	netaddr_any host_sa;
+	int host_sa_len = host_sa.storage_size();
+	srt_getsockname(sock, host_sa.get(), &host_sa_len);
+	netaddr_any host(host_sa.get(), host_sa_len);
 	spdlog::trace(LOG_SRT_GROUP "Accepted member socket @{}, host IP {}, remote IP {}", sock, host.str(), sa.str());
 
 	// TODO: this group may no longer exist. Use some global array to track valid groups.
