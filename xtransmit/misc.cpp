@@ -30,7 +30,7 @@ shared_sock_t create_connection(const vector<UriParser>& parsed_urls, shared_soc
 			listening_sock = make_shared<socket::srt_group>(parsed_urls);
 		socket::srt_group* s = dynamic_cast<socket::srt_group*>(listening_sock.get());
 		const bool  accept = s->mode() == socket::srt_group::LISTENER;
-		if (accept) {
+		if (accept && !is_listening) {
 			s->listen();
 		}
 		shared_sock_t connection = accept ? s->accept() : s->connect();
