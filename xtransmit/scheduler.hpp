@@ -53,6 +53,11 @@ public:
 			thread_.join();
 	}
 
+	void stop()
+	{
+		done_ = true;
+	}
+
 	template <typename Callable, typename... Args>
 	void schedule_on(const steady_clock::time_point time, Callable&& f, Args&&... args)
 	{
@@ -76,7 +81,6 @@ private:
 	} sync_;
 
 	multimap<steady_clock::time_point, shared_ptr<task>> tasks_;
-	mutex                                                lock_;
 	thread                                               thread_;
 
 	void timer_loop()
@@ -102,14 +106,14 @@ private:
 
 	void add_task(const steady_clock::time_point time, shared_ptr<task> t)
 	{
-		lock_guard<mutex> l(lock_);
+		lock_guard<mutex> l(sync_.mtx);
 		tasks_.emplace(time, move(t));
 		sync_.cv.notify_one();
 	}
 
 	void manage_tasks()
 	{
-		lock_guard<mutex> l(lock_);
+		lock_guard<mutex> l(sync_.mtx);
 
 		auto end_of_tasks_to_run = tasks_.upper_bound(steady_clock::now());
 		if (end_of_tasks_to_run != tasks_.begin())

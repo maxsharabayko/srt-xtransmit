@@ -53,12 +53,12 @@ public:
 
 	class not_found : public std::runtime_error { public: not_found(const char* m) : std::runtime_error(m) {} };
 
-	std::unique_lock<std::mutex>&& scoped_lock(intptr_t p) const
+	std::unique_lock<std::mutex> scoped_lock(intptr_t p) const
 	{
 		std::unique_lock<std::mutex> lck(m_mtx);
 		if (!m_groups.count(p))
 			throw not_found("");
-		return std::unique_lock<std::mutex>(m_mtx);
+		return lck; // Compiler will perform an RVO or move.
 	}
 
 private:
@@ -249,6 +249,7 @@ socket::srt_group::srt_group(srt_group& group, int group_id)
 
 socket::srt_group::~srt_group()
 {
+	m_scheduler.stop();
 	if (!m_blocking_mode)
 	{
 		spdlog::debug(LOG_SRT_GROUP "@{} Closing. Releasing epolls", m_bind_socket);
@@ -257,6 +258,7 @@ socket::srt_group::~srt_group()
 		if (m_epoll_io != -1)
 			srt_epoll_release(m_epoll_io);
 	}
+	
 	spdlog::debug(LOG_SRT_GROUP "@{} Closing SRT group", m_bind_socket);
 	details::g_group_registry.remove((intptr_t)this);
 	release_targets();
@@ -486,10 +488,10 @@ int socket::srt_group::listen_callback_fn(void* opaq, SRTSOCKET sock, int hsvers
 	netaddr_any host(host_sa.get(), host_sa_len);
 	spdlog::trace(LOG_SRT_GROUP "Accepted member socket @{}, host IP {}, remote IP {}", sock, host.str(), sa.str());
 
-	// TODO: this group may no longer exist. Use some global array to track valid groups.
 
 	try
 	{
+		// The group passed via 'opaq' may no longer exist. The g_group_registry checks and holds the lifetime.
 		auto lck = details::g_group_registry.scoped_lock((intptr_t)opaq);
 		socket::srt_group* group = reinterpret_cast<socket::srt_group*>(opaq);
 		return group->on_listen_callback(sock);
@@ -519,10 +521,17 @@ void socket::srt_group::connect_callback_fn(void* opaq, SRTSOCKET sock, int erro
 		return;
 	}
 
-	// TODO: this group may no longer exist. Use some global array to track valid groups.
-	socket::srt_group* group = reinterpret_cast<socket::srt_group*>(opaq);
-
-	group->on_connect_callback(sock, error, peer, token);
+	try
+	{
+		// The group passed via 'opaq' may no longer exist. The g_group_registry checks and holds the lifetime.
+		auto lck = details::g_group_registry.scoped_lock((intptr_t)opaq);
+		socket::srt_group* group = reinterpret_cast<socket::srt_group*>(opaq);
+		return group->on_connect_callback(sock, error, peer, token);
+	}
+	catch (const details::group_registry::not_found&)
+	{
+		spdlog::warn(LOG_SRT_GROUP "connect_callback_fn: group has already been destructed.");
+	}
 }
 
 void socket::srt_group::on_connect_callback(SRTSOCKET sock, int error, const sockaddr* /*peer*/, int token)
