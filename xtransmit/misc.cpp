@@ -83,10 +83,70 @@ shared_sock_t create_connection(const vector<UriParser>& parsed_urls, shared_soc
 	throw socket::exception(fmt::format("Unknown protocol '{}'.", uri.proto()));
 }
 
+class concurrent_pipes
+{
+public:
+	concurrent_pipes(socket::stats_writer* stats)
+		:m_stats(stats)
+	{}
+
+	void add_pipe(shared_sock_t conn, processing_fn_t const& run_pipe, const atomic_bool& break_token)
+	{
+		m_pipes.emplace(conn->id(), ::async(::launch::async, run_pipe, conn, [this](int conn_id) { on_pipe_exit(conn_id); }, ref(break_token)));
+	}
+
+	void on_pipe_exit(int conn_id)
+	{
+		using namespace std;
+		if (m_stats)
+			m_stats->remove_socket(conn_id);
+
+		lock_guard<mutex> lck(m_mtx);
+		const auto& pipe = m_pipes.find(conn_id);
+		if (pipe == m_pipes.end())
+		{
+			spdlog::error("PIPE Failed to find exiting pipe (conn @{}), {} remain active.", conn_id, m_pipes.size());
+			return;
+		}
+
+		// Can't erase a pipe here, because execition of a pipe function is not done.
+		m_to_close.insert(conn_id);
+		spdlog::info("PIPE Pipe exit (conn @{}), {} remain active.", conn_id, m_pipes.size() - m_to_close.size());
+		m_cv_active.notify_all();
+	}
+
+	size_t size() const
+	{
+		using namespace std;
+		lock_guard<mutex> lck(m_mtx);
+		return m_pipes.size() - m_to_close.size();
+	}
+
+	// Wait for changes in the number of active pipes.
+	void wait()
+	{
+		using namespace std;
+		unique_lock<mutex> lck(m_mtx);
+		m_cv_active.wait(lck);
+
+		spdlog::debug("PIPE Clearing {} inactive pipes.", m_to_close.size());
+		for (const auto id : m_to_close)
+			m_pipes.erase(id);
+		m_to_close.clear();
+	}
+
+private:
+	socket::stats_writer*        m_stats;
+	map<SOCKET, future<void>>    m_pipes;
+	set<SOCKET>                  m_to_close;
+	mutable std::mutex           m_mtx;
+	std::condition_variable      m_cv_active;
+};
+
 
 // Use std::bind to pass the run_pipe function, and bind arguments to it.
 void common_run(const vector<string>& urls, const stats_config& cfg_stats, const conn_config& cfg_conn,
-	const atomic_bool& force_break, processing_fn_t& processing_fn)
+	const atomic_bool& break_token, processing_fn_t& processing_fn)
 {
 	if (urls.empty())
 	{
@@ -124,16 +184,19 @@ void common_run(const vector<string>& urls, const stats_config& cfg_stats, const
 	// 		? ::async(::launch::async, route, dst, src, cfg, "[DST->SRC]", ref(force_break))
 	// 		: future<void>();	
 	// TODO: Add connection lost event.
-	list<future<void>> processing_pipes;
+	//map<SRTSOCKET, future<void>> processing_pipes;
+	concurrent_pipes pipes(stats.get());
+	unsigned conns_cnt = 0;
 
 	do {
+		const auto tstart = steady_clock::now();
 		try
 		{
-			const auto tnow = steady_clock::now();
-			if (tnow < next_reconnect)
+			if (tstart < next_reconnect)
 				this_thread::sleep_until(next_reconnect);
 
-			next_reconnect = tnow + seconds(1);
+			spdlog::info(LOG_SC_CONN "Establishing connection no.{}.", conns_cnt +1);
+
 			// It is important to close `conn` after processing is done.
 			// The scope of `conn` closes it unless stats_writer holds a pointer.
 			shared_sock_t conn = create_connection(parsed_urls, listening_sock);
@@ -141,7 +204,7 @@ void common_run(const vector<string>& urls, const stats_config& cfg_stats, const
 			if (!conn)
 			{
 				spdlog::error(LOG_SC_CONN "Failed to create a connection to '{}'.", urls[0]);
-				return;
+				break;
 			}
 
 			// Closing a listener socket (if any) will not allow further connections.
@@ -151,29 +214,35 @@ void common_run(const vector<string>& urls, const stats_config& cfg_stats, const
 			if (stats)
 				stats->add_socket(conn);
 
-			processing_pipes.emplace_back(::async(::launch::async, processing_fn, conn, ref(force_break)));
+			pipes.add_pipe(conn, processing_fn, break_token);
+			++conns_cnt;
 
-			// Remove on connection lost
-			//if (stats)
-			//	stats->remove_socket(conn->id());
 		}
 		catch (const socket::exception& e)
 		{
 			spdlog::warn(LOG_SC_CONN "{}", e.what());
 		}
-	} while ((cfg_conn.reconnect || processing_pipes.size() < cfg_conn.client_conns) && !force_break);
 
-	while (!processing_pipes.empty())
+		if (conns_cnt >= cfg_conn.max_conns)
+			break;
+
+		if (pipes.size() < cfg_conn.concurrent_streams)
+			continue;
+
+		if (!cfg_conn.reconnect || break_token)
+			break;
+
+		while (!break_token && pipes.size() >= cfg_conn.concurrent_streams)
+			pipes.wait();
+
+		// Slow down reconnection pace to not faster than once per second.
+		next_reconnect = tstart + seconds(1);
+
+	} while (!break_token);
+
+	while (pipes.size() > 0)
 	{
-		try
-		{
-			processing_pipes.front().get();
-			processing_pipes.pop_front();
-		}
-		catch (const socket::exception& e)
-		{
-			spdlog::warn(LOG_SC_CONN "{}", e.what());
-		}
+		pipes.wait();
 	}
 }
 

@@ -32,7 +32,7 @@ using shared_sock = std::shared_ptr<socket::isocket>;
 
 #define LOG_SC_GENERATE "GENERATE "
 
-void run_pipe(shared_sock dst, const config& cfg, const atomic_bool& force_break)
+void run_pipe(shared_sock dst, const config& cfg, std::function<void(int conn_id)> const& on_done, const atomic_bool& force_break)
 {
 	vector<char> message_to_send(cfg.message_size);
 	iota(message_to_send.begin(), message_to_send.end(), (char)0);
@@ -40,7 +40,8 @@ void run_pipe(shared_sock dst, const config& cfg, const atomic_bool& force_break
 	const auto start_time   = steady_clock::now();
 	const int  num_messages = cfg.duration > 0 ? -1 : cfg.num_messages;
 
-	socket::isocket* target = dst.get();
+	socket::isocket& sock = *dst.get();
+	const auto conn_id = sock.id();
 
 	metrics::generator pldgen(cfg.enable_metrics);
 
@@ -68,7 +69,7 @@ void run_pipe(shared_sock dst, const config& cfg, const atomic_bool& force_break
 
 			pldgen.generate_payload(message_to_send);
 
-			target->write(const_buffer(message_to_send.data(), message_to_send.size()));
+			sock.write(const_buffer(message_to_send.data(), message_to_send.size()));
 
 			const auto tnow = steady_clock::now();
 			if (tnow > (stat_time + chrono::seconds(1)))
@@ -76,7 +77,7 @@ void run_pipe(shared_sock dst, const config& cfg, const atomic_bool& force_break
 				const int       n       = i - prev_i;
 				const auto      elapsed = tnow - stat_time;
 				const long long bps     = (8 * n * cfg.message_size) / duration_cast<milliseconds>(elapsed).count() * 1000;
-				spdlog::info(LOG_SC_GENERATE "Sending at {} kbps", bps / 1000);
+				spdlog::info(LOG_SC_GENERATE "@{} Sending at {} kbps", conn_id, bps / 1000);
 				stat_time = tnow;
 				prev_i    = i;
 			}
@@ -91,12 +92,14 @@ void run_pipe(shared_sock dst, const config& cfg, const atomic_bool& force_break
 	{
 		spdlog::info(LOG_SC_GENERATE "interrupted by request!");
 	}
+
+	on_done(conn_id);
 }
 
 void xtransmit::generate::run(const std::vector<std::string>& dst_urls, const config& cfg, const atomic_bool& force_break)
 {
 	using namespace std::placeholders;
-	processing_fn_t process_fn = std::bind(run_pipe, _1, cfg, _2);
+	processing_fn_t process_fn = std::bind(run_pipe, _1, cfg, _2, _3);
 	common_run(dst_urls, cfg, cfg, force_break, process_fn);
 }
 
@@ -119,7 +122,8 @@ CLI::App* xtransmit::generate::add_subcommand(CLI::App& app, config& cfg, std::v
 	sc_generate->add_option("--statsfreq", cfg.stats_freq_ms, fmt::format("Output stats report frequency, ms (default {})", cfg.stats_freq_ms))
 		->transform(CLI::AsNumberWithUnit(to_ms, CLI::AsNumberWithUnit::CASE_SENSITIVE));
 	sc_generate->add_flag("--twoway", cfg.two_way, "Both send and receive data");
-	sc_generate->add_option("--clients", cfg.client_conns, "Number of client connections to initiate or accept");
+	sc_generate->add_option("--maxconns", cfg.max_conns, "Maximum Number of connections to initiate or accept");
+	sc_generate->add_option("--concurrent-streams", cfg.concurrent_streams, "Maximum Number of concurrect generating streams");
 	sc_generate->add_flag("--reconnect,!--no-reconnect", cfg.reconnect, "Reconnect automatically");
 	sc_generate->add_flag("--close-listener,!--no-close-listener", cfg.close_listener, "Close listener once connection is established");
 	sc_generate->add_flag("--enable-metrics", cfg.enable_metrics, "Enable embeding metrics: latency, loss, reordering, jitter, etc.");

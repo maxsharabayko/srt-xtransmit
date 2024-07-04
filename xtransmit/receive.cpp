@@ -92,13 +92,15 @@ void metrics_writing_loop(ofstream&                   metrics_file,
 	}
 }
 
-void run_pipe(shared_sock src, const config& cfg, const atomic_bool& force_break)
+void run_pipe(shared_sock src, const config& cfg, std::function<void(int conn_id)> const& on_done, const atomic_bool& force_break)
 {
 	socket::isocket& sock = *src.get();
+	const auto conn_id = sock.id();
 
 	vector<char>       buffer(cfg.message_size);
 	metrics::validator validator;
 
+	// TODO: Move metrics thread out of here.
 	atomic_bool  metrics_stop(false);
 	mutex        metrics_mtx;
 	future<void> metrics_th;
@@ -151,7 +153,7 @@ void run_pipe(shared_sock src, const config& cfg, const atomic_bool& force_break
 				sock.write(const_buffer(out_message.data(), out_message.size()));
 
 				if (cfg.print_notifications)
-					spdlog::error(LOG_SC_RECEIVE "Reply sent on conn ID {}", sock.id());
+					spdlog::error(LOG_SC_RECEIVE "{} Reply sent on conn ID {}", conn_id, sock.id());
 			}
 		}
 	}
@@ -168,6 +170,8 @@ void run_pipe(shared_sock src, const config& cfg, const atomic_bool& force_break
 	{
 		spdlog::info(LOG_SC_RECEIVE "interrupted by request!");
 	}
+
+	on_done(conn_id);
 }
 
 void xtransmit::receive::run(const std::vector<std::string>& src_urls,
@@ -175,7 +179,7 @@ void xtransmit::receive::run(const std::vector<std::string>& src_urls,
 							 const atomic_bool&              force_break)
 {
 	using namespace std::placeholders;
-	processing_fn_t process_fn = std::bind(run_pipe, _1, cfg, _2);
+	processing_fn_t process_fn = std::bind(run_pipe, _1, cfg, _2, _3);
 	common_run(src_urls, cfg, cfg, force_break, process_fn);
 }
 
@@ -191,7 +195,8 @@ CLI::App* xtransmit::receive::add_subcommand(CLI::App& app, config& cfg, std::ve
 	sc_receive->add_option("--statsfreq", cfg.stats_freq_ms, fmt::format("Output stats report frequency, ms (default {})", cfg.stats_freq_ms))
 		->transform(CLI::AsNumberWithUnit(to_ms, CLI::AsNumberWithUnit::CASE_SENSITIVE));
 	sc_receive->add_flag("--printmsg", cfg.print_notifications, "Print message to stdout");
-	sc_receive->add_option("--clients", cfg.client_conns, "Number of client connections to initiate or accept");
+	sc_receive->add_option("--maxconns", cfg.max_conns, "Maximum Number of connections to initiate or accept");
+	sc_receive->add_option("--concurrent-streams", cfg.concurrent_streams, "Maximum Number of concurrect receiving streams");
 	sc_receive->add_flag("--reconnect,!--no-reconnect", cfg.reconnect, "Reconnect automatically");
 	sc_receive->add_flag("--close-listener,!--no-close-listener", cfg.close_listener, "Close listener once connection is established");
 	sc_receive->add_flag("--enable-metrics", cfg.enable_metrics, "Enable checking metrics: jitter, latency, etc.");
