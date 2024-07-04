@@ -110,7 +110,7 @@ void xtransmit::route::run(const vector<string>& src_urls, const vector<string>&
 
 		future<void> route_bkwd = cfg.bidir
 			? ::async(::launch::async, route, dst, src, cfg, "[DST->SRC]", ref(force_break))
-			: future<void>();	
+			: future<void>();
 
 		route(src, dst, cfg, "[SRC->DST]", force_break);
 

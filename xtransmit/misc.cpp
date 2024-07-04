@@ -1,3 +1,4 @@
+#include <list>
 #include <thread>
 #include "misc.hpp"
 #include "socket_stats.hpp"
@@ -82,10 +83,70 @@ shared_sock_t create_connection(const vector<UriParser>& parsed_urls, shared_soc
 	throw socket::exception(fmt::format("Unknown protocol '{}'.", uri.proto()));
 }
 
+class concurrent_pipes
+{
+public:
+	concurrent_pipes(socket::stats_writer* stats)
+		:m_stats(stats)
+	{}
+
+	void add_pipe(shared_sock_t conn, processing_fn_t const& run_pipe, const atomic_bool& break_token)
+	{
+		m_pipes.emplace(conn->id(), ::async(::launch::async, run_pipe, conn, [this](int conn_id) { on_pipe_exit(conn_id); }, ref(break_token)));
+	}
+
+	void on_pipe_exit(int conn_id)
+	{
+		using namespace std;
+		if (m_stats)
+			m_stats->remove_socket(conn_id);
+
+		lock_guard<mutex> lck(m_mtx);
+		const auto& pipe = m_pipes.find(conn_id);
+		if (pipe == m_pipes.end())
+		{
+			spdlog::error("PIPE Failed to find exiting pipe (conn @{}), {} remain active.", conn_id, m_pipes.size());
+			return;
+		}
+
+		// Can't erase a pipe here, because execition of a pipe function is not done.
+		m_to_close.insert(conn_id);
+		spdlog::info("PIPE Pipe exit (conn @{}), {} remain active.", conn_id, m_pipes.size() - m_to_close.size());
+		m_cv_active.notify_all();
+	}
+
+	size_t size() const
+	{
+		using namespace std;
+		lock_guard<mutex> lck(m_mtx);
+		return m_pipes.size() - m_to_close.size();
+	}
+
+	// Wait for changes in the number of active pipes.
+	void wait()
+	{
+		using namespace std;
+		unique_lock<mutex> lck(m_mtx);
+		m_cv_active.wait(lck);
+
+		spdlog::debug("PIPE Clearing {} inactive pipes.", m_to_close.size());
+		for (const auto id : m_to_close)
+			m_pipes.erase(id);
+		m_to_close.clear();
+	}
+
+private:
+	socket::stats_writer*        m_stats;
+	map<SOCKET, future<void>>    m_pipes;
+	set<SOCKET>                  m_to_close;
+	mutable std::mutex           m_mtx;
+	std::condition_variable      m_cv_active;
+};
+
 
 // Use std::bind to pass the run_pipe function, and bind arguments to it.
-void common_run(const vector<string>& urls, const stats_config& cfg, bool reconnect, bool close_listener, const atomic_bool& force_break,
-	processing_fn_t& processing_fn)
+void common_run(const vector<string>& urls, const stats_config& cfg_stats, const conn_config& cfg_conn,
+	const atomic_bool& break_token, processing_fn_t& processing_fn)
 {
 	if (urls.empty())
 	{
@@ -93,7 +154,7 @@ void common_run(const vector<string>& urls, const stats_config& cfg, bool reconn
 		return;
 	}
 
-	const bool write_stats = cfg.stats_file != "" && cfg.stats_freq_ms > 0;
+	const bool write_stats = cfg_stats.stats_file != "" && cfg_stats.stats_freq_ms > 0;
 	unique_ptr<socket::stats_writer> stats;
 
 	if (write_stats)
@@ -101,7 +162,7 @@ void common_run(const vector<string>& urls, const stats_config& cfg, bool reconn
 		// make_unique is not supported by GCC 4.8, only starting from GCC 4.9 :(
 		try {
 			stats = unique_ptr<socket::stats_writer>(
-				new socket::stats_writer(cfg.stats_file, cfg.stats_format, milliseconds(cfg.stats_freq_ms)));
+				new socket::stats_writer(cfg_stats.stats_file, cfg_stats.stats_format, milliseconds(cfg_stats.stats_freq_ms)));
 		}
 		catch (const socket::exception& e)
 		{
@@ -119,14 +180,18 @@ void common_run(const vector<string>& urls, const stats_config& cfg, bool reconn
 	shared_sock_t listening_sock; // A shared pointer to store a listening socket for multiple connections.
 	steady_clock::time_point next_reconnect = steady_clock::now();
 
+	concurrent_pipes pipes(stats.get());
+	unsigned conns_cnt = 0;
+
 	do {
+		const auto tstart = steady_clock::now();
 		try
 		{
-			const auto tnow = steady_clock::now();
-			if (tnow < next_reconnect)
+			if (tstart < next_reconnect)
 				this_thread::sleep_until(next_reconnect);
 
-			next_reconnect = tnow + seconds(1);
+			spdlog::info(LOG_SC_CONN "Establishing connection no.{}.", conns_cnt +1);
+
 			// It is important to close `conn` after processing is done.
 			// The scope of `conn` closes it unless stats_writer holds a pointer.
 			shared_sock_t conn = create_connection(parsed_urls, listening_sock);
@@ -134,26 +199,47 @@ void common_run(const vector<string>& urls, const stats_config& cfg, bool reconn
 			if (!conn)
 			{
 				spdlog::error(LOG_SC_CONN "Failed to create a connection to '{}'.", urls[0]);
-				return;
+				break;
 			}
 
 			// Closing a listener socket (if any) will not allow further connections.
-			if (close_listener)
+			if (cfg_conn.close_listener)
 				listening_sock.reset();
 
 			if (stats)
 				stats->add_socket(conn);
 
-			processing_fn(conn, force_break);
+			// TODO: Maybe just run from this thread if cfg_conn.concurrent_streams == 1.
+			pipes.add_pipe(conn, processing_fn, break_token);
+			++conns_cnt;
 
-			if (stats)
-				stats->remove_socket(conn->id());
 		}
 		catch (const socket::exception& e)
 		{
 			spdlog::warn(LOG_SC_CONN "{}", e.what());
 		}
-	} while (reconnect && !force_break);
+
+		if (cfg_conn.max_conns > 0 && conns_cnt >= cfg_conn.max_conns)
+			break;
+
+		if (pipes.size() < cfg_conn.concurrent_streams)
+			continue;
+
+		if (!cfg_conn.reconnect || break_token)
+			break;
+
+		while (!break_token && pipes.size() >= cfg_conn.concurrent_streams)
+			pipes.wait();
+
+		// Slow down reconnection pace to not faster than once per second.
+		next_reconnect = tstart + seconds(1);
+
+	} while (!break_token);
+
+	while (pipes.size() > 0)
+	{
+		pipes.wait();
+	}
 }
 
 netaddr_any create_addr(const string& name, unsigned short port, int pref_family)
@@ -211,6 +297,15 @@ netaddr_any create_addr(const string& name, unsigned short port, int pref_family
 	freeaddrinfo(val);
 
 	return result;
+}
+
+void apply_cli_opts(CLI::App& sc, conn_config& cfg)
+{
+	sc.add_option("--maxconns", cfg.max_conns, "Maximum Number of connections to initiate or accept (-1: infinite, default: 1).");
+	sc.add_option("--concurrent-streams", cfg.concurrent_streams, "Maximum Number of concurrect receiving streams (default: 1).")
+		->check(CLI::Validator(CLI::PositiveNumber));
+	sc.add_flag("--reconnect,!--no-reconnect", cfg.reconnect, "Reconnect automatically.");
+	sc.add_flag("--close-listener,!--no-close-listener", cfg.close_listener, "Close listener once connection is established.");
 }
 
 } // namespace xtransmit

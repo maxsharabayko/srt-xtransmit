@@ -6,6 +6,9 @@
 #include <memory>
 #include <sstream>	// std::stringstream, std::stringbuf
 
+// Third party libraries
+#include "CLI/CLI.hpp"
+
 // xtransmit
 #include "socket.hpp"
 #include "netaddr_any.hpp"
@@ -52,13 +55,24 @@ inline std::string print_timestamp_now()
 #endif // HAS_PUT_TIME
 
 
-
 struct stats_config
 {
 	int         stats_freq_ms = 0;
 	std::string stats_file;
 	std::string stats_format = "csv";
 };
+
+/// Connection establishment config
+struct conn_config
+{
+	bool        reconnect = false; // Try to reconnect broken connections.
+	int         max_conns = 1;     // SRT Caller: the number of client connections to initiate.
+	                               // SRT Listener: the number of allowed clients to accept.
+	int         concurrent_streams = 1;   // Maximum number of concurrent streams allowed.
+	bool        close_listener = false; // Close listener after all connection have been accepted.
+};
+
+void apply_cli_opts(CLI::App& sc, conn_config& cfg);
 
 
 typedef std::shared_ptr<socket::isocket> shared_sock_t;
@@ -82,19 +96,17 @@ inline shared_sock_t create_connection(const std::vector<UriParser>& uris)
 }
 
 
-typedef std::function<void(shared_sock_t, const std::atomic_bool&)> processing_fn_t;
+typedef std::function<void(shared_sock_t, std::function<void (int conn_id)> const & on_done, const std::atomic_bool&)> processing_fn_t;
 
 /// @brief Creates stats writer if needed, establishes a connection, and runs `processing_fn`.
 /// @param urls a list of URLs to to establish a connection
-/// @param cfg 
-/// @param reconnect whether to reconnect after existing connection was broken
-/// @param close_listener whether to close a listener once a connection has been established
+/// @param cfg_stats 
+/// @param cfg_conn
 /// @param force_break 
-/// @param processing_fn
+/// @param processing_fn 
 void common_run(const std::vector<std::string>& urls,
-				const stats_config&             cfg,
-				bool                            reconnect,
-				bool                            close_listener,
+				const stats_config&             cfg_stats,
+				const conn_config&              cfg_conn,
 				const std::atomic_bool&         force_break,
 				processing_fn_t&                processing_fn);
 

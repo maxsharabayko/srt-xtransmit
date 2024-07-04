@@ -23,11 +23,10 @@ class exception : public std::exception
 {
 public:
 	explicit exception(const std::string &&err)
-		: m_error_msg(std::move(err)) // note "short string optimization" (SSO)
+		: m_error_msg(err) // note "short string optimization" (SSO)
 	{
 	}
 
-public:
 	virtual const char *what() const throw() { return m_error_msg.c_str(); }
 
 private:

@@ -16,6 +16,7 @@
 #include "misc.hpp"
 #include "receive.hpp"
 #include "metrics.hpp"
+#include "metrics_writer.hpp"
 
 // OpenSRT
 #include "apputil.hpp"
@@ -56,73 +57,18 @@ void trace_message(const size_t bytes, const vector<char>& buffer, SOCKET conn_i
 	//::cout << "SRT HS: " << hs.show() << endl;
 }
 
-/// @brief Output metrics in a loop until @a force_break is true.
-/// @param metrics_file the output file handle; print to stdout if not open.
-/// @param validator the source of the metrics.
-/// @param mtx mutex to protect access to validator
-/// @param freq output frequency.
-/// @param force_break break the loop and return from the function once set to true.
-void metrics_writing_loop(ofstream&                   metrics_file,
-						  metrics::validator&         validator,
-						  mutex&                      mtx,
-						  const chrono::milliseconds& freq,
-						  const atomic_bool&          force_break)
-{
-	auto stat_time = steady_clock::now();
-	while (!force_break)
-	{
-		const auto tnow = steady_clock::now();
-		if (tnow >= stat_time)
-		{
-			if (metrics_file.is_open())
-			{
-				lock_guard<mutex> lck(mtx);
-				metrics_file << validator.stats_csv(false);
-			}
-			else
-			{
-				lock_guard<mutex> lck(mtx);
-				const auto        stats_str = validator.stats();
-				spdlog::info(LOG_SC_RECEIVE "{}", stats_str);
-			}
-			stat_time += freq;
-		}
-
-		std::this_thread::sleep_until(stat_time);
-	}
-}
-
-void run_pipe(shared_sock src, const config& cfg, const atomic_bool& force_break)
+void run_pipe(shared_sock src, const config& cfg, unique_ptr<metrics::metrics_writer>& metrics, std::function<void(int conn_id)> const& on_done, const atomic_bool& force_break)
 {
 	socket::isocket& sock = *src.get();
+	const auto conn_id = sock.id();
 
 	vector<char>       buffer(cfg.message_size);
-	metrics::validator validator;
+	metrics::metrics_writer::shared_validator validator;
 
-	atomic_bool  metrics_stop(false);
-	mutex        metrics_mtx;
-	future<void> metrics_th;
-	ofstream     metrics_file;
-	if (cfg.enable_metrics && cfg.metrics_freq_ms > 0)
+	if (metrics)
 	{
-		if (!cfg.metrics_file.empty())
-		{
-			metrics_file.open(cfg.metrics_file, std::ofstream::out);
-			if (!metrics_file)
-			{
-				spdlog::error(LOG_SC_RECEIVE "Failed to open metrics file {} for output", cfg.metrics_file);
-				return;
-			}
-			metrics_file << validator.stats_csv(true);
-		}
-
-		metrics_th = async(::launch::async,
-						   metrics_writing_loop,
-						   ref(metrics_file),
-						   ref(validator),
-						   ref(metrics_mtx),
-						   chrono::milliseconds(cfg.metrics_freq_ms),
-						   ref(metrics_stop));
+		validator = make_shared<metrics::validator>(conn_id);
+		metrics->add_validator(validator, conn_id);
 	}
 
 	try
@@ -139,10 +85,9 @@ void run_pipe(shared_sock src, const config& cfg, const atomic_bool& force_break
 
 			if (cfg.print_notifications)
 				trace_message(bytes, buffer, sock.id());
-			if (cfg.enable_metrics)
+			if (metrics)
 			{
-				lock_guard<mutex> lck(metrics_mtx);
-				validator.validate_packet(const_buffer(buffer.data(), bytes));
+				validator->validate_packet(const_buffer(buffer.data(), bytes));
 			}
 
 			if (cfg.send_reply)
@@ -151,7 +96,7 @@ void run_pipe(shared_sock src, const config& cfg, const atomic_bool& force_break
 				sock.write(const_buffer(out_message.data(), out_message.size()));
 
 				if (cfg.print_notifications)
-					spdlog::error(LOG_SC_RECEIVE "Reply sent on conn ID {}", sock.id());
+					spdlog::error(LOG_SC_RECEIVE "{} Reply sent on conn ID {}", conn_id, sock.id());
 			}
 		}
 	}
@@ -160,14 +105,15 @@ void run_pipe(shared_sock src, const config& cfg, const atomic_bool& force_break
 		spdlog::warn(LOG_SC_RECEIVE "{}", e.what());
 	}
 
-	metrics_stop = true;
-	if (metrics_th.valid())
-		metrics_th.get();
+	if (metrics)
+		metrics->remove_validator(conn_id);
 
 	if (force_break)
 	{
 		spdlog::info(LOG_SC_RECEIVE "interrupted by request!");
 	}
+
+	on_done(conn_id);
 }
 
 void xtransmit::receive::run(const std::vector<std::string>& src_urls,
@@ -175,8 +121,25 @@ void xtransmit::receive::run(const std::vector<std::string>& src_urls,
 							 const atomic_bool&              force_break)
 {
 	using namespace std::placeholders;
-	processing_fn_t process_fn = std::bind(run_pipe, _1, cfg, _2);
-	common_run(src_urls, cfg, cfg.reconnect, cfg.close_listener, force_break, process_fn);
+
+	const bool write_metrics = cfg.enable_metrics && cfg.metrics_freq_ms > 0;
+	unique_ptr<metrics::metrics_writer> metrics;
+
+	if (write_metrics)
+	{
+		try {
+			metrics = make_unique<metrics::metrics_writer>(
+				cfg.metrics_file, milliseconds(cfg.metrics_freq_ms));
+		}
+		catch (const runtime_error& e)
+		{
+			spdlog::error(LOG_SC_RECEIVE "{}", e.what());
+			return;
+		}
+	}
+
+	processing_fn_t process_fn = std::bind(run_pipe, _1, cfg, std::ref(metrics), _2, _3);
+	common_run(src_urls, cfg, cfg, force_break, process_fn);
 }
 
 CLI::App* xtransmit::receive::add_subcommand(CLI::App& app, config& cfg, std::vector<std::string>& src_urls)
@@ -191,13 +154,13 @@ CLI::App* xtransmit::receive::add_subcommand(CLI::App& app, config& cfg, std::ve
 	sc_receive->add_option("--statsfreq", cfg.stats_freq_ms, fmt::format("Output stats report frequency, ms (default {})", cfg.stats_freq_ms))
 		->transform(CLI::AsNumberWithUnit(to_ms, CLI::AsNumberWithUnit::CASE_SENSITIVE));
 	sc_receive->add_flag("--printmsg", cfg.print_notifications, "Print message to stdout");
-	sc_receive->add_flag("--reconnect,!--no-reconnect", cfg.reconnect, "Reconnect automatically");
-	sc_receive->add_flag("--close-listener,!--no-close-listener", cfg.close_listener, "Close listener once connection is established");
 	sc_receive->add_flag("--enable-metrics", cfg.enable_metrics, "Enable checking metrics: jitter, latency, etc.");
 	sc_receive->add_option("--metricsfile", cfg.metrics_file, "Metrics output filename (default stdout)");
 	sc_receive->add_option("--metricsfreq", cfg.metrics_freq_ms, fmt::format("Metrics report frequency, ms (default {})", cfg.metrics_freq_ms))
 		->transform(CLI::AsNumberWithUnit(to_ms, CLI::AsNumberWithUnit::CASE_SENSITIVE));
 	sc_receive->add_flag("--twoway", cfg.send_reply, "Both send and receive data");
+
+	apply_cli_opts(*sc_receive, cfg);
 
 	return sc_receive;
 }
