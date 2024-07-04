@@ -153,6 +153,7 @@ bool validate_packet_checksum(const const_buffer& payload)
 
 std:: string validator::stats()
 {
+	std::lock_guard lock(m_mtx);
 	std::stringstream ss;
 
 	auto latency_str = [](long long val, long long na_val) -> string {
@@ -184,61 +185,65 @@ std:: string validator::stats()
 	return ss.str();
 }
 
-string validator::stats_csv(bool only_header)
+string validator::stats_csv_header()
 {
 	stringstream ss;
 
-	if (only_header)
-	{
 #ifdef HAS_PUT_TIME
-		ss << "Timepoint,";
+	ss << "Timepoint,";
 #endif
-		ss << "usLatencyMin,";
-		ss << "usLatencyMax,";
-		ss << "usLatencyAvg,";
-		ss << "usJitter,";
-		ss << "usDelayFactor,";
-		ss << "pktReceived,";
-		ss << "pktLost,";
-		ss << "pktReordered,";
-		ss << "pktReorderDist,";
-		ss << "pktChecksumError,";
-		ss << "pktLengthError";
-		ss << '\n';
-	}
-	else
-	{
+	ss << "iConn,";
+	ss << "usLatencyMin,";
+	ss << "usLatencyMax,";
+	ss << "usLatencyAvg,";
+	ss << "usJitter,";
+	ss << "usDelayFactor,";
+	ss << "pktReceived,";
+	ss << "pktLost,";
+	ss << "pktReordered,";
+	ss << "pktReorderDist,";
+	ss << "pktChecksumError,";
+	ss << "pktLengthError";
+	ss << '\n';
+	return ss.str();
+}
+
+string validator::stats_csv()
+{
+	stringstream ss;
+
+	std::lock_guard lock(m_mtx);
 #ifdef HAS_PUT_TIME
-		ss << print_timestamp_now() << ',';
+	ss << print_timestamp_now() << ',';
 #endif
+	ss << m_id << ',';
 
-		// Empty string (N/A) on default-initialized latency min and max values.
-		auto latency_str = [](long long val, long long na_val) -> string {
-			if (val == na_val)
-				return "";
-			return to_string(val);
-		};
+	// Empty string (N/A) on default-initialized latency min and max values.
+	auto latency_str = [](long long val, long long na_val) -> string {
+		if (val == na_val)
+			return "";
+		return to_string(val);
+	};
 
-		const auto latency_min = m_latency.get_latency_min();
-		ss << latency_str(latency_min, numeric_limits<long long>::max()) << ',';
-		const auto latency_max = m_latency.get_latency_max();
-		ss << latency_str(latency_max, numeric_limits<long long>::min()) << ',';
-		ss << latency_str(m_latency.get_latency_avg(), -1) << ',';
-		ss << m_jitter.get_jitter() << ',';
-		ss << m_delay_factor.get_delay_factor() << ',';
-		const auto stats = m_reorder.get_stats();
-		ss << stats.pkts_processed << ',';
-		ss << stats.pkts_lost << ',';
-		ss << stats.pkts_reordered << ',';
-		ss << stats.reorder_dist << ',';
-		const auto intgr_stats = m_integrity.get_stats();
-		ss << intgr_stats.pkts_wrong_checksum << ',';
-		ss << intgr_stats.pkts_wrong_len;
-		ss << '\n';
+	const auto latency_min = m_latency.get_latency_min();
+	ss << latency_str(latency_min, numeric_limits<long long>::max()) << ',';
+	const auto latency_max = m_latency.get_latency_max();
+	ss << latency_str(latency_max, numeric_limits<long long>::min()) << ',';
+	ss << latency_str(m_latency.get_latency_avg(), -1) << ',';
+	ss << m_jitter.get_jitter() << ',';
+	ss << m_delay_factor.get_delay_factor() << ',';
+	const auto stats = m_reorder.get_stats();
+	ss << stats.pkts_processed << ',';
+	ss << stats.pkts_lost << ',';
+	ss << stats.pkts_reordered << ',';
+	ss << stats.reorder_dist << ',';
+	const auto intgr_stats = m_integrity.get_stats();
+	ss << intgr_stats.pkts_wrong_checksum << ',';
+	ss << intgr_stats.pkts_wrong_len;
+	ss << '\n';
 
-		m_latency.reset();
-		m_delay_factor.reset();
-	}
+	m_latency.reset();
+	m_delay_factor.reset();
 
 	return ss.str();
 }

@@ -69,11 +69,11 @@ namespace metrics
 	class validator
 	{
 	public:
-		validator() {}
+		validator(int id) : m_id(id) {}
 
-	public:
 		inline void validate_packet(const const_buffer& payload)
 		{
+			std::lock_guard lock(m_mtx);
 			const auto sys_time_now = system_clock::now();
 			const auto std_time_now = steady_clock::now();
 			
@@ -99,14 +99,17 @@ namespace metrics
 		}
 
 		std::string stats();
-		std::string stats_csv(bool only_header = false);
+		std::string stats_csv();
+		static std::string stats_csv_header();
 
 	private:
+		const int m_id;
 		latency m_latency;
 		jitter m_jitter;
 		delay_factor m_delay_factor;
 		reorder m_reorder;
 		integrity m_integrity;
+		mutable std::mutex m_mtx;
 	};
 
 
