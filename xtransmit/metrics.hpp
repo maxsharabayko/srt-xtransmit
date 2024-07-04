@@ -73,7 +73,7 @@ namespace metrics
 
 		inline void validate_packet(const const_buffer& payload)
 		{
-			std::lock_guard lock(m_mtx);
+			std::lock_guard<std::mutex> lock(m_mtx);
 			const auto sys_time_now = system_clock::now();
 			const auto std_time_now = steady_clock::now();
 			

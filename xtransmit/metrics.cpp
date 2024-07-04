@@ -153,7 +153,7 @@ bool validate_packet_checksum(const const_buffer& payload)
 
 std:: string validator::stats()
 {
-	std::lock_guard lock(m_mtx);
+	std::lock_guard<std::mutex> lock(m_mtx);
 	std::stringstream ss;
 
 	auto latency_str = [](long long val, long long na_val) -> string {
@@ -212,7 +212,7 @@ string validator::stats_csv()
 {
 	stringstream ss;
 
-	std::lock_guard lock(m_mtx);
+	std::lock_guard<std::mutex> lock(m_mtx);
 #ifdef HAS_PUT_TIME
 	ss << print_timestamp_now() << ',';
 #endif
