@@ -195,15 +195,13 @@ CLI::App* xtransmit::receive::add_subcommand(CLI::App& app, config& cfg, std::ve
 	sc_receive->add_option("--statsfreq", cfg.stats_freq_ms, fmt::format("Output stats report frequency, ms (default {})", cfg.stats_freq_ms))
 		->transform(CLI::AsNumberWithUnit(to_ms, CLI::AsNumberWithUnit::CASE_SENSITIVE));
 	sc_receive->add_flag("--printmsg", cfg.print_notifications, "Print message to stdout");
-	sc_receive->add_option("--maxconns", cfg.max_conns, "Maximum Number of connections to initiate or accept");
-	sc_receive->add_option("--concurrent-streams", cfg.concurrent_streams, "Maximum Number of concurrect receiving streams");
-	sc_receive->add_flag("--reconnect,!--no-reconnect", cfg.reconnect, "Reconnect automatically");
-	sc_receive->add_flag("--close-listener,!--no-close-listener", cfg.close_listener, "Close listener once connection is established");
 	sc_receive->add_flag("--enable-metrics", cfg.enable_metrics, "Enable checking metrics: jitter, latency, etc.");
 	sc_receive->add_option("--metricsfile", cfg.metrics_file, "Metrics output filename (default stdout)");
 	sc_receive->add_option("--metricsfreq", cfg.metrics_freq_ms, fmt::format("Metrics report frequency, ms (default {})", cfg.metrics_freq_ms))
 		->transform(CLI::AsNumberWithUnit(to_ms, CLI::AsNumberWithUnit::CASE_SENSITIVE));
 	sc_receive->add_flag("--twoway", cfg.send_reply, "Both send and receive data");
+
+	apply_cli_opts(*sc_receive, cfg);
 
 	return sc_receive;
 }

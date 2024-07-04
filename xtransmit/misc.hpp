@@ -6,6 +6,9 @@
 #include <memory>
 #include <sstream>	// std::stringstream, std::stringbuf
 
+// Third party libraries
+#include "CLI/CLI.hpp"
+
 // xtransmit
 #include "socket.hpp"
 #include "netaddr_any.hpp"
@@ -68,6 +71,8 @@ struct conn_config
 	int         concurrent_streams = 1;   // Maximum number of concurrent streams allowed.
 	bool        close_listener = false; // Close listener after all connection have been accepted.
 };
+
+void apply_cli_opts(CLI::App& sc, conn_config& cfg);
 
 
 typedef std::shared_ptr<socket::isocket> shared_sock_t;

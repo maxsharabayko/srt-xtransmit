@@ -180,11 +180,6 @@ void common_run(const vector<string>& urls, const stats_config& cfg_stats, const
 	shared_sock_t listening_sock; // A shared pointer to store a listening socket for multiple connections.
 	steady_clock::time_point next_reconnect = steady_clock::now();
 
-	// future<void> route_bkwd = cfg.bidir
-	// 		? ::async(::launch::async, route, dst, src, cfg, "[DST->SRC]", ref(force_break))
-	// 		: future<void>();	
-	// TODO: Add connection lost event.
-	//map<SRTSOCKET, future<void>> processing_pipes;
 	concurrent_pipes pipes(stats.get());
 	unsigned conns_cnt = 0;
 
@@ -214,6 +209,7 @@ void common_run(const vector<string>& urls, const stats_config& cfg_stats, const
 			if (stats)
 				stats->add_socket(conn);
 
+			// TODO: Maybe just run from this thread if cfg_conn.concurrent_streams == 1.
 			pipes.add_pipe(conn, processing_fn, break_token);
 			++conns_cnt;
 
@@ -223,7 +219,7 @@ void common_run(const vector<string>& urls, const stats_config& cfg_stats, const
 			spdlog::warn(LOG_SC_CONN "{}", e.what());
 		}
 
-		if (conns_cnt >= cfg_conn.max_conns)
+		if (cfg_conn.max_conns > 0 && conns_cnt >= cfg_conn.max_conns)
 			break;
 
 		if (pipes.size() < cfg_conn.concurrent_streams)
@@ -301,6 +297,15 @@ netaddr_any create_addr(const string& name, unsigned short port, int pref_family
 	freeaddrinfo(val);
 
 	return result;
+}
+
+void apply_cli_opts(CLI::App& sc, conn_config& cfg)
+{
+	sc.add_option("--maxconns", cfg.max_conns, "Maximum Number of connections to initiate or accept (-1: infinite, default: 1).");
+	sc.add_option("--concurrent-streams", cfg.concurrent_streams, "Maximum Number of concurrect receiving streams (default: 1).")
+		->check(CLI::Validator(CLI::PositiveNumber));
+	sc.add_flag("--reconnect,!--no-reconnect", cfg.reconnect, "Reconnect automatically.");
+	sc.add_flag("--close-listener,!--no-close-listener", cfg.close_listener, "Close listener once connection is established.");
 }
 
 } // namespace xtransmit

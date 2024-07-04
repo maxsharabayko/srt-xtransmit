@@ -122,13 +122,11 @@ CLI::App* xtransmit::generate::add_subcommand(CLI::App& app, config& cfg, std::v
 	sc_generate->add_option("--statsfreq", cfg.stats_freq_ms, fmt::format("Output stats report frequency, ms (default {})", cfg.stats_freq_ms))
 		->transform(CLI::AsNumberWithUnit(to_ms, CLI::AsNumberWithUnit::CASE_SENSITIVE));
 	sc_generate->add_flag("--twoway", cfg.two_way, "Both send and receive data");
-	sc_generate->add_option("--maxconns", cfg.max_conns, "Maximum Number of connections to initiate or accept");
-	sc_generate->add_option("--concurrent-streams", cfg.concurrent_streams, "Maximum Number of concurrect generating streams");
-	sc_generate->add_flag("--reconnect,!--no-reconnect", cfg.reconnect, "Reconnect automatically");
-	sc_generate->add_flag("--close-listener,!--no-close-listener", cfg.close_listener, "Close listener once connection is established");
 	sc_generate->add_flag("--enable-metrics", cfg.enable_metrics, "Enable embeding metrics: latency, loss, reordering, jitter, etc.");
 	sc_generate->add_option("--playback-csv", cfg.playback_csv, "Input CSV file with timestamp of every packet");
 	sc_generate->add_flag("--spin-wait", cfg.spin_wait, "Use CPU-expensive spin waiting for better sending accuracy");
+	
+	apply_cli_opts(*sc_generate, cfg);
 
 	return sc_generate;
 }
