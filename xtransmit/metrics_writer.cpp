@@ -1,4 +1,5 @@
 #include <thread>
+#include <mutex>
 #include "metrics_writer.hpp"
 
 // submodules
@@ -69,7 +70,7 @@ void metrics_writer::remove_validator(SOCKET id)
 
 void metrics_writer::clear()
 {
-	std::lock_guard l(m_lock);
+	lock_guard<mutex> l(m_lock);
 	m_validators.clear();
 }
 
@@ -85,7 +86,7 @@ future<void> metrics_writer::launch()
 	auto print_metrics = [](map<SOCKET, shared_validator>& validators, ofstream& fout, mutex& stats_lock)
 	{
 		const bool         print_to_file = fout.is_open();
-		scoped_lock<mutex> lock(stats_lock);
+		lock_guard<mutex> lock(stats_lock);
 
 		for (auto& it : validators)
 		{
