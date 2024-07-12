@@ -3,7 +3,6 @@
 #include "socketoptions.hpp"
 
 #ifndef _WIN32
-//#include <linux/tcp.h>
 #include <netinet/tcp.h>
 #endif
 

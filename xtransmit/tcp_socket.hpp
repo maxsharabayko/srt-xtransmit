@@ -70,7 +70,7 @@ private:
 	void set_blocking_flags(bool is_blocking) const;
 
 private:
-	SOCKET      m_bind_socket = -1; // INVALID_SOCK;
+	SOCKET      m_bind_socket = SRT_INVALID_SOCK;
 	sockaddr_in m_dst_addr    = {};
 
 	bool                     m_blocking_mode = false;
