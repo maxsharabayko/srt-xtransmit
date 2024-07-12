@@ -57,7 +57,7 @@ public:
 #endif
 	}
 
-	const std::string statistics_csv(bool print_header) const final;
+	const std::string get_statistics(std::string stats_format, bool print_header) const final;
 
 private:
 	void raise_exception(const string&& place, const string&& reason) const;

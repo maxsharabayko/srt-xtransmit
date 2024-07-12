@@ -405,9 +405,13 @@ string tcp_info_to_csv(int socketid, const tcp_info& stats, bool print_header)
 }
 #endif
 
-const string socket::tcp::statistics_csv(bool print_header) const
+const string socket::tcp::get_statistics(std::string stats_format, bool print_header) const
 {
 #ifdef ENABLE_TCP_STATS
+	if (stats_format != "csv")
+		spdlog::warn("TCP {} format is not supported. 'csv' format will be used instead.", stats_format);
+
+
 	tcp_info tcp_stats = {};
 	socklen_t len = sizeof tcp_stats;
 
