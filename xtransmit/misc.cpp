@@ -210,7 +210,7 @@ void common_run(const vector<string>& urls, const stats_config& cfg_stats, const
 	steady_clock::time_point next_reconnect = steady_clock::now();
 
 	concurrent_pipes pipes(stats.get());
-	unsigned conns_cnt = 0;
+	int conns_cnt = 0;
 
 	do {
 		const auto tstart = steady_clock::now();
@@ -246,6 +246,7 @@ void common_run(const vector<string>& urls, const stats_config& cfg_stats, const
 		catch (const socket::exception& e)
 		{
 			spdlog::warn(LOG_SC_CONN "{}", e.what());
+			break;
 		}
 
 		if (cfg_conn.max_conns > 0 && conns_cnt >= cfg_conn.max_conns)
