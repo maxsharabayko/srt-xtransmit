@@ -8,6 +8,7 @@
 
 // submodules
 #include "spdlog/spdlog.h"
+#include "nlohmann/json.hpp"
 
 // Log entry prefix
 #define LOG_SC_PACER "PACER "
@@ -133,5 +134,80 @@ private:
 	std::ifstream            m_srccsv;
 	steady_clock::time_point m_start = steady_clock::now();
 };
+
+/// @brief 
+/// JSON file format:
+/// {"msDuration": "1000", "kbpsSendRate": "1000"}
+/// {"msDuration": "5000", "kbpsSendRate": "4000"}
+//class json_pacer : public ipacer
+//{
+//	using json = nlohmann::json;
+//public:
+//	explicit json_pacer(const std::string& filename)
+//		: m_src_file(filename.c_str())
+//	{
+//		if (!m_src_file)
+//		{
+//			spdlog::critical("Failed to open input JSON file. Path: {0}", filename);
+//			throw socket::exception("Failed to open input JSON file. Path " + filename);
+//		}
+//
+//		try {
+//			m_json_data = json::parse(m_src_file);
+//		}
+//		catch (json::parse_error& e) {
+//			spdlog::critical("Failed to parse json file. Path: {0}", filename);
+//			throw socket::exception("Failed to parse json file. Path " + filename);
+//		}
+//		m_json_iter = m_json_data.begin();
+//	}
+//
+//	~json_pacer() final = default;
+//
+//public:
+//	inline void wait(const atomic_bool& force_break) final
+//	{
+//		const steady_clock::time_point next_time_ = next_time();
+//		for (;;)
+//		{
+//			if (steady_clock::now() >= next_time_)
+//				break;
+//			if (force_break)
+//				break;
+//		}
+//	}
+//
+//private:
+//	steady_clock::time_point next_time()
+//	{
+//		if (m_json_iter == m_json_data.end())
+//		{
+//			m_json_iter = m_json_data.begin();
+//			m_start = steady_clock::now();
+//		}
+//
+//		if (m_srccsv.eof())
+//		{
+//			m_srccsv.clear(); // Need to clear the eof flag
+//			m_srccsv.seekg(0, m_srccsv.beg);
+//			m_start = steady_clock::now();
+//		}
+//
+//		std::string line;
+//		if (!std::getline(m_srccsv, line))
+//			return steady_clock::time_point();
+//		const double val = stod(line);
+//		return m_start + microseconds(static_cast<long long>(val * 1000000));
+//	}
+//
+//private:
+//	std::unique_ptr<pacer>   m_pacer;
+//	std::ifstream            m_src_file;
+//	json                     m_json_data;
+//	json::iterator           m_json_iter;
+//	steady_clock::time_point m_start = steady_clock::now();
+//};
+
+
 
 } // namespace xtransmit
