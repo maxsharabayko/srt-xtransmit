@@ -381,15 +381,16 @@ std::string socket::srt::print_negotiated_config(SRTSOCKET sock)
 	const string crypto_mode_str = "";
 #endif
 #undef VAL_AND_STR
-	
+
 	// Template lambdas are only available since C++20, have to duplicate the code.
 	std::string streamid(512, '\0');
-	int         streamid_len = (int) streamid.size();
+	auto        streamid_len = (int)streamid.size();
 	if (srt_getsockflag(sock, SRTO_STREAMID, (void*)streamid.data(), &streamid_len) != SRT_SUCCESS)
 	{
 		spdlog::error(LOG_SOCK_SRT "Failed to get sockopt SRTO_STREAMID.");
 		streamid_len = 0;
 	}
+	streamid.resize(streamid_len);
 
 	return fmt::format("TSBPD {}. KM state {} (RCV {}, SND {}). PB key length: {}. Cryptomode {}. Stream ID: {}",
 					   latency_str,
