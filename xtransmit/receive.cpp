@@ -22,7 +22,10 @@
 #include "apputil.hpp"
 #include "uriparser.hpp"
 
-using namespace std;
+using std::vector;
+using std::unique_ptr;
+using std::atomic_bool;
+using std::string;
 using namespace xtransmit;
 using namespace xtransmit::receive;
 using namespace std::chrono;
@@ -32,33 +35,53 @@ using shared_sock = std::shared_ptr<socket::isocket>;
 
 #define LOG_SC_RECEIVE "RECEIVE "
 
+
+namespace xtransmit
+{
+namespace details
+{
+#if defined(_MSC_VER) || __cplusplus >= 201402L // C++14 and beyond
+	using std::make_unique;
+#else
+	template<typename T, typename... Args>
+	std::unique_ptr<T> make_unique(Args &&... args)
+	{
+		static_assert(!std::is_array<T>::value, "arrays are not supported");
+		return std::unique_ptr<T>(new T(std::forward<Args>(args)...));
+	}
+#endif
+}
+}
+
 void trace_message(const size_t bytes, const vector<char>& buffer, SOCKET conn_id)
 {
-	::cout << "RECEIVED MESSAGE length " << bytes << " on conn ID " << conn_id;
+	using std::cout;
+	cout << "RECEIVED MESSAGE length " << bytes << " on conn ID " << conn_id;
 
 #if 0
 	if (bytes < 50)
 	{
-		::cout << ":\n";
-		::cout << string(buffer.data(), bytes).c_str();
+		cout << ":\n";
+		cout << string(buffer.data(), bytes).c_str();
 	}
 	else if (buffer[0] >= '0' && buffer[0] <= 'z')
 	{
-		::cout << " (first character):";
-		::cout << buffer[0];
+		cout << " (first character):";
+		cout << buffer[0];
 	}
 #endif
-	::cout << endl;
+	cout << std::endl;
 
 	// CHandShake hs;
 	// if (hs.load_from(buffer.data(), buffer.size()) < 0)
 	//	return;
 	//
-	//::cout << "SRT HS: " << hs.show() << endl;
+	//cout << "SRT HS: " << hs.show() << endl;
 }
 
 void run_pipe(shared_sock src, const config& cfg, unique_ptr<metrics::metrics_writer>& metrics, std::function<void(int conn_id)> const& on_done, const atomic_bool& force_break)
 {
+	using std::make_shared;
 	socket::isocket& sock = *src.get();
 	const auto conn_id = sock.id();
 
@@ -128,10 +151,10 @@ void xtransmit::receive::run(const std::vector<std::string>& src_urls,
 	if (write_metrics)
 	{
 		try {
-			metrics = make_unique<metrics::metrics_writer>(
+			metrics = details::make_unique<metrics::metrics_writer>(
 				cfg.metrics_file, milliseconds(cfg.metrics_freq_ms));
 		}
-		catch (const runtime_error& e)
+		catch (const std::runtime_error& e)
 		{
 			spdlog::error(LOG_SC_RECEIVE "{}", e.what());
 			return;
@@ -144,7 +167,7 @@ void xtransmit::receive::run(const std::vector<std::string>& src_urls,
 
 CLI::App* xtransmit::receive::add_subcommand(CLI::App& app, config& cfg, std::vector<std::string>& src_urls)
 {
-	const map<string, int> to_ms{{"s", 1000}, {"ms", 1}};
+	const std::map<string, int> to_ms{{"s", 1000}, {"ms", 1}};
 
 	CLI::App* sc_receive = app.add_subcommand("receive", "Receive data (SRT, UDP)")->fallthrough();
 	sc_receive->add_option("-i,--input,src", src_urls, "Source URI");
