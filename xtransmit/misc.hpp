@@ -55,7 +55,6 @@ inline std::string print_timestamp_now()
 
 #endif // HAS_PUT_TIME
 
-
 struct stats_config
 {
 	int         stats_freq_ms = 0;
