@@ -1,5 +1,7 @@
 # srt-xtransmit
 
+[!["Buy Me A Coffee"](https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png)](https://www.buymeacoffee.com/4c1qfdewk)
+
 `srt-xtransmit` is a testing utility with support for SRT and UDP network protocols.
 
 ## Functionality
