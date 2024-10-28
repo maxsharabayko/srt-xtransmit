@@ -94,6 +94,20 @@ void run_pipe(shared_sock src, const config& cfg, unique_ptr<metrics::metrics_wr
 		metrics->add_validator(validator, conn_id);
 	}
 
+	std::ofstream dumpfile;
+	if (!cfg.dump_to_file.empty())
+	{
+		spdlog::info(LOG_SC_RECEIVE "Dumping received payload to file {}.", cfg.dump_to_file);
+
+		dumpfile.open(cfg.dump_to_file, std::ios::out | std::ios::binary);
+		if (!dumpfile)
+		{
+			spdlog::error(LOG_SC_RECEIVE "Failed to open file for output. Path: {0}.", cfg.dump_to_file);
+			return;
+		}
+	}
+
+	const bool is_dumping = dumpfile.is_open();
 	try
 	{
 		while (!force_break)
@@ -111,6 +125,11 @@ void run_pipe(shared_sock src, const config& cfg, unique_ptr<metrics::metrics_wr
 			if (metrics)
 			{
 				validator->validate_packet(const_buffer(buffer.data(), bytes));
+			}
+
+			if (is_dumping)
+			{
+				dumpfile.write(buffer.data(), bytes);
 			}
 
 			if (cfg.send_reply)
@@ -181,6 +200,8 @@ CLI::App* xtransmit::receive::add_subcommand(CLI::App& app, config& cfg, std::ve
 	sc_receive->add_option("--metricsfile", cfg.metrics_file, "Metrics output filename (default stdout)");
 	sc_receive->add_option("--metricsfreq", cfg.metrics_freq_ms, fmt::format("Metrics report frequency, ms (default {})", cfg.metrics_freq_ms))
 		->transform(CLI::AsNumberWithUnit(to_ms, CLI::AsNumberWithUnit::CASE_SENSITIVE));
+	sc_receive->add_option("--dump-to-file", cfg.dump_to_file, "Dump received payload to a file (default: none)");
+	sc_receive->add_option("--dump-timestamps-to-file", cfg.dump_timestamps_to_file, "Dump timestamps of SRT packets to a file (default: none)");
 	sc_receive->add_flag("--twoway", cfg.send_reply, "Both send and receive data");
 
 	apply_cli_opts(*sc_receive, cfg);
