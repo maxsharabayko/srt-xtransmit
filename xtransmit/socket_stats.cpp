@@ -1,5 +1,6 @@
 #include <thread>
 #include "socket_stats.hpp"
+#include "xtr_defs.hpp"
 
 // submodules
 #include "spdlog/spdlog.h"
@@ -78,7 +79,7 @@ future<void> xtransmit::socket::stats_writer::launch()
 	auto print_stats = [](map<SOCKET, shared_sock>& sock_vector,
 		ofstream& out,
 		mutex& stats_lock,
-		string format,
+		const string& format,
 		bool print_header)
 	{
 #ifdef ENABLE_CXX17
@@ -94,7 +95,7 @@ future<void> xtransmit::socket::stats_writer::launch()
 				continue;
 			}
 
-			auto* s = it.second.get();
+			const auto* s = it.second.get();
 
 			try
 			{
@@ -130,7 +131,7 @@ future<void> xtransmit::socket::stats_writer::launch()
 
 	auto stats_func = [&print_stats](map<SOCKET, shared_sock>& sock_vector,
 						 ofstream&            out,
-						 string&              format,
+						 const string&        format,
 						 const milliseconds   interval,
 						 mutex&               stats_lock,
 						 const atomic_bool&   stop_stats) {
@@ -145,5 +146,6 @@ future<void> xtransmit::socket::stats_writer::launch()
 		}
 	};
 
+	XTR_THREADNAME(std::string("XTR:Stats"));
 	return async(::launch::async, stats_func, ref(m_sock), ref(m_logfile), ref(m_format), m_interval, ref(m_lock), ref(m_stop));
 }

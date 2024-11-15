@@ -17,6 +17,7 @@
 #include "receive.hpp"
 #include "metrics.hpp"
 #include "metrics_writer.hpp"
+#include "xtr_defs.hpp"
 
 // OpenSRT
 #include "apputil.hpp"
@@ -35,23 +36,6 @@ using shared_sock = std::shared_ptr<socket::isocket>;
 
 #define LOG_SC_RECEIVE "RECEIVE "
 
-
-namespace xtransmit
-{
-namespace details
-{
-#if defined(_MSC_VER) || __cplusplus >= 201402L // C++14 and beyond
-	using std::make_unique;
-#else
-	template<typename T, typename... Args>
-	std::unique_ptr<T> make_unique(Args &&... args)
-	{
-		static_assert(!std::is_array<T>::value, "arrays are not supported");
-		return std::unique_ptr<T>(new T(std::forward<Args>(args)...));
-	}
-#endif
-}
-}
 
 void trace_message(const size_t bytes, const vector<char>& buffer, SOCKET conn_id)
 {
@@ -81,7 +65,7 @@ void trace_message(const size_t bytes, const vector<char>& buffer, SOCKET conn_i
 
 void run_pipe(shared_sock src, const config& cfg, unique_ptr<metrics::metrics_writer>& metrics, std::function<void(int conn_id)> const& on_done, const atomic_bool& force_break)
 {
-	using std::make_shared;
+	XTR_THREADNAME(std::string("XTR:Rcv"));
 	socket::isocket& sock = *src.get();
 	const auto conn_id = sock.id();
 
@@ -90,7 +74,7 @@ void run_pipe(shared_sock src, const config& cfg, unique_ptr<metrics::metrics_wr
 
 	if (metrics)
 	{
-		validator = make_shared<metrics::validator>(conn_id);
+		validator = std::make_shared<metrics::validator>(conn_id);
 		metrics->add_validator(validator, conn_id);
 	}
 
