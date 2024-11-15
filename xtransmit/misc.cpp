@@ -3,7 +3,7 @@
 #include "misc.hpp"
 #include "socket_stats.hpp"
 #include "srt_socket_group.hpp"
-
+#include "xtr_defs.hpp"
 // submodules
 #include "spdlog/spdlog.h"
 
@@ -177,6 +177,7 @@ private:
 void common_run(const vector<string>& urls, const stats_config& cfg_stats, const conn_config& cfg_conn,
 	const atomic_bool& break_token, processing_fn_t& processing_fn)
 {
+	//XTR_THREADNAME(std::string("XTR:ConnMngmt"));
 	if (urls.empty())
 	{
 		spdlog::error(LOG_SC_CONN "URL was not provided");

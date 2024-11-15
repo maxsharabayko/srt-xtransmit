@@ -1,6 +1,7 @@
 #include <thread>
 #include <mutex>
 #include "metrics_writer.hpp"
+#include "xtr_defs.hpp"
 
 // submodules
 #include "spdlog/spdlog.h"
@@ -149,6 +150,7 @@ future<void> metrics_writer::launch()
 		}
 	};
 
+	XTR_THREADNAME(std::string("XTR:Metrics"));
 	return async(
 		::launch::async, metrics_func, ref(m_validators), ref(m_file), m_interval, ref(m_lock), ref(m_stop_token));
 }

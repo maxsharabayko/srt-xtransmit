@@ -17,6 +17,7 @@
 #include "generate.hpp"
 #include "pacer.hpp"
 #include "metrics.hpp"
+#include "xtr_defs.hpp"
 
 // OpenSRT
 #include "apputil.hpp"
@@ -34,6 +35,7 @@ using shared_sock = std::shared_ptr<socket::isocket>;
 
 void run_pipe(shared_sock dst, const config& cfg, std::function<void(int conn_id)> const& on_done, const atomic_bool& force_break)
 {
+	XTR_THREADNAME(std::string("XTR:Gen"));
 	vector<char> message_to_send(cfg.message_size);
 	iota(message_to_send.begin(), message_to_send.end(), (char)0);
 

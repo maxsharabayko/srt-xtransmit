@@ -20,6 +20,7 @@
 // OpenSRT
 #include "apputil.hpp"
 #include "uriparser.hpp"
+#include "xtr_defs.hpp"
 
 using namespace std;
 using namespace xtransmit;
@@ -39,6 +40,7 @@ namespace route
 	void route(shared_sock src, shared_sock dst,
 		const config& cfg, const string&& desc, const atomic_bool& force_break)
 	{
+		XTR_THREADNAME(std::string("XTR:Route"));
 		vector<char> buffer(cfg.message_size);
 
 		socket::isocket& sock_src = *src.get();
