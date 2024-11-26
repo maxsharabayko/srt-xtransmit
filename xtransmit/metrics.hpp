@@ -50,7 +50,8 @@ namespace metrics
 		inline void generate_payload(vector<char>& payload)
 		{
 			const int seqno = m_seqno++;
-			iota(payload.begin(), payload.end(), static_cast<char>(seqno));
+			// Using data() instead of begin() significantly improves performance. See #104.
+			iota(payload.data(), payload.data() + payload.size(), static_cast<char>(seqno));
 			if (!m_enable_metrics)
 				return;
 
