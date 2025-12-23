@@ -13,6 +13,8 @@
 # Build results
 _build*/
 build*/
+result
+result-*
 .venv/
 venv/
 [Dd]ebug/

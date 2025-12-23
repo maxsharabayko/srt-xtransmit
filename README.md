@@ -146,6 +146,22 @@ docker build --rm -f docker/Dockerfile.alpine --build-arg build_options="-DENABL
 ```
 * build_options - list of build options
 
+### Building with Nix
+
+If you have [Nix](https://nixos.org/download/) installed with flakes enabled, you can build directly from the repository:
+
+```shell
+nix build .#srt-xtransmit
+```
+
+The binary will be available at `./result/bin/srt-xtransmit`.
+
+To run without installing:
+
+```shell
+nix shell .#srt-xtransmit -c srt-xtransmit --version
+```
+
 ### Switching SRT version
 
 Before building the project with cmake, checkout the desired SRT library version.
