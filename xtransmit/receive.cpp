@@ -1,6 +1,7 @@
 #include <atomic>
 #include <chrono>
 #include <ctime>
+#include <fstream>
 #include <functional>
 #include <future>
 #include <iomanip>
@@ -35,6 +36,29 @@ using shared_srt  = std::shared_ptr<socket::srt>;
 using shared_sock = std::shared_ptr<socket::isocket>;
 
 #define LOG_SC_RECEIVE "RECEIVE "
+
+namespace
+{
+
+string dump_filename_for_connection(const string& filename, SOCKET conn_id)
+{
+	const auto separator_pos = filename.find_last_of("/\\");
+	const auto extension_pos = filename.find_last_of('.');
+	const bool has_extension = extension_pos != string::npos &&
+							   (separator_pos == string::npos || extension_pos > separator_pos);
+
+	if (!has_extension)
+	{
+		return fmt::format("{}.{}", filename, conn_id);
+	}
+
+	return fmt::format("{}.{:d}{}",
+					   filename.substr(0, extension_pos),
+					   static_cast<int>(conn_id),
+					   filename.substr(extension_pos));
+}
+
+} // namespace
 
 
 void trace_message(const size_t bytes, const vector<char>& buffer, SOCKET conn_id)
@@ -81,12 +105,18 @@ void run_pipe(shared_sock src, const config& cfg, unique_ptr<metrics::metrics_wr
 	std::ofstream dumpfile;
 	if (!cfg.dump_to_file.empty())
 	{
-		spdlog::info(LOG_SC_RECEIVE "Dumping received payload to file {}.", cfg.dump_to_file);
+		const string dump_filename = cfg.max_connections > 1
+										 ? dump_filename_for_connection(cfg.dump_to_file, conn_id)
+										 : cfg.dump_to_file;
+		spdlog::info(LOG_SC_RECEIVE "Dumping received payload to file {}.", dump_filename);
 
-		dumpfile.open(cfg.dump_to_file, std::ios::out | std::ios::binary);
+		dumpfile.open(dump_filename, std::ios::out | std::ios::binary);
 		if (!dumpfile)
 		{
-			spdlog::error(LOG_SC_RECEIVE "Failed to open file for output. Path: {0}.", cfg.dump_to_file);
+			spdlog::error(LOG_SC_RECEIVE "Failed to open file for output. Path: {}.", dump_filename);
+			if (metrics)
+				metrics->remove_validator(conn_id);
+			on_done(conn_id);
 			return;
 		}
 	}
@@ -114,6 +144,11 @@ void run_pipe(shared_sock src, const config& cfg, unique_ptr<metrics::metrics_wr
 			if (is_dumping)
 			{
 				dumpfile.write(buffer.data(), bytes);
+				if (!dumpfile)
+				{
+					spdlog::error(LOG_SC_RECEIVE "Failed to write received payload to file. Closing connection {}", conn_id);
+					break;
+				}
 			}
 
 			if (cfg.send_reply)
@@ -185,7 +220,6 @@ CLI::App* xtransmit::receive::add_subcommand(CLI::App& app, config& cfg, std::ve
 	sc_receive->add_option("--metricsfreq", cfg.metrics_freq_ms, fmt::format("Metrics report frequency, ms (default {})", cfg.metrics_freq_ms))
 		->transform(CLI::AsNumberWithUnit(to_ms, CLI::AsNumberWithUnit::CASE_SENSITIVE));
 	sc_receive->add_option("--dump-to-file", cfg.dump_to_file, "Dump received payload to a file (default: none)");
-	sc_receive->add_option("--dump-timestamps-to-file", cfg.dump_timestamps_to_file, "Dump timestamps of SRT packets to a file (default: none)");
 	sc_receive->add_flag("--twoway", cfg.send_reply, "Both send and receive data");
 
 	apply_cli_opts(*sc_receive, cfg);
