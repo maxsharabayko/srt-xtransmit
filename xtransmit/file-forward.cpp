@@ -68,7 +68,7 @@ void fwd_route(shared_ptr<SrtNode> src, shared_ptr<SrtNode> dst, SRTSOCKET dst_s
 		else if (message_rcvd[0] >= '0' && message_rcvd[0] <= 'z')
 		{
 			spdlog::debug(LOG_SC_FORWARD "{} RECEIVED MESSAGE length on conn ID {} (first character): {}",
-				description, dst->GetBindSocket());
+				description, connection_id, message_rcvd[0]);
 		}
 
 		spdlog::debug(LOG_SC_FORWARD "{} Forwarding message to {} (first character): {}",
