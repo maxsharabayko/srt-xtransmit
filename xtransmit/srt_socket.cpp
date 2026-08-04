@@ -249,15 +249,10 @@ std::future<shared_srt> socket::srt::async_read(std::vector<char> &buffer)
 
 void socket::srt::assert_options_valid(const std::map<string, string>& options, const unordered_set<string>& extra)
 {
-#ifdef ENABLE_CXX17
-	for (const auto& [key, val] : options)
-	{
-#else
 	for (const auto& el : options)
 	{
 		const string& key = el.first;
 		const string& val = el.second;
-#endif
 		bool opt_found = false;
 		for (const auto& o : srt_options)
 		{

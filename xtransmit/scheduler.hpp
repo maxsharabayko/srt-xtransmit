@@ -4,26 +4,25 @@
 #include <chrono>
 #include <condition_variable>
 #include <functional>
-#include <iostream>
 #include <map>
 #include <memory>
 #include <mutex>
 #include <thread>
+#include <utility>
+#include <vector>
 
 namespace xtransmit
 {
-using namespace std;
-using namespace std::chrono;
 
 class task
 {
 public:
-	explicit task(std::function<void()>&& f)
+	explicit task(std::function<void()> f)
 		: f(std::move(f))
 	{
 	}
 
-	function<void()> f;
+	std::function<void()> f;
 };
 
 class scheduler
@@ -33,102 +32,92 @@ public:
 		: done_(false)
 		, thread_(&scheduler::timer_loop, this)
 	{
+		(void)max_n_tasks;
 	}
 
 	scheduler(const scheduler&) = delete;
-
 	scheduler(scheduler&&) noexcept = delete;
-
 	scheduler& operator=(const scheduler&) = delete;
-
 	scheduler& operator=(scheduler&&) noexcept = delete;
 
 	~scheduler()
 	{
-		done_ = true;
-		sync_.mtx.lock();
+		stop();
 		sync_.cv.notify_one();
-		sync_.mtx.unlock();
 		if (thread_.joinable())
 			thread_.join();
 	}
 
 	void stop()
 	{
-		done_ = true;
-	}
-
-	template <typename Callable, typename... Args>
-	void schedule_on(const steady_clock::time_point time, Callable&& f, Args&&... args)
-	{
-		shared_ptr<task> t =
-			make_shared<task>(bind(forward<Callable>(f), forward<Args>(args)...));
-		add_task(time, move(t));
-	}
-
-	template <typename Callable, typename... Args>
-	void schedule_in(const steady_clock::duration time, Callable&& f, Args&&... args)
-	{
-		schedule_on(steady_clock::now() + time, forward<Callable>(f), forward<Args>(args)...);
-	}
-
-private:
-	atomic<bool> done_;
-	struct
-	{
-		mutex              mtx;
-		condition_variable cv;
-	} sync_;
-
-	multimap<steady_clock::time_point, shared_ptr<task>> tasks_;
-	thread                                               thread_;
-
-	void timer_loop()
-	{
-		while (!this->done_)
-		{
-			this->manage_tasks();
-
-			if (this->tasks_.empty())
-			{
-				unique_lock<mutex> lock(sync_.mtx);
-				sync_.cv.wait(lock, [this]() { return done_ || !tasks_.empty(); });
-			}
-			else
-			{
-				const auto         time_of_first_task = (*tasks_.begin()).first;
-				unique_lock<mutex> lock(sync_.mtx);
-				sync_.cv.wait_until(lock, time_of_first_task);
-			}
-		}
-	}
-
-
-	void add_task(const steady_clock::time_point time, shared_ptr<task> t)
-	{
-		lock_guard<mutex> l(sync_.mtx);
-		tasks_.emplace(time, move(t));
+		done_.store(true);
 		sync_.cv.notify_one();
 	}
 
-	void manage_tasks()
+	template <typename Callable, typename... Args>
+	void schedule_on(const std::chrono::steady_clock::time_point time, Callable&& f, Args&&... args)
 	{
-		lock_guard<mutex> l(sync_.mtx);
+		auto t = std::make_shared<task>(std::bind(std::forward<Callable>(f), std::forward<Args>(args)...));
+		add_task(time, std::move(t));
+	}
 
-		auto end_of_tasks_to_run = tasks_.upper_bound(steady_clock::now());
-		if (end_of_tasks_to_run != tasks_.begin())
+	template <typename Callable, typename... Args>
+	void schedule_in(const std::chrono::steady_clock::duration time, Callable&& f, Args&&... args)
+	{
+		schedule_on(std::chrono::steady_clock::now() + time, std::forward<Callable>(f), std::forward<Args>(args)...);
+	}
+
+private:
+	std::atomic<bool> done_;
+	struct
+	{
+		std::mutex              mtx;
+		std::condition_variable cv;
+	} sync_;
+
+	std::multimap<std::chrono::steady_clock::time_point, std::shared_ptr<task>> tasks_;
+	std::thread                                                                  thread_;
+
+	void timer_loop()
+	{
+		while (!done_.load())
 		{
-			// for all tasks_ that have been triggered
-			for (auto i = tasks_.begin(); i != end_of_tasks_to_run; ++i)
+			std::vector<std::shared_ptr<task>> tasks_to_run;
 			{
-				auto& task = (*i).second;
-				task->f();
+				std::lock_guard<std::mutex> l(sync_.mtx);
+
+				const auto end_of_tasks_to_run = tasks_.upper_bound(std::chrono::steady_clock::now());
+				for (auto i = tasks_.begin(); i != end_of_tasks_to_run; ++i)
+				{
+					tasks_to_run.push_back(i->second);
+				}
+				tasks_.erase(tasks_.begin(), end_of_tasks_to_run);
 			}
 
-			// remove the completed tasks_
-			tasks_.erase(tasks_.begin(), end_of_tasks_to_run);
+			for (auto& scheduled_task : tasks_to_run)
+			{
+				scheduled_task->f();
+			}
+
+			std::unique_lock<std::mutex> lock(sync_.mtx);
+			if (tasks_.empty())
+			{
+				sync_.cv.wait(lock, [this]() { return done_.load() || !tasks_.empty(); });
+			}
+			else
+			{
+				sync_.cv.wait_until(lock, tasks_.begin()->first);
+			}
 		}
 	}
+
+	void add_task(const std::chrono::steady_clock::time_point time, std::shared_ptr<task> t)
+	{
+		std::lock_guard<std::mutex> l(sync_.mtx);
+		tasks_.emplace(time, std::move(t));
+		sync_.cv.notify_one();
+	}
+
 };
 
 } // namespace xtransmit

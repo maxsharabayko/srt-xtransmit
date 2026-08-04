@@ -47,7 +47,7 @@ public:
 	 *
 	 * May throw a socket_exception.
 	 */
-	void listen() noexcept(false);
+	void listen();
 
 
 private:
@@ -108,8 +108,8 @@ public:
 	static const nlohmann::json stats_to_json(int socketid, const SRT_TRACEBSTATS& stats, uint16_t weight);
 
 private:
-	void raise_exception(const string&& place, SRTSOCKET sock = SRT_INVALID_SOCK) const;
-	void raise_exception(const string&& place, const string&& reason) const;
+	void raise_exception(const std::string& place, SRTSOCKET sock = SRT_INVALID_SOCK) const;
+	void raise_exception(const std::string& place, const std::string& reason) const;
 
 	const std::string get_statistics_csv(bool print_header) const;
 	const std::string get_statistics_json() const;

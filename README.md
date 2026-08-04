@@ -14,9 +14,9 @@
 
 ### File Transmission Commands
 
-* **file send** - segment-based file/folder sender (requires C++17: `-DENABLE_CXX17=ON`)
-* **file receive** - segment-based file/folder receiver (requires C++17: `-DENABLE_CXX17=ON`)
-* **file forward** - forward packets bidirectionally between two SRT connections (requires C++17: `-DENABLE_CXX17=ON`)
+* **file send** - segment-based file/folder sender (requires C++20)
+* **file receive** - segment-based file/folder receiver (requires C++20)
+* **file forward** - forward packets bidirectionally between two SRT connections (requires C++20)
 
 ## Build Instructions
 
@@ -27,12 +27,12 @@
 
 ### Requirements
 
-* C++14 compliant compiler (GCC 4.8+, CLang, MSVC, etc...)
+* C++20 compliant compiler (modern GCC, Clang, MSVC, etc...)
 * cmake (as a build configuration system)
 * OpenSSL (for encryption - required by SRT)
 
-**Note!** In order to have absolute timepoint in CSV statistics, GCC v5.0 (instead of v4.8+) and above is required
-(with support for [std::put_time](https://en.cppreference.com/w/cpp/io/manip/put_time)).
+**Note!** In order to have absolute timepoint in CSV statistics, a standard library with
+`std::put_time` support is required.
 
 ### Building on Linux/Mac
 
@@ -102,7 +102,7 @@ cmake --build ./
 
 ```shell
 mkdir _build && cd _build
-cmake ../ -DENABLE_CXX17=OFF
+cmake ../
 cmake --build ./
 ```
 
@@ -114,7 +114,7 @@ Comprehensive Windows build instructions can be found in the corresponding [wiki
 
 ```shell
 md _build && cd _build
-cmake ../ -DENABLE_STDCXX_SYNC=ON
+cmake ../
 cmake --build ./
 ```
 
@@ -142,7 +142,7 @@ docker build --rm -f docker/Dockerfile.alpine --build-arg srt_version="v1.4.0" -
 
 #### Build with specififc build options
 ```shell
-docker build --rm -f docker/Dockerfile.alpine --build-arg build_options="-DENABLE_CXX17=ON -DENABLE_BONDING=ON" -t srt-xtransmit-alpine:bonding .
+docker build --rm -f docker/Dockerfile.alpine --build-arg build_options="-DENABLE_BONDING=ON" -t srt-xtransmit-alpine:bonding .
 ```
 * build_options - list of build options
 
@@ -213,8 +213,8 @@ srt-xtransmit receive "srt://:4200?transtype=file&messageapi=1&payloadsize=1456&
 
 Send all files in folder "srcfolder", and  receive into a current folder "./".
 
-Requires C++17 compliant compiler with support for `file_system` (GCC 8 and higher). See [compiler support](https://en.cppreference.com/w/cpp/compiler_support) matrix. \
-Build with `-DENABLE_CXX17=ON` build option to enable (default -DENABLE_CXX17=OFF).
+Requires a C++20 compliant compiler with support for `std::filesystem`. See [compiler support](https://en.cppreference.com/w/cpp/compiler_support) matrix. \
+Build with `-DENABLE_BONDING=ON` to enable bonding support. File transfer is part of the default C++20 build.
 
 #### Sender
 
@@ -226,4 +226,3 @@ srt-xtransmit file send srcfolder/ "srt://127.0.0.1:4200" --statsfile stats-snd.
 ```shell
 srt-xtransmit file receive "srt://:4200" ./ --statsfile stats-rcv.csv --statsfreq 1s
 ```
-

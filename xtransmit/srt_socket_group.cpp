@@ -28,7 +28,7 @@ using shared_srt_group = shared_ptr<socket::srt_group>;
 namespace srt_logging
 {
 	// Defined in srtcore/common.h. Don't use directly because it includes sync.h.
-	// Otherwise xtransmit has to inherit ENABLE_STDCXX_SYNC and related preprocessir definitions.
+	// Otherwise xtransmit has to inherit the related SRT preprocessing definitions.
 	std::string SockStatusStr(SRT_SOCKSTATUS);
 }
 
@@ -588,7 +588,7 @@ void socket::srt_group::set_connect_callback()
 	srt_connect_callback(m_bind_socket, connect_callback_fn, (void*) this);
 }
 
-void socket::srt_group::raise_exception(const string&& place, SRTSOCKET sock) const
+void socket::srt_group::raise_exception(const std::string& place, SRTSOCKET sock) const
 {
 	const int    udt_result = srt_getlasterror(nullptr);
 	const string message    = srt_getlasterror_str();
@@ -597,7 +597,7 @@ void socket::srt_group::raise_exception(const string&& place, SRTSOCKET sock) co
 	throw socket::exception(place + ": " + message);
 }
 
-void socket::srt_group::raise_exception(const string&& place, const string&& reason) const
+void socket::srt_group::raise_exception(const std::string& place, const std::string& reason) const
 {
 	spdlog::debug(LOG_SRT_GROUP "@{} {} ERROR {}", m_bind_socket, place, reason);
 	throw socket::exception(place + ": " + reason);
