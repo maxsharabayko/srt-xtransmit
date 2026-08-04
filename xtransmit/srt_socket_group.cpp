@@ -805,7 +805,7 @@ int socket::srt_group::statistics(SRT_TRACEBSTATS& stats, bool instant)
 	return srt_bstats(m_bind_socket, &stats, instant);
 }
 
-const string socket::srt_group::stats_to_csv(int socketid, const SRT_TRACEBSTATS& stats, uint16_t weight, bool print_header)
+std::string socket::srt_group::stats_to_csv(int socketid, const SRT_TRACEBSTATS& stats, uint16_t weight, bool print_header)
 {
 	std::ostringstream output;
 
@@ -954,7 +954,7 @@ const nlohmann::json socket::srt_group::stats_to_json(int socketid, const SRT_TR
 	return root;
 }
 
-const string socket::srt_group::get_statistics_csv(bool print_header) const {
+std::string socket::srt_group::get_statistics_csv(bool print_header) const {
 	if (print_header)
 		return stats_to_csv(m_bind_socket, SRT_TRACEBSTATS(), 0, print_header);;
 
@@ -1003,7 +1003,7 @@ const string socket::srt_group::get_statistics_csv(bool print_header) const {
 	return csv_stats;
 }
 
-const string socket::srt_group::get_statistics_json() const {
+std::string socket::srt_group::get_statistics_json() const {
 	nlohmann::json root;
 	root["LinksStats"] = nlohmann::json::array();
 	SRT_TRACEBSTATS stats = {};
@@ -1053,7 +1053,7 @@ const string socket::srt_group::get_statistics_json() const {
 	return root.dump() + "\n";
 }
 
-const string socket::srt_group::get_statistics(string stats_format, bool print_header) const
+std::string socket::srt_group::get_statistics(std::string stats_format, bool print_header) const
 {
 	string res = "";
 	if(stats_format == "json")

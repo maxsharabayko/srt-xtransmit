@@ -404,7 +404,7 @@ string tcp_info_to_csv(int socketid, const tcp_info& stats, bool print_header)
 }
 #endif
 
-const string socket::tcp::get_statistics(std::string stats_format, bool print_header) const
+std::string socket::tcp::get_statistics(std::string stats_format, bool print_header) const
 {
 #ifdef ENABLE_TCP_STATS
 	if (stats_format != "csv")
