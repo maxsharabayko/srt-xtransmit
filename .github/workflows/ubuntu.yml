@@ -32,6 +32,6 @@ jobs:
         echo "CC=clang" >> $GITHUB_ENV
         echo "CXX=clang" >> $GITHUB_ENV
     - name: cmake
-      run: mkdir _build && cd _build && cmake ../ -DENABLE_CXX17=OFF
+      run: mkdir _build && cd _build && cmake ../ -DENABLE_CXX17=OFF -DCMAKE_POLICY_VERSION_MINIMUM=3.5
     - name: build
       run: cd _build && cmake --build ./

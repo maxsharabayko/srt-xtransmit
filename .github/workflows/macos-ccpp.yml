@@ -22,6 +22,6 @@ jobs:
         export OPENSSL_ROOT_DIR=$(brew --prefix openssl)
         export OPENSSL_LIB_DIR=$(brew --prefix openssl)"/lib"
         export OPENSSL_INCLUDE_DIR=$(brew --prefix openssl)"/include"
-        cmake ../ -DENABLE_CXX17=OFF
+        cmake ../ -DENABLE_CXX17=OFF -DCMAKE_POLICY_VERSION_MINIMUM=3.5
     - name: build
       run: cd _build && cmake --build ./
