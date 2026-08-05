@@ -40,8 +40,8 @@ public:
 	virtual ~srt();
 
 public:
-	std::future<shared_srt> async_connect() noexcept(false);
-	std::future<shared_srt> async_accept() noexcept(false);
+	std::future<shared_srt> async_connect();
+	std::future<shared_srt> async_accept();
 
 	shared_srt connect();
 	shared_srt accept();
@@ -51,7 +51,7 @@ public:
 	 *
 	 * May throw a socket::exception.
 	 */
-	void listen() noexcept(false);
+	void listen();
 
 	/// Verifies URI options provided are valid.
 	///
@@ -99,13 +99,13 @@ public:
 	SOCKET						id() const final { return m_bind_socket; }
 	int							statistics(SRT_TRACEBSTATS& stats, bool instant = true);
 	bool						supports_statistics() const final { return true; }
-	const std::string			get_statistics(std::string stats_format, bool print_header) const final;
-	static const std::string	stats_to_csv(int socketid, const SRT_TRACEBSTATS& stats, bool print_header);
+	std::string					get_statistics(std::string stats_format, bool print_header) const final;
+	static std::string			stats_to_csv(int socketid, const SRT_TRACEBSTATS& stats, bool print_header);
 	static const nlohmann::json stats_to_json(int socketid, const SRT_TRACEBSTATS& stats);
 
 private:
-	void raise_exception(const string&& place) const;
-	void raise_exception(const string&& place, const string&& reason) const;
+	void raise_exception(const std::string& place) const;
+	void raise_exception(const std::string& place, const std::string& reason) const;
 
 private:
 	SRTSOCKET m_bind_socket = SRT_INVALID_SOCK;

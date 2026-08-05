@@ -20,19 +20,7 @@ using namespace xtransmit;
 
 inline std::string print_ts()
 {
-    time_t time = chrono::system_clock::to_time_t(std::chrono::system_clock::now());
-    tm *tm  = localtime(&time);
-    time_t usec = time % 1000000;
-
-    char tmp_buf[512];
-#ifdef _WIN32
-    strftime(tmp_buf, 512, "%T.", tm);
-#else
-    strftime(tmp_buf, 512, "%T.", tm);
-#endif
-    ostringstream out;
-    out << tmp_buf << setfill('0') << setw(6) << usec << " ";
-    return out.str();
+    return print_timestamp_now() + " ";
 }
 
 
@@ -65,14 +53,14 @@ SrtNode::~SrtNode()
 }
 
 
-std::future<SRTSOCKET> SrtNode::AcceptConnection(const volatile std::atomic_bool& force_break)
+std::future<SRTSOCKET> SrtNode::AcceptConnection(const std::atomic_bool& force_break)
 {
     return async(std::launch::async, &SrtNode::AcceptingThread, this, std::ref(force_break));
 }
 
 
 
-SRTSOCKET SrtNode::AcceptingThread(const volatile std::atomic_bool& force_break)
+SRTSOCKET SrtNode::AcceptingThread(const std::atomic_bool& force_break)
 {
     int rnum = 2;
     SRTSOCKET read_fds[2] = {};
@@ -417,6 +405,5 @@ int SrtNode::Send(const char *buffer, size_t buffer_len)
 {
     return srt_sendmsg(m_bindsock, buffer, (int)buffer_len, -1, true);
 }
-
 
 

@@ -20,8 +20,7 @@ jobs:
     - if: matrix.compiler == 'g++-4.8' && matrix.os != 'macOS-latest'
       name: install gcc 4.8
       run: |
-        # It has become quite tricky to install GCC 4.8 on Ubuntu 20.04.
-        # This way does no longer work :(
+        # Legacy branch kept only for historical reference.
         sudo apt-get install g++-4.8
         dpkg --list | grep compiler
         echo "CC=gcc-4.8" >> $GITHUB_ENV
@@ -32,6 +31,6 @@ jobs:
         echo "CC=clang" >> $GITHUB_ENV
         echo "CXX=clang" >> $GITHUB_ENV
     - name: cmake
-      run: mkdir _build && cd _build && cmake ../ -DENABLE_CXX17=OFF -DCMAKE_POLICY_VERSION_MINIMUM=3.5
+      run: mkdir _build && cd _build && cmake ../ -DCMAKE_POLICY_VERSION_MINIMUM=3.5
     - name: build
       run: cd _build && cmake --build ./

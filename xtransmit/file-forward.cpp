@@ -1,6 +1,8 @@
 #include "forward.h"
 #include "srt_node.hpp"
 
+#include <memory>
+
 // submodules
 #include "spdlog/spdlog.h"
 
@@ -27,12 +29,12 @@ shared_ptr<SrtNode> create_node(const config& cfg, const char* uri, bool is_call
 			urlp["rcvbuf"] = to_string(3 * (cfg.message_size * 1472 / 1456 + 1472));
 	}
 
-	return shared_ptr<SrtNode>(new SrtNode(urlp));
+	return std::make_shared<SrtNode>(urlp);
 }
 
 
 void fwd_route(shared_ptr<SrtNode> src, shared_ptr<SrtNode> dst, SRTSOCKET dst_sock,
-	const config& cfg, const string&& description, const atomic_bool& force_break)
+	const config& cfg, const string& description, const atomic_bool& force_break)
 {
 	vector<char> message_rcvd(cfg.message_size);
 
@@ -66,7 +68,7 @@ void fwd_route(shared_ptr<SrtNode> src, shared_ptr<SrtNode> dst, SRTSOCKET dst_s
 		else if (message_rcvd[0] >= '0' && message_rcvd[0] <= 'z')
 		{
 			spdlog::debug(LOG_SC_FORWARD "{} RECEIVED MESSAGE length on conn ID {} (first character): {}",
-				description, dst->GetBindSocket());
+				description, connection_id, message_rcvd[0]);
 		}
 
 		spdlog::debug(LOG_SC_FORWARD "{} Forwarding message to {} (first character): {}",
@@ -142,7 +144,7 @@ int start_forwarding(const config& cfg, const char* src_uri, const char* dst_uri
 	th_dst_to_src.join();
 
 
-	auto wait_undelivered = [&cfg](shared_ptr<SrtNode> node, int wait_ms, const string&& desc) {
+	auto wait_undelivered = [&cfg](shared_ptr<SrtNode> node, int wait_ms, const string& desc) {
 		const int undelivered = node->WaitUndelivered(wait_ms);
 		if (undelivered == -1)
 		{

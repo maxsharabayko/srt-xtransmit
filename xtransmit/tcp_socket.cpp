@@ -212,7 +212,7 @@ shared_tcp socket::tcp::accept()
 	return make_shared<tcp>(sock, m_blocking_mode);
 }
 
-void socket::tcp::raise_exception(const string&& place, const string&& reason) const
+void socket::tcp::raise_exception(const std::string& place, const std::string& reason) const
 {
 	spdlog::debug(LOG_SOCK_TCP "0x{:X} {}. ERROR: {}.", m_bind_socket, place, reason);
 	throw socket::exception(place + ": " + reason);
@@ -404,7 +404,7 @@ string tcp_info_to_csv(int socketid, const tcp_info& stats, bool print_header)
 }
 #endif
 
-const string socket::tcp::get_statistics(std::string stats_format, bool print_header) const
+std::string socket::tcp::get_statistics(std::string stats_format, bool print_header) const
 {
 #ifdef ENABLE_TCP_STATS
 	if (stats_format != "csv")
@@ -425,5 +425,4 @@ const string socket::tcp::get_statistics(std::string stats_format, bool print_he
 	return "";
 #endif
 }
-
 

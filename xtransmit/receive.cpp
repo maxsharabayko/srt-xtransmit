@@ -189,7 +189,7 @@ void xtransmit::receive::run(const std::vector<std::string>& src_urls,
 	if (write_metrics)
 	{
 		try {
-			metrics = details::make_unique<metrics::metrics_writer>(
+			metrics = std::make_unique<metrics::metrics_writer>(
 				cfg.metrics_file, milliseconds(cfg.metrics_freq_ms));
 		}
 		catch (const std::runtime_error& e)
