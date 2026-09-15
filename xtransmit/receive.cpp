@@ -18,6 +18,7 @@
 #include "receive.hpp"
 #include "metrics.hpp"
 #include "metrics_writer.hpp"
+#include "prometheus_exporter.hpp"
 #include "xtr_defs.hpp"
 
 // OpenSRT
@@ -87,11 +88,19 @@ void trace_message(const size_t bytes, const vector<char>& buffer, SOCKET conn_i
 	//cout << "SRT HS: " << hs.show() << endl;
 }
 
-void run_pipe(shared_sock src, const config& cfg, unique_ptr<metrics::metrics_writer>& metrics, std::function<void(int conn_id)> const& on_done, const atomic_bool& force_break)
+void run_pipe(
+    shared_sock src,
+    const config& cfg,
+    unique_ptr<metrics::metrics_writer>& metrics,
+    prometheus::exporter* prometheus_exporter,
+    std::function<void(int conn_id)> const& on_done,
+    const atomic_bool& force_break)
 {
 	XTR_THREADNAME(std::string("XTR:Rcv"));
 	socket::isocket& sock = *src.get();
 	const auto conn_id = sock.id();
+	if (prometheus_exporter)
+		prometheus_exporter->add_socket(src);
 
 	vector<char>       buffer(cfg.message_size);
 	metrics::metrics_writer::shared_validator validator;
@@ -112,13 +121,21 @@ void run_pipe(shared_sock src, const config& cfg, unique_ptr<metrics::metrics_wr
 
 		dumpfile.open(dump_filename, std::ios::out | std::ios::binary);
 		if (!dumpfile)
-		{
-			spdlog::error(LOG_SC_RECEIVE "Failed to open file for output. Path: {}.", dump_filename);
-			if (metrics)
-				metrics->remove_validator(conn_id);
-			on_done(conn_id);
-			return;
-		}
+	{
+	    spdlog::error(
+	        LOG_SC_RECEIVE
+	        "Failed to open file for output. Path: {}.",
+	        dump_filename);
+
+	    if (metrics)
+	        metrics->remove_validator(conn_id);
+
+	    if (prometheus_exporter)
+	        prometheus_exporter->remove_socket(conn_id);
+
+	    on_done(conn_id);
+	    return;
+	}
 	}
 
 	const bool is_dumping = dumpfile.is_open();
@@ -169,6 +186,10 @@ void run_pipe(shared_sock src, const config& cfg, unique_ptr<metrics::metrics_wr
 	if (metrics)
 		metrics->remove_validator(conn_id);
 
+	
+	if (prometheus_exporter)
+	prometheus_exporter->remove_socket(conn_id);
+
 	if (force_break)
 	{
 		spdlog::info(LOG_SC_RECEIVE "interrupted by request!");
@@ -182,6 +203,35 @@ void xtransmit::receive::run(const std::vector<std::string>& src_urls,
 							 const atomic_bool&              force_break)
 {
 	using namespace std::placeholders;
+
+	std::unique_ptr<prometheus::exporter> prometheus_exporter;
+
+try
+{
+    const int prometheus_port =
+        resolve_prometheus_port(
+            src_urls,
+            cfg.stats_input_port,
+            "input");
+
+    if (prometheus_port > 0)
+    {
+	prometheus_exporter.reset(
+		new prometheus::exporter(
+        	prometheus_port,
+        	"input"));
+        prometheus_exporter->start();
+    }
+}
+catch (const std::exception& e)
+{
+    spdlog::error(
+        LOG_SC_RECEIVE
+        "Failed to start Prometheus exporter: {}",
+        e.what());
+
+    return;
+}
 
 	const bool write_metrics = cfg.enable_metrics && cfg.metrics_freq_ms > 0;
 	unique_ptr<metrics::metrics_writer> metrics;
@@ -199,7 +249,15 @@ void xtransmit::receive::run(const std::vector<std::string>& src_urls,
 		}
 	}
 
-	processing_fn_t process_fn = std::bind(run_pipe, _1, cfg, std::ref(metrics), _2, _3);
+	processing_fn_t process_fn =
+    std::bind(
+        run_pipe,
+        _1,
+        cfg,
+        std::ref(metrics),
+        prometheus_exporter.get(),
+        _2,
+        _3);
 	common_run(src_urls, cfg, cfg, force_break, process_fn);
 }
 
@@ -214,6 +272,9 @@ CLI::App* xtransmit::receive::add_subcommand(CLI::App& app, config& cfg, std::ve
 	sc_receive->add_option("--statsformat", cfg.stats_format, "Output stats report format (csv - default, json)");
 	sc_receive->add_option("--statsfreq", cfg.stats_freq_ms, fmt::format("Output stats report frequency, ms (default {})", cfg.stats_freq_ms))
 		->transform(CLI::AsNumberWithUnit(to_ms, CLI::AsNumberWithUnit::CASE_SENSITIVE));
+	sc_receive->add_option("--stats-input-port", cfg.stats_input_port, "TCP port for the Prometheus exporter monitoring the input SRT socket "
+	"(default: use the input SRT UDP port)")
+	->check(CLI::Range(1, 65535));
 	sc_receive->add_flag("--printmsg", cfg.print_notifications, "Print message to stdout");
 	sc_receive->add_flag("--enable-metrics", cfg.enable_metrics, "Enable checking metrics: jitter, latency, etc.");
 	sc_receive->add_option("--metricsfile", cfg.metrics_file, "Metrics output filename (default stdout)");

@@ -17,6 +17,7 @@ target_include_directories(srt-xtransmit PUBLIC
 	${SRT_UTILS_INCLUDE_DIR}
 	${PTHREAD_INCLUDE_DIR}
 	${SSL_INCLUDE_DIRS}
+	${CMAKE_SOURCE_DIR}/submodule/cpp-httplib
 	)
 
 target_link_directories(srt-xtransmit PUBLIC ${SSL_LIBRARY_DIRS})
@@ -65,6 +66,7 @@ target_link_libraries(srt-xtransmit
 set_target_properties(srt-xtransmit
 	PROPERTIES
 	CXX_STANDARD ${REQUIRE_CXX_VER}
+	OUTPUT_NAME "srt-xtransmit-prometheus"
 	ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
 	LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
 	RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"

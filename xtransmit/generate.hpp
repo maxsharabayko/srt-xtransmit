@@ -16,6 +16,7 @@ namespace generate
 struct config
 	: public stats_config
 	, public conn_config
+	, public prometheus_config
 {
 	int         sendrate       = 0;
 	int         num_messages   = -1;

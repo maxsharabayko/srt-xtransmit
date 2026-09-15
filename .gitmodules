@@ -16,3 +16,6 @@
 [submodule "submodule/nlohmann_json"]
 	path = submodule/nlohmann_json
 	url = https://github.com/nlohmann/json.git
+[submodule "submodule/cpp-httplib"]
+	path = submodule/cpp-httplib
+	url = https://github.com/yhirose/cpp-httplib.git

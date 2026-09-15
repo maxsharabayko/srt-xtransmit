@@ -17,6 +17,7 @@
 #include "generate.hpp"
 #include "pacer.hpp"
 #include "metrics.hpp"
+#include "prometheus_exporter.hpp"
 #include "xtr_defs.hpp"
 
 // OpenSRT
@@ -33,7 +34,12 @@ using shared_sock = std::shared_ptr<socket::isocket>;
 
 #define LOG_SC_GENERATE "GENERATE "
 
-void run_pipe(shared_sock dst, const config& cfg, std::function<void(int conn_id)> const& on_done, const atomic_bool& force_break)
+void run_pipe(
+    shared_sock dst,
+    const config& cfg,
+    prometheus::exporter* prometheus_exporter,
+    std::function<void(int conn_id)> const& on_done,
+    const atomic_bool& force_break)
 {
 	XTR_THREADNAME(std::string("XTR:Gen"));
 	vector<char> message_to_send(cfg.message_size);
@@ -44,7 +50,8 @@ void run_pipe(shared_sock dst, const config& cfg, std::function<void(int conn_id
 
 	socket::isocket& sock = *dst.get();
 	const auto conn_id = sock.id();
-
+	if (prometheus_exporter)
+    prometheus_exporter->add_socket(dst);
 	metrics::generator pldgen(cfg.enable_metrics);
 
 	auto stat_time = steady_clock::now();
@@ -95,14 +102,65 @@ void run_pipe(shared_sock dst, const config& cfg, std::function<void(int conn_id
 		spdlog::info(LOG_SC_GENERATE "interrupted by request!");
 	}
 
+	if (prometheus_exporter)
+    prometheus_exporter->remove_socket(conn_id);
+
 	on_done(conn_id);
 }
 
-void xtransmit::generate::run(const std::vector<std::string>& dst_urls, const config& cfg, const atomic_bool& force_break)
+void xtransmit::generate::run(
+    const std::vector<std::string>& dst_urls,
+    const config& cfg,
+    const atomic_bool& force_break)
 {
-	using namespace std::placeholders;
-	processing_fn_t process_fn = std::bind(run_pipe, _1, cfg, _2, _3);
-	common_run(dst_urls, cfg, cfg, force_break, process_fn);
+    using namespace std::placeholders;
+
+    std::unique_ptr<prometheus::exporter>
+        prometheus_exporter;
+
+    try
+    {
+        const int prometheus_port =
+            resolve_prometheus_port(
+                dst_urls,
+                cfg.stats_output_port,
+                "output");
+
+        if (prometheus_port > 0)
+        {
+            prometheus_exporter.reset(
+                new prometheus::exporter(
+                    prometheus_port,
+                    "output"));
+
+            prometheus_exporter->start();
+        }
+    }
+    catch (const std::exception& e)
+    {
+        spdlog::error(
+            LOG_SC_GENERATE
+            "Failed to start Prometheus exporter: {}",
+            e.what());
+
+        return;
+    }
+
+    processing_fn_t process_fn =
+        std::bind(
+            run_pipe,
+            _1,
+            cfg,
+            prometheus_exporter.get(),
+            _2,
+            _3);
+
+    common_run(
+        dst_urls,
+        cfg,
+        cfg,
+        force_break,
+        process_fn);
 }
 
 CLI::App* xtransmit::generate::add_subcommand(CLI::App& app, config& cfg, std::vector<std::string>& dst_urls)
@@ -127,7 +185,12 @@ CLI::App* xtransmit::generate::add_subcommand(CLI::App& app, config& cfg, std::v
 	sc_generate->add_flag("--enable-metrics", cfg.enable_metrics, "Enable embeding metrics: latency, loss, reordering, jitter, etc.");
 	sc_generate->add_option("--playback-csv", cfg.playback_csv, "Input CSV file with timestamp of every packet");
 	sc_generate->add_flag("--spin-wait", cfg.spin_wait, "Use CPU-expensive spin waiting for better sending accuracy");
-	
+	sc_generate->add_option(
+		"--stats-output-port",
+		cfg.stats_output_port,
+		"TCP port for the Prometheus exporter monitoring the output SRT socket "
+		"(default: use the output SRT UDP port)")
+		->check(CLI::Range(1, 65535));
 	apply_cli_opts(*sc_generate, cfg);
 
 	return sc_generate;

@@ -98,6 +98,9 @@ public:
 public:
 	SOCKET						id() const final { return m_bind_socket; }
 	int							statistics(SRT_TRACEBSTATS& stats, bool instant = true);
+	int statistics_snapshot(
+		SRT_TRACEBSTATS& stats,
+		bool instantaneous = true) const;
 	bool						supports_statistics() const final { return true; }
 	const std::string			get_statistics(std::string stats_format, bool print_header) const final;
 	static const std::string	stats_to_csv(int socketid, const SRT_TRACEBSTATS& stats, bool print_header);

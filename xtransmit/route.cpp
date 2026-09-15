@@ -16,7 +16,7 @@
 #include "misc.hpp"
 #include "route.hpp"
 #include "socket_stats.hpp"
-
+#include "prometheus_exporter.hpp"
 // OpenSRT
 #include "apputil.hpp"
 #include "uriparser.hpp"
@@ -75,6 +75,67 @@ namespace route
 void xtransmit::route::run(const vector<string>& src_urls, const vector<string>& dst_urls,
 	const config& cfg, const atomic_bool& force_break)
 {
+	    unique_ptr<prometheus::exporter> prometheus_input_exporter;
+    unique_ptr<prometheus::exporter> prometheus_output_exporter;
+
+    try
+    {
+        const int prometheus_input_port =
+            resolve_prometheus_port(
+                src_urls,
+                cfg.stats_input_port,
+                "input");
+
+        const int prometheus_output_port =
+            resolve_prometheus_port(
+                dst_urls,
+                cfg.stats_output_port,
+                "output");
+
+        /*
+         * Input and output exporters must use different TCP ports
+         * if both sides are SRT.
+         */
+        if (prometheus_input_port > 0 &&
+            prometheus_output_port > 0 &&
+            prometheus_input_port == prometheus_output_port)
+        {
+            throw runtime_error(
+                "Prometheus input and output ports both resolve to TCP/" +
+                to_string(prometheus_input_port) +
+                ". Please specify --stats-input-port and/or "
+                "--stats-output-port.");
+        }
+
+        if (prometheus_input_port > 0)
+        {
+            prometheus_input_exporter.reset(
+                new prometheus::exporter(
+                    prometheus_input_port,
+                    "input"));
+
+            prometheus_input_exporter->start();
+        }
+
+        if (prometheus_output_port > 0)
+        {
+            prometheus_output_exporter.reset(
+                new prometheus::exporter(
+                    prometheus_output_port,
+                    "output"));
+
+            prometheus_output_exporter->start();
+        }
+    }
+    catch (const std::exception& e)
+    {
+        spdlog::error(
+            LOG_SC_ROUTE
+            "Failed to start Prometheus exporter: {}",
+            e.what());
+
+        return;
+    }
 	vector<UriParser> parsed_src_urls;
 	for (const string& url : src_urls)
 	{
@@ -104,6 +165,11 @@ void xtransmit::route::run(const vector<string>& src_urls, const vector<string>&
 			? create_connection(parsed_src_urls)
 			: create_connection(parsed_src_urls, listening_sock_b);;
 
+		        if (prometheus_input_exporter)
+            prometheus_input_exporter->add_socket(src);
+
+        if (prometheus_output_exporter)
+            prometheus_output_exporter->add_socket(dst);
 		if (stats)
 		{
 			stats->add_socket(src);
@@ -117,6 +183,11 @@ void xtransmit::route::run(const vector<string>& src_urls, const vector<string>&
 		route(src, dst, cfg, "[SRC->DST]", force_break);
 
 		route_bkwd.wait();
+		        if (prometheus_input_exporter)
+            prometheus_input_exporter->remove_socket(src->id());
+
+        if (prometheus_output_exporter)
+            prometheus_output_exporter->remove_socket(dst->id());
 	}
 	catch (const socket::exception & e)
 	{
@@ -128,7 +199,11 @@ CLI::App* xtransmit::route::add_subcommand(CLI::App& app, config& cfg, vector<st
 {
 	const map<string, int> to_ms{ {"s", 1000}, {"ms", 1} };
 
-	CLI::App* sc_route = app.add_subcommand("route", "Route data (SRT, UDP)")->fallthrough();
+	CLI::App* sc_route =
+		app.add_subcommand(
+		"route",
+		"Route data between SRT/UDP endpoints with optional Prometheus monitoring")
+	->fallthrough();
 	sc_route->add_option("-i,--input",  src_urls, "Source URIs");
 	sc_route->add_option("-o,--output", dst_urls, "Destination URIs");
 	sc_route->add_option("--msgsize", cfg.message_size, "Size of a buffer to receive message payload");
@@ -138,7 +213,19 @@ CLI::App* xtransmit::route::add_subcommand(CLI::App& app, config& cfg, vector<st
 	sc_route->add_option("--statsformat", cfg.stats_format, "output stats report format (json, csv)");
 	sc_route->add_option("--statsfreq", cfg.stats_freq_ms, "output stats report frequency (ms)")
 		->transform(CLI::AsNumberWithUnit(to_ms, CLI::AsNumberWithUnit::CASE_SENSITIVE));
+	sc_route->add_option(
+		"--stats-input-port",
+		cfg.stats_input_port,
+		"TCP port for the Prometheus exporter monitoring the input SRT socket "
+		"(default: use the input SRT UDP port)")
+		->check(CLI::Range(1, 65535));
 
+	sc_route->add_option(
+		"--stats-output-port",
+		cfg.stats_output_port,
+		"TCP port for the Prometheus exporter monitoring the output SRT socket "
+		"(default: use the output SRT UDP port)")
+		->check(CLI::Range(1, 65535));
 	return sc_route;
 }
 

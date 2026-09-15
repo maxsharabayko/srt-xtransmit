@@ -4,7 +4,9 @@
 #if !defined(_WIN32)
 #include <sys/ioctl.h>
 typedef int SOCKET;
+#ifndef INVALID_SOCKET
 #define INVALID_SOCKET ((SOCKET)-1)
+#endif
 #define closesocket close
 #endif
 

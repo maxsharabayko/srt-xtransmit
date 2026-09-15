@@ -62,6 +62,30 @@ struct stats_config
 	std::string stats_format = "csv";
 };
 
+struct prometheus_config
+{
+    // -1 means: automatically use the corresponding SRT UDP port
+    int stats_input_port  = -1;
+    int stats_output_port = -1;
+};
+
+
+/// Resolve the TCP port for a Prometheus exporter.
+///
+/// If configured_port > 0, the explicitly configured port is used.
+///
+/// If configured_port == -1, the port is automatically derived
+/// from the SRT URI.
+///
+/// Returns -1 if no SRT URI exists.
+///
+/// Throws std::runtime_error if automatic port selection is ambiguous
+/// or the URI does not contain a valid port.
+int resolve_prometheus_port(
+    const std::vector<std::string>& urls,
+    int configured_port,
+    const std::string& direction);
+
 /// Connection establishment config
 struct conn_config
 {

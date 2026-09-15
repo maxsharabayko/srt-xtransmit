@@ -5,11 +5,13 @@
 // Third party libraries
 #include "CLI/CLI.hpp"
 
+// xtransmit
+#include "misc.hpp"
 
 namespace xtransmit {
 	namespace route {
 
-		struct config
+		struct config : public prometheus_config
 		{
 			int message_size = 1456;
 			bool bidir = false;

@@ -563,6 +563,17 @@ int socket::srt::statistics(SRT_TRACEBSTATS& stats, bool instant)
 	return srt_bstats(m_bind_socket, &stats, instant);
 }
 
+int socket::srt::statistics_snapshot(
+    SRT_TRACEBSTATS& stats,
+    bool instantaneous) const
+{
+    return srt_bistats(
+        m_bind_socket,
+        &stats,
+        0,                      // clear = false
+        instantaneous ? 1 : 0);
+}
+
 const string socket::srt::stats_to_csv(int socketid, const SRT_TRACEBSTATS& stats, bool print_header)
 {
 	std::ostringstream output;

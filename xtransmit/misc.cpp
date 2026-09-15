@@ -1,5 +1,6 @@
 #include <list>
 #include <thread>
+#include <stdexcept>
 #include "misc.hpp"
 #include "socket_stats.hpp"
 #include "srt_socket_group.hpp"
@@ -14,6 +15,83 @@ namespace xtransmit {
 
 #define LOG_SC_CONN "CONN "
 
+int resolve_prometheus_port(
+    const vector<string>& urls,
+    int configured_port,
+    const string& direction)
+{
+    int auto_port = -1;
+    bool has_srt = false;
+
+    for (const auto& url : urls)
+    {
+        UriParser uri(url);
+
+        /*
+         * Prometheus statistics are only available for SRT sockets.
+         */
+        if (uri.type() != UriParser::SRT)
+            continue;
+
+        has_srt = true;
+
+        const int port = static_cast<int>(uri.portno());
+
+        if (port <= 0 || port > 65535)
+        {
+            throw runtime_error(
+                "Unable to determine SRT " + direction +
+                " port from URI '" + url + "'");
+        }
+
+        /*
+         * Remember the first SRT port.
+         */
+        if (auto_port < 0)
+        {
+            auto_port = port;
+        }
+        /*
+         * Multiple SRT URLs with different ports make automatic
+         * Prometheus port selection ambiguous.
+         */
+        else if (configured_port <= 0 && auto_port != port)
+        {
+            throw runtime_error(
+                "Multiple SRT " + direction +
+                " URIs use different ports. "
+                "Please specify --stats-" +
+                direction + "-port.");
+        }
+    }
+
+    /*
+     * No SRT URI means there are no SRT statistics to export.
+     */
+    if (!has_srt)
+    {
+        if (configured_port > 0)
+        {
+            throw runtime_error(
+                "--stats-" + direction +
+                "-port was specified, but no SRT " +
+                direction + " URI exists.");
+        }
+
+        return -1;
+    }
+
+    /*
+     * An explicitly configured port always wins.
+     */
+    if (configured_port > 0)
+        return configured_port;
+
+    /*
+     * Otherwise use the SRT UDP port.
+     */
+    return auto_port;
+}
 
 shared_sock_t create_connection(const vector<UriParser>& parsed_urls, shared_sock_t& listening_sock)
 {

@@ -13,7 +13,7 @@ namespace xtransmit
 namespace receive
 {
 
-struct config : stats_config, conn_config
+struct config : stats_config, conn_config, prometheus_config
 {
 	bool        print_notifications = false; // Print notifications about the messages received
 	bool        send_reply          = false;

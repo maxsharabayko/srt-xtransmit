@@ -1,8 +1,281 @@
-# srt-xtransmit
+# srt-xtransmit-prometheus
 
-[!["Buy Me A Coffee"](https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png)](https://www.buymeacoffee.com/4c1qfdewk)
+`srt-xtransmit-prometheus` is a fork of [srt-xtransmit](https://github.com/maxsharabayko/srt-xtransmit) with an integrated Prometheus exporter for SRT socket statistics.
 
-`srt-xtransmit` is a testing utility with support for SRT and UDP network protocols.
+It retains the original SRT/UDP testing functionality of `srt-xtransmit` and adds a native HTTP `/metrics` endpoint. SRT statistics are read directly from the active SRT sockets without using CSV files or an external exporter.
+
+The Prometheus exporter is currently integrated into the live transmission commands:
+
+* `receive` — Prometheus metrics for the input SRT socket
+* `generate` — Prometheus metrics for the output SRT socket
+* `route` — separate Prometheus exporters for input and output SRT sockets
+
+The exporter exposes accumulated, interval-based and instantaneous SRT statistics directly from `SRT_TRACEBSTATS`.
+
+## Prometheus Exporter
+
+### Port selection
+
+By default, the Prometheus exporter uses the same **port number** as the corresponding SRT endpoint.
+
+SRT uses UDP while the Prometheus HTTP exporter uses TCP, so both can use the same numeric port simultaneously.
+
+Example:
+
+```text
+SRT receiver:        UDP/4200
+Prometheus exporter: TCP/4200
+```
+
+For a receiver:
+
+```bash
+srt-xtransmit-prometheus receive "srt://:4200"
+```
+
+Prometheus metrics are then available at:
+
+```text
+http://<host>:4200/metrics
+```
+
+The HTTP port can be overridden with:
+
+```text
+--stats-input-port PORT
+--stats-output-port PORT
+```
+
+### Receive
+
+Start an SRT listener:
+
+```bash
+srt-xtransmit-prometheus receive "srt://:4200"
+```
+
+The exporter automatically listens on TCP port 4200:
+
+```bash
+curl http://127.0.0.1:4200/metrics
+```
+
+To use a different Prometheus port:
+
+```bash
+srt-xtransmit-prometheus receive \
+    "srt://:4200" \
+    --stats-input-port 11001
+```
+
+This results in:
+
+```text
+SRT input:           UDP/4200
+Prometheus exporter: TCP/11001
+```
+
+### Generate
+
+Example SRT generator:
+
+```bash
+srt-xtransmit-prometheus generate \
+    -o "srt://192.168.2.121:4200" \
+    --sendrate 10Mbps
+```
+
+By default:
+
+```text
+SRT output:          UDP/4200
+Prometheus exporter: TCP/4200
+```
+
+To override the exporter port:
+
+```bash
+srt-xtransmit-prometheus generate \
+    -o "srt://192.168.2.121:4200" \
+    --sendrate 10Mbps \
+    --stats-output-port 11002
+```
+
+### Route
+
+A route can expose input and output SRT statistics independently:
+
+```bash
+srt-xtransmit-prometheus route \
+    -i "srt://:4200" \
+    -o "srt://192.168.2.121:4300"
+```
+
+By default this creates:
+
+```text
+Input SRT:           UDP/4200
+Input Prometheus:    TCP/4200
+
+Output SRT:          UDP/4300
+Output Prometheus:   TCP/4300
+```
+
+The ports can be explicitly configured:
+
+```bash
+srt-xtransmit-prometheus route \
+    -i "srt://:4200" \
+    -o "srt://192.168.2.121:4300" \
+    --stats-input-port 11001 \
+    --stats-output-port 11002
+```
+
+The metrics are then available at:
+
+```text
+http://<host>:11001/metrics   # input
+http://<host>:11002/metrics   # output
+```
+
+Input and output exporters must use different TCP ports. If automatic port selection results in the same TCP port for both sides, `srt-xtransmit-prometheus` exits with an error and requires `--stats-input-port` and/or `--stats-output-port`.
+
+### Direction labels
+
+SRT socket metrics contain a `direction` label:
+
+```text
+direction="input"
+direction="output"
+```
+
+Example:
+
+```text
+srt_mbps_recv_rate{direction="input",socket_id="650235235"} 10.33
+srt_pkt_rcv_loss_total{direction="input",socket_id="650235235"} 0
+
+srt_mbps_send_rate{direction="output",socket_id="828055493"} 10.34
+srt_pkt_retrans_total{direction="output",socket_id="828055493"} 0
+```
+
+Each active SRT connection is additionally identified by its SRT `socket_id`.
+
+### Connection state
+
+The exporter remains available even when no SRT connection is currently established.
+
+For example:
+
+```text
+srt_xtransmit_prometheus_up 1
+srt_active_connections{direction="input"} 0
+```
+
+After a connection is established:
+
+```text
+srt_active_connections{direction="input"} 1
+srt_socket_up{direction="input",socket_id="650235235"} 1
+```
+
+### Metrics
+
+The exporter exposes SRT statistics including:
+
+* packet and byte counters
+* unique packets and bytes
+* packet loss
+* retransmissions
+* ACK and NAK statistics
+* send and receive bitrate
+* RTT
+* estimated bandwidth
+* congestion and flow windows
+* packets in flight
+* send and receive buffer levels
+* TSBPD delays
+* reorder statistics
+* belated packets
+* packet-filter/FEC statistics
+* dropped packets and bytes
+* undecryptable packets and bytes
+
+Accumulated SRT statistics use Prometheus `counter` types where appropriate.
+
+Interval-based SRT statistics are exposed as `gauge` values because they may be reset by another SRT statistics request using `clear=1`.
+
+Prometheus scrapes performed by the integrated exporter do **not** reset SRT statistics.
+
+### Prometheus configuration
+
+Example `prometheus.yml` for an SRT route using exporter ports 11001 and 11002:
+
+```yaml
+scrape_configs:
+  - job_name: "srt-xtransmit-prometheus-input"
+    scrape_interval: 1s
+    static_configs:
+      - targets:
+          - "192.168.2.100:11001"
+
+  - job_name: "srt-xtransmit-prometheus-output"
+    scrape_interval: 1s
+    static_configs:
+      - targets:
+          - "192.168.2.100:11002"
+```
+
+For a receiver using the default SRT/Prometheus port 4200:
+
+```yaml
+scrape_configs:
+  - job_name: "srt-xtransmit-prometheus"
+    scrape_interval: 1s
+    static_configs:
+      - targets:
+          - "192.168.2.100:4200"
+```
+
+### Example PromQL
+
+Current receiver bitrate as reported by SRT:
+
+```promql
+srt_mbps_recv_rate
+```
+
+Current sender bitrate:
+
+```promql
+srt_mbps_send_rate
+```
+
+Packet loss rate derived from the accumulated counter:
+
+```promql
+rate(srt_pkt_rcv_loss_total[10s])
+```
+
+Unique received payload bitrate derived from the accumulated byte counter:
+
+```promql
+rate(srt_byte_recv_unique_total[10s]) * 8
+```
+
+### UDP endpoints
+
+Prometheus SRT statistics are only created for SRT endpoints.
+
+A pure UDP endpoint such as:
+
+```text
+udp://:4200
+```
+
+does not have SRT socket statistics and therefore does not create an SRT Prometheus exporter for that endpoint.
+
+---
 
 ## Functionality
 
@@ -41,7 +314,10 @@
 ```shell
 mkdir -p projects/srt/srt-xtransmit
 cd projects/srt
-git clone https://github.com/maxsharabayko/srt-xtransmit.git srt-xtransmit
+git clone --recurse-submodules \
+    https://github.com/skureal/srt-xtransmit-prometheus.git
+
+cd srt-xtransmit-prometheus
 ```
 
 #### 2. Initialize, fetch and checkout submodules
