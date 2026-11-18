@@ -21,6 +21,7 @@ struct config : stats_config, conn_config
 	unsigned    metrics_freq_ms     = 1000;
 	std::string metrics_file;
 	std::string dump_to_file;
+	int         duration        = 0;
 	int         max_connections = 1; // Maximum number of connections on a socket
 	int         message_size    = 1316;
 };

@@ -92,6 +92,7 @@ void run_pipe(shared_sock src, const config& cfg, unique_ptr<metrics::metrics_wr
 	XTR_THREADNAME(std::string("XTR:Rcv"));
 	socket::isocket& sock = *src.get();
 	const auto conn_id = sock.id();
+	const auto start_time = steady_clock::now();
 
 	vector<char>       buffer(cfg.message_size);
 	metrics::metrics_writer::shared_validator validator;
@@ -126,6 +127,11 @@ void run_pipe(shared_sock src, const config& cfg, unique_ptr<metrics::metrics_wr
 	{
 		while (!force_break)
 		{
+			if (cfg.duration > 0 && (steady_clock::now() - start_time > seconds(cfg.duration)))
+			{
+				break;
+			}
+
 			const size_t bytes = sock.read(mutable_buffer(buffer.data(), buffer.size()), -1);
 
 			if (bytes == 0)
@@ -206,6 +212,7 @@ void xtransmit::receive::run(const std::vector<std::string>& src_urls,
 CLI::App* xtransmit::receive::add_subcommand(CLI::App& app, config& cfg, std::vector<std::string>& src_urls)
 {
 	const std::map<string, int> to_ms{{"s", 1000}, {"ms", 1}};
+	const std::map<string, int> to_sec{{"s", 1}, {"min", 60}, {"mins", 60}};
 
 	CLI::App* sc_receive = app.add_subcommand("receive", "Receive data (SRT, UDP)")->fallthrough();
 	sc_receive->add_option("-i,--input,src", src_urls, "Source URI");
@@ -219,6 +226,8 @@ CLI::App* xtransmit::receive::add_subcommand(CLI::App& app, config& cfg, std::ve
 	sc_receive->add_option("--metricsfile", cfg.metrics_file, "Metrics output filename (default stdout)");
 	sc_receive->add_option("--metricsfreq", cfg.metrics_freq_ms, fmt::format("Metrics report frequency, ms (default {})", cfg.metrics_freq_ms))
 		->transform(CLI::AsNumberWithUnit(to_ms, CLI::AsNumberWithUnit::CASE_SENSITIVE));
+	sc_receive->add_option("--duration", cfg.duration, "Receiving duration in seconds (default 0 - no limit)")
+		->transform(CLI::AsNumberWithUnit(to_sec, CLI::AsNumberWithUnit::CASE_SENSITIVE));
 	sc_receive->add_option("--dump-to-file", cfg.dump_to_file, "Dump received payload to a file (default: none)");
 	sc_receive->add_flag("--twoway", cfg.send_reply, "Both send and receive data");
 
