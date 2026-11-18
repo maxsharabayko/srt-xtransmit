@@ -1,9 +1,12 @@
 #pragma once
+#include <exception>
 #include <map>
+#include <string>
+#include <utility>
 
 #if !defined(_WIN32)
 #include <sys/ioctl.h>
-typedef int SOCKET;
+using SOCKET = int;
 #define INVALID_SOCKET ((SOCKET)-1)
 #define closesocket close
 #endif
@@ -22,12 +25,12 @@ namespace socket
 class exception : public std::exception
 {
 public:
-	explicit exception(const std::string &&err)
-		: m_error_msg(err) // note "short string optimization" (SSO)
+	explicit exception(std::string err)
+		: m_error_msg(std::move(err))
 	{
 	}
 
-	virtual const char *what() const throw() { return m_error_msg.c_str(); }
+	const char *what() const noexcept override { return m_error_msg.c_str(); }
 
 private:
 	const std::string m_error_msg;
@@ -70,7 +73,7 @@ public:
 	 *
 	 * @throws socket::exception Thrown on failure.
 	 */
-	virtual const std::string get_statistics(std::string statistic_format, bool print_header) const { return std::string(); }
+	virtual std::string get_statistics(std::string statistic_format, bool print_header) const { return {}; }
 
 
 	virtual SOCKET id() const = 0;

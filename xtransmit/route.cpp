@@ -38,7 +38,7 @@ namespace route
 {
 
 	void route(shared_sock src, shared_sock dst,
-		const config& cfg, const string&& desc, const atomic_bool& force_break)
+		const config& cfg, const std::string& desc, const atomic_bool& force_break)
 	{
 		XTR_THREADNAME(std::string("XTR:Route"));
 		vector<char> buffer(cfg.message_size);
@@ -90,10 +90,12 @@ void xtransmit::route::run(const vector<string>& src_urls, const vector<string>&
 
 	try {
 		const bool write_stats = cfg.stats_file != "" && cfg.stats_freq_ms > 0;
-		// make_unique is not supported by GCC 4.8, only starting from GCC 4.9 :(
-		unique_ptr<socket::stats_writer> stats = write_stats
-			? unique_ptr<socket::stats_writer>(new socket::stats_writer(cfg.stats_file, cfg.stats_format, milliseconds(cfg.stats_freq_ms)))
-			: nullptr;
+		// Build now targets C++20, so make_unique is always available.
+		std::unique_ptr<socket::stats_writer> stats;
+		if (write_stats)
+		{
+			stats = std::make_unique<socket::stats_writer>(cfg.stats_file, cfg.stats_format, milliseconds(cfg.stats_freq_ms));
+		}
 
 		shared_sock_t listening_sock_a; // A shared pointer to store a listening socket for multiple connections.
 		shared_sock_t listening_sock_b; // A shared pointer to store a listening socket for multiple connections.
@@ -141,6 +143,3 @@ CLI::App* xtransmit::route::add_subcommand(CLI::App& app, config& cfg, vector<st
 
 	return sc_route;
 }
-
-
-

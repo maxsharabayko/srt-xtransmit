@@ -1,39 +1,39 @@
 #pragma once
+
 #include <chrono>
+#include <cstdint>
 #include <limits>
 #include <memory>
-#include <string>
+#include <mutex>
 #include <numeric>
+#include <string>
 #include <vector>
 
 // submodules
 #include "spdlog/spdlog.h"
 
 #include "buffer.hpp"
-#include "metrics_latency.hpp"      // Transmission Delay
-#include "metrics_jitter.hpp"       // Interarrival Jitter (RFC 3550)
 #include "metrics_delay_factor.hpp" // Time-Stamped Delay Factor (TS-DF) (EBU TECH 3337)
-#include "metrics_reorder.hpp"      // RFC 4737
 #include "metrics_integrity.hpp"
+#include "metrics_jitter.hpp"       // Interarrival Jitter (RFC 3550)
+#include "metrics_latency.hpp"      // Transmission Delay
+#include "metrics_reorder.hpp"      // RFC 4737
 
 namespace xtransmit
 {
 namespace metrics
 {
-	using namespace std;
-	using namespace std::chrono;
-
 	//#define LOG_SC_METRICS "METRIC "
 
-	void write_sysclock_timestamp(vector<char>& payload);
-	system_clock::time_point read_sysclock_timestamp(const const_buffer& payload);
-	void write_steadyclock_timestamp(vector<char>& payload);
-	steady_clock::time_point read_stdclock_timestamp(const const_buffer& payload);
-	void write_packet_seqno(vector<char>& payload, uint64_t seqno);
+	void write_sysclock_timestamp(std::vector<char>& payload);
+	std::chrono::system_clock::time_point read_sysclock_timestamp(const const_buffer& payload);
+	void write_steadyclock_timestamp(std::vector<char>& payload);
+	std::chrono::steady_clock::time_point read_stdclock_timestamp(const const_buffer& payload);
+	void write_packet_seqno(std::vector<char>& payload, uint64_t seqno);
 	uint64_t read_packet_seqno(const const_buffer& payload);
-	void write_packet_length(vector<char>& payload, uint64_t length);
+	void write_packet_length(std::vector<char>& payload, uint64_t length);
 	uint64_t read_packet_length(const const_buffer& payload);
-	void write_packet_checksum(vector<char>& payload);
+	void write_packet_checksum(std::vector<char>& payload);
 	/// @brief Check if the MD5 checksum of the packet is correct.
 	/// @param payload the payload
 	/// @return true if the checksum is correct, false otherwise.
@@ -43,15 +43,15 @@ namespace metrics
 	{
 	public:
 		explicit generator(bool enable_metrics)
-			 :m_enable_metrics(enable_metrics)
+			: m_enable_metrics(enable_metrics)
 		{}
 
 	public:
-		inline void generate_payload(vector<char>& payload)
+		inline void generate_payload(std::vector<char>& payload)
 		{
 			const int seqno = m_seqno++;
 			// Using data() instead of begin() significantly improves performance. See #104.
-			iota(payload.data(), payload.data() + payload.size(), static_cast<char>(seqno));
+			std::iota(payload.data(), payload.data() + payload.size(), static_cast<char>(seqno));
 			if (!m_enable_metrics)
 				return;
 
@@ -64,21 +64,21 @@ namespace metrics
 
 	private:
 		const bool m_enable_metrics;
-		uint64_t m_seqno = 0;
+		uint64_t   m_seqno = 0;
 	};
 
 	class validator
 	{
 	public:
-		validator(int id) : m_id(id) {}
+		explicit validator(int id) : m_id(id) {}
 
 		inline void validate_packet(const const_buffer& payload)
 		{
 			std::lock_guard<std::mutex> lock(m_mtx);
-			const auto sys_time_now = system_clock::now();
-			const auto std_time_now = steady_clock::now();
-			
-			const uint64_t pktseqno  = read_packet_seqno(payload);
+			const auto sys_time_now = std::chrono::system_clock::now();
+			const auto std_time_now = std::chrono::steady_clock::now();
+
+			const uint64_t pktseqno = read_packet_seqno(payload);
 			const auto std_timestamp = read_stdclock_timestamp(payload);
 			const auto sys_timestamp = read_sysclock_timestamp(payload);
 			const uint64_t pktlength = read_packet_length(payload);
@@ -112,7 +112,6 @@ namespace metrics
 		integrity m_integrity;
 		mutable std::mutex m_mtx;
 	};
-
 
 } // namespace metrics
 } // namespace xtransmit

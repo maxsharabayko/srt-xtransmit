@@ -189,10 +189,10 @@ void common_run(const vector<string>& urls, const stats_config& cfg_stats, const
 
 	if (write_stats)
 	{
-		// make_unique is not supported by GCC 4.8, only starting from GCC 4.9 :(
+		// Build now targets C++20, so make_unique is always available.
 		try {
-			stats = unique_ptr<socket::stats_writer>(
-				new socket::stats_writer(cfg_stats.stats_file, cfg_stats.stats_format, milliseconds(cfg_stats.stats_freq_ms)));
+			stats = std::make_unique<socket::stats_writer>(
+				cfg_stats.stats_file, cfg_stats.stats_format, milliseconds(cfg_stats.stats_freq_ms));
 		}
 		catch (const socket::exception& e)
 		{

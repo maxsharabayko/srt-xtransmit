@@ -50,9 +50,15 @@ void run_pipe(shared_sock dst, const config& cfg, std::function<void(int conn_id
 	auto stat_time = steady_clock::now();
 	int  prev_i    = 0;
 
-	unique_ptr<ipacer> ratepacer =
-		cfg.sendrate ? unique_ptr<ipacer>(new pacer(cfg.sendrate, cfg.message_size, cfg.spin_wait))
-					 : (!cfg.playback_csv.empty() ? unique_ptr<ipacer>(new csv_pacer(cfg.playback_csv)) : nullptr);
+	std::unique_ptr<ipacer> ratepacer;
+	if (cfg.sendrate)
+	{
+		ratepacer = std::make_unique<pacer>(cfg.sendrate, cfg.message_size, cfg.spin_wait);
+	}
+	else if (!cfg.playback_csv.empty())
+	{
+		ratepacer = std::make_unique<csv_pacer>(cfg.playback_csv);
+	}
 
 	try
 	{

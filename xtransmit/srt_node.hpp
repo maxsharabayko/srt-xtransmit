@@ -1,18 +1,21 @@
-#include <thread>
-#include <list>
-#include <queue>
 #include <atomic>
-#include <mutex>
 #include <future>
+#include <list>
+#include <map>
+#include <mutex>
+#include <queue>
+#include <string>
+#include <set>
+#include <thread>
+
 #include "srt.h"
 #include "uriparser.hpp"
 //#include "testmedia.hpp"
 #include "utilities.h"
 
-using namespace std;
-
 class SrtNode
 {
+    using string = std::string;
 public:
     SrtNode(const UriParser &src_uri);
     ~SrtNode();
@@ -20,7 +23,7 @@ public:
 public:
     int Listen(int max_conn);
     int Connect();
-    std::future<SRTSOCKET> AcceptConnection(const volatile std::atomic_bool& force_break);
+    std::future<SRTSOCKET> AcceptConnection(const std::atomic_bool& force_break);
     void Close() { m_stop_accept = true; }
 
 public:
@@ -41,7 +44,7 @@ public:
 private:
     int EstablishConnection(bool caller, int max_conn);
 
-    SRTSOCKET AcceptingThread(const volatile std::atomic_bool& force_break);
+    SRTSOCKET AcceptingThread(const std::atomic_bool& force_break);
 
     SRTSOCKET AcceptNewClient();
 
@@ -71,5 +74,3 @@ private:    // Configuration
     int m_port;
     std::map<string, string> m_options; // All other options, as provided in the URI
 };
-
-

@@ -153,7 +153,7 @@ shared_srt socket::srt::accept()
 	return make_shared<srt>(sock, m_blocking_mode);
 }
 
-void socket::srt::raise_exception(const string &&place) const
+void socket::srt::raise_exception(const std::string& place) const
 {
 	const int    udt_result = srt_getlasterror(nullptr);
 	const string message = srt_getlasterror_str();
@@ -161,7 +161,7 @@ void socket::srt::raise_exception(const string &&place) const
 	throw socket::exception(place + ": " + message);
 }
 
-void socket::srt::raise_exception(const string &&place, const string &&reason) const
+void socket::srt::raise_exception(const std::string& place, const std::string& reason) const
 {
 	spdlog::debug(LOG_SOCK_SRT "@{} {}. ERROR: {}.", m_bind_socket, place, reason);
 	throw socket::exception(place + ": " + reason);
@@ -249,15 +249,10 @@ std::future<shared_srt> socket::srt::async_read(std::vector<char> &buffer)
 
 void socket::srt::assert_options_valid(const std::map<string, string>& options, const unordered_set<string>& extra)
 {
-#ifdef ENABLE_CXX17
-	for (const auto& [key, val] : options)
-	{
-#else
 	for (const auto& el : options)
 	{
 		const string& key = el.first;
 		const string& val = el.second;
-#endif
 		bool opt_found = false;
 		for (const auto& o : srt_options)
 		{
@@ -563,7 +558,7 @@ int socket::srt::statistics(SRT_TRACEBSTATS& stats, bool instant)
 	return srt_bstats(m_bind_socket, &stats, instant);
 }
 
-const string socket::srt::stats_to_csv(int socketid, const SRT_TRACEBSTATS& stats, bool print_header)
+std::string socket::srt::stats_to_csv(int socketid, const SRT_TRACEBSTATS& stats, bool print_header)
 {
 	std::ostringstream output;
 
@@ -704,7 +699,7 @@ const nlohmann::json socket::srt::stats_to_json(int socketid, const SRT_TRACEBST
 	return root;
 }
 
-const string socket::srt::get_statistics(string stats_format, bool print_header) const
+std::string socket::srt::get_statistics(std::string stats_format, bool print_header) const
 {
 	SRT_TRACEBSTATS stats;
 	if (SRT_ERROR == srt_bstats(m_bind_socket, &stats, true))

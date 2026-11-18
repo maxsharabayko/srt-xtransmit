@@ -1,5 +1,6 @@
 #include <cstdio>
 #include <cstring>
+#include <atomic>
 #include <vector>
 #include <iostream>
 #include <thread>
@@ -32,9 +33,7 @@ atomic_bool force_break(false);
 
 void OnINT_ForceExit(int)
 {
-	cerr << "\n-------- REQUESTED INTERRUPT!\n";
 	force_break = true;
-	srt_cleanup();
 }
 
 struct NetworkInit

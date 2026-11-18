@@ -27,7 +27,7 @@ namespace xtransmit
  */
 class mutable_buffer
 {
-  public:
+public:
 	/// Construct an empty buffer.
 	mutable_buffer() noexcept : data_(nullptr), size_(0) {}
 
@@ -52,7 +52,7 @@ class mutable_buffer
 		return *this;
 	}
 
-  private:
+private:
 	void *      data_;
 	std::size_t size_;
 };
@@ -81,7 +81,7 @@ class mutable_buffer
  */
 class const_buffer
 {
-  public:
+public:
 	/// Construct an empty buffer.
 	const_buffer() noexcept
 	    : data_(nullptr)
@@ -121,7 +121,7 @@ class const_buffer
 		return *this;
 	}
 
-  private:
+private:
 	const void *data_;
 	std::size_t size_;
 };

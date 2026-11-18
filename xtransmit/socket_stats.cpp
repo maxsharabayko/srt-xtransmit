@@ -82,11 +82,7 @@ future<void> xtransmit::socket::stats_writer::launch()
 		const string& format,
 		bool print_header)
 	{
-#ifdef ENABLE_CXX17
-		scoped_lock<mutex> lock(stats_lock);
-#else
-		lock_guard<mutex> lock(stats_lock);
-#endif
+		std::lock_guard<std::mutex> lock(stats_lock);
 		for (auto& it : sock_vector)
 		{
 			if (!it.second)
