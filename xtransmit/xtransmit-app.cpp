@@ -30,6 +30,12 @@ using namespace std;
 
 atomic_bool force_break(false);
 
+namespace xtransmit {
+#ifdef __linux__
+bool g_udp_mode_bulk = false;
+#endif
+}
+
 void OnINT_ForceExit(int)
 {
 	cerr << "\n-------- REQUESTED INTERRUPT!\n";
@@ -176,6 +182,17 @@ int main(int argc, char** argv)
 			return true;
 		},
 		"log level [debug, error, note, info, fatal]");
+
+#ifdef __linux__
+    app.add_option(
+        "--udp-mode",
+        [](CLI::results_t val) {
+            if (val[0] == "bulk")
+                ::xtransmit::g_udp_mode_bulk = true;
+            return true;
+        },
+        "UDP mode: simple or bulk [Linux only]");
+#endif
 
 	const string logfa_desc = create_srt_logfa_description();
 	app.add_option(

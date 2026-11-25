@@ -14,6 +14,9 @@ namespace xtransmit {
 
 #define LOG_SC_CONN "CONN "
 
+#ifdef __linux__
+extern bool g_udp_mode_bulk;
+#endif
 
 shared_sock_t create_connection(const vector<UriParser>& parsed_urls, shared_sock_t& listening_sock)
 {
@@ -50,6 +53,10 @@ shared_sock_t create_connection(const vector<UriParser>& parsed_urls, shared_soc
 
 	if (uri.type() == UriParser::UDP)
 	{
+#ifdef __linux__
+        if (g_udp_mode_bulk)
+            return make_shared<socket::mudp>(uri);
+#endif
 		return make_shared<socket::udp>(uri);
 	}
 
