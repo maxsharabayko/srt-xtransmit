@@ -13,7 +13,6 @@
 
 // OpenSRT
 #include "srt.h"
-#include "udt.h"
 #include "uriparser.hpp"
 #include "netinet_any.h"
 

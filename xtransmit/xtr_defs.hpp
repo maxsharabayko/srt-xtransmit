@@ -1,7 +1,10 @@
 #pragma once
 #include "srt.h"
 
-#if SRT_VERSION_VALUE >= SRT_MAKE_VERSION(1, 5, 0)
+#if SRT_VERSION_VALUE >= SRT_MAKE_VERSION(1, 6, 0)
+#include "hvu_threadname.h"
+#define XTR_THREADNAME(name) hvu::ThreadName tn(name);
+#elif SRT_VERSION_VALUE >= SRT_MAKE_VERSION(1, 5, 0)
 #include "threadname.h" // srt::ThreadName
 #define XTR_THREADNAME(name) srt::ThreadName tn(name);
 #else
