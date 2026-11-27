@@ -9,7 +9,9 @@
 #include "misc.hpp"
 #include "uriparser.hpp"  // UriParser
 #include "socketoptions.hpp"
+#if SRT_VERSION_VALUE < SRT_MAKE_VERSION(1, 6, 0)
 #include "logsupport.hpp"
+#endif
 #include "verbose.hpp"
 #include "srt_node.hpp"
 

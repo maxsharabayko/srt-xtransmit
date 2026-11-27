@@ -20,17 +20,24 @@
 #include "socketoptions.hpp"
 #include "apputil.hpp"
 
-using namespace std;
-using namespace xtransmit;
-using shared_srt_group = shared_ptr<socket::srt_group>;
-
-
+#if SRT_VERSION_VALUE < SRT_MAKE_VERSION(1, 6, 0)
 namespace srt_logging
 {
 	// Defined in srtcore/common.h. Don't use directly because it includes sync.h.
 	// Otherwise xtransmit has to inherit ENABLE_STDCXX_SYNC and related preprocessir definitions.
 	std::string SockStatusStr(SRT_SOCKSTATUS);
 }
+using srt_logging::SockStatusStr;
+#else
+// srtcode/common.h split into parts; you can safely include the header
+#include "common_debug.h"
+using srt::SockStatusStr;
+#endif
+
+using namespace std;
+using namespace xtransmit;
+using shared_srt_group = shared_ptr<socket::srt_group>;
+
 
 namespace xtransmit
 {
@@ -987,7 +994,7 @@ const string socket::srt_group::get_statistics_csv(bool print_header) const {
 
 		if (group_data[i].sockstate != SRTS_CONNECTED)
 		{
-			spdlog::trace(LOG_SRT_GROUP "@{} get_statistics_csv: Socket @{} state is {}, skipping.", m_bind_socket, id, srt_logging::SockStatusStr(status));
+			spdlog::trace(LOG_SRT_GROUP "@{} get_statistics_csv: Socket @{} state is {}, skipping.", m_bind_socket, id, SockStatusStr(status));
 			continue;
 		}
 
@@ -1036,7 +1043,7 @@ const string socket::srt_group::get_statistics_json() const {
 
 		if (group_data[i].sockstate != SRTS_CONNECTED)
 		{
-			spdlog::trace(LOG_SRT_GROUP "@{} get_statistics_json: Socket 0x{:X} state is {}, skipping.", m_bind_socket, id, srt_logging::SockStatusStr(status));
+			spdlog::trace(LOG_SRT_GROUP "@{} get_statistics_json: Socket 0x{:X} state is {}, skipping.", m_bind_socket, id, SockStatusStr(status));
 			continue;
 		}
 

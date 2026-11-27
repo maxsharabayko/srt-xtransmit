@@ -14,8 +14,18 @@
 #include "apputil.hpp"
 #include "uriparser.hpp"
 #include "srt_node.hpp"
-#include "logsupport.hpp"
 #include "verbose.hpp"
+
+#if SRT_VERSION_VALUE >= SRT_MAKE_VERSION(1, 6, 0)
+#include "logging_api.h"
+#include "logger_fas.h"
+#define SrtParseLogLevel hvu::logging::parse_level
+inline auto SrtParseLogFA(const std::string& faspec) { return hvu::logging::parse_fa(srt::logging::logger_config(), faspec); }
+inline std::map<string, int> SrtLogFAList() { return srt::logging::logger_config().name_map(); }
+namespace srt_logging = hvu::logging;
+#else
+#include "logsupport.hpp"
+#endif
 
 #include "srt_socket.hpp"
 
@@ -145,7 +155,7 @@ int main(int argc, char** argv)
 	app.add_option(
 		"--loglevel",
 		[](CLI::results_t val) {
-			srt_logging::LogLevel::type lev = SrtParseLogLevel(val[0]);
+			auto lev = SrtParseLogLevel(val[0]);
 			srt_setloglevel(lev);
 
 			// Uncovered spdlog levels:
@@ -181,10 +191,10 @@ int main(int argc, char** argv)
 	app.add_option(
 		"--logfa",
 		[](CLI::results_t val) {
-			set<srt_logging::LogFA> fas = SrtParseLogFA(val[0]);
+			auto fas = SrtParseLogFA(val[0]);
 			srt_resetlogfa(nullptr, 0);
-			for (set<srt_logging::LogFA>::iterator i = fas.begin(); i != fas.end(); ++i)
-				srt_addlogfa(*i);
+            for (auto fai: fas)
+				srt_addlogfa(fai);
 
 			spdlog::info("SRT log FAs enabled: {}", val[0]);
 			return true;
